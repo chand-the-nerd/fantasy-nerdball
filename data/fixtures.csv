@@ -1,0 +1,381 @@
+fixture_id,gameweek,kickoff_time,home_team,away_team,home_team_short,away_team_short,home_difficulty,away_difficulty,home_score,away_score,finished
+1,1,2025-08-15T19:00:00Z,Liverpool,Bournemouth,LIV,BOU,3,5,,,False
+2,1,2025-08-16T11:30:00Z,Aston Villa,Newcastle,AVL,NEW,3,4,,,False
+3,1,2025-08-16T14:00:00Z,Brighton,Fulham,BHA,FUL,3,3,,,False
+6,1,2025-08-16T14:00:00Z,Spurs,Burnley,TOT,BUR,2,3,,,False
+5,1,2025-08-16T14:00:00Z,Sunderland,West Ham,SUN,WHU,2,2,,,False
+7,1,2025-08-16T16:30:00Z,Wolves,Man City,WOL,MCI,4,3,,,False
+8,1,2025-08-17T13:00:00Z,Chelsea,Crystal Palace,CHE,CRY,3,4,,,False
+4,1,2025-08-17T13:00:00Z,Nott'm Forest,Brentford,NFO,BRE,3,3,,,False
+9,1,2025-08-17T15:30:00Z,Man Utd,Arsenal,MUN,ARS,4,3,,,False
+10,1,2025-08-18T19:00:00Z,Leeds,Everton,LEE,EVE,2,2,,,False
+20,2,2025-08-22T19:00:00Z,West Ham,Chelsea,WHU,CHE,3,2,,,False
+18,2,2025-08-23T11:30:00Z,Man City,Spurs,MCI,TOT,3,4,,,False
+12,2,2025-08-23T14:00:00Z,Bournemouth,Wolves,BOU,WOL,2,3,,,False
+13,2,2025-08-23T14:00:00Z,Brentford,Aston Villa,BRE,AVL,3,3,,,False
+14,2,2025-08-23T14:00:00Z,Burnley,Sunderland,BUR,SUN,2,2,,,False
+11,2,2025-08-23T16:30:00Z,Arsenal,Leeds,ARS,LEE,2,4,,,False
+15,2,2025-08-24T13:00:00Z,Crystal Palace,Nott'm Forest,CRY,NFO,3,3,,,False
+16,2,2025-08-24T13:00:00Z,Everton,Brighton,EVE,BHA,3,3,,,False
+17,2,2025-08-24T15:30:00Z,Fulham,Man Utd,FUL,MUN,3,3,,,False
+19,2,2025-08-25T19:00:00Z,Newcastle,Liverpool,NEW,LIV,4,4,,,False
+23,3,2025-08-30T11:30:00Z,Chelsea,Fulham,CHE,FUL,3,4,,,False
+26,3,2025-08-30T14:00:00Z,Man Utd,Burnley,MUN,BUR,2,3,,,False
+29,3,2025-08-30T14:00:00Z,Spurs,Bournemouth,TOT,BOU,3,3,,,False
+28,3,2025-08-30T14:00:00Z,Sunderland,Brentford,SUN,BRE,3,2,,,False
+30,3,2025-08-30T14:00:00Z,Wolves,Everton,WOL,EVE,2,3,,,False
+24,3,2025-08-30T16:30:00Z,Leeds,Newcastle,LEE,NEW,3,2,,,False
+22,3,2025-08-31T13:00:00Z,Brighton,Man City,BHA,MCI,4,3,,,False
+27,3,2025-08-31T13:00:00Z,Nott'm Forest,West Ham,NFO,WHU,2,3,,,False
+25,3,2025-08-31T15:30:00Z,Liverpool,Arsenal,LIV,ARS,4,5,,,False
+21,3,2025-08-31T18:00:00Z,Aston Villa,Crystal Palace,AVL,CRY,3,4,,,False
+31,4,2025-09-13T11:30:00Z,Arsenal,Nott'm Forest,ARS,NFO,3,4,,,False
+32,4,2025-09-13T14:00:00Z,Bournemouth,Brighton,BOU,BHA,3,3,,,False
+35,4,2025-09-13T14:00:00Z,Crystal Palace,Sunderland,CRY,SUN,2,3,,,False
+36,4,2025-09-13T14:00:00Z,Everton,Aston Villa,EVE,AVL,3,3,,,False
+37,4,2025-09-13T14:00:00Z,Fulham,Leeds,FUL,LEE,2,3,,,False
+39,4,2025-09-13T14:00:00Z,Newcastle,Wolves,NEW,WOL,2,4,,,False
+40,4,2025-09-13T16:30:00Z,West Ham,Spurs,WHU,TOT,3,2,,,False
+33,4,2025-09-13T19:00:00Z,Brentford,Chelsea,BRE,CHE,3,3,,,False
+34,4,2025-09-14T13:00:00Z,Burnley,Liverpool,BUR,LIV,4,2,,,False
+38,4,2025-09-14T15:30:00Z,Man City,Man Utd,MCI,MUN,3,4,,,False
+46,5,2025-09-20T11:30:00Z,Liverpool,Everton,LIV,EVE,2,5,,,False
+42,5,2025-09-20T14:00:00Z,Bournemouth,Newcastle,BOU,NEW,3,3,,,False
+43,5,2025-09-20T14:00:00Z,Brighton,Spurs,BHA,TOT,3,3,,,False
+44,5,2025-09-20T14:00:00Z,Burnley,Nott'm Forest,BUR,NFO,3,2,,,False
+49,5,2025-09-20T14:00:00Z,West Ham,Crystal Palace,WHU,CRY,3,2,,,False
+50,5,2025-09-20T14:00:00Z,Wolves,Leeds,WOL,LEE,2,3,,,False
+47,5,2025-09-20T16:30:00Z,Man Utd,Chelsea,MUN,CHE,3,3,,,False
+45,5,2025-09-20T19:00:00Z,Fulham,Brentford,FUL,BRE,3,3,,,False
+48,5,2025-09-21T13:00:00Z,Sunderland,Aston Villa,SUN,AVL,3,2,,,False
+41,5,2025-09-21T15:30:00Z,Arsenal,Man City,ARS,MCI,4,4,,,False
+52,6,2025-09-27T11:30:00Z,Brentford,Man Utd,BRE,MUN,3,3,,,False
+51,6,2025-09-27T14:00:00Z,Aston Villa,Fulham,AVL,FUL,3,4,,,False
+53,6,2025-09-27T14:00:00Z,Chelsea,Brighton,CHE,BHA,3,4,,,False
+54,6,2025-09-27T14:00:00Z,Crystal Palace,Liverpool,CRY,LIV,4,3,,,False
+56,6,2025-09-27T14:00:00Z,Leeds,Bournemouth,LEE,BOU,3,2,,,False
+57,6,2025-09-27T14:00:00Z,Man City,Burnley,MCI,BUR,2,4,,,False
+59,6,2025-09-27T16:30:00Z,Nott'm Forest,Sunderland,NFO,SUN,2,3,,,False
+60,6,2025-09-28T13:00:00Z,Spurs,Wolves,TOT,WOL,2,3,,,False
+58,6,2025-09-28T15:30:00Z,Newcastle,Arsenal,NEW,ARS,4,4,,,False
+55,6,2025-09-29T19:00:00Z,Everton,West Ham,EVE,WHU,2,3,,,False
+61,7,2025-10-04T14:00:00Z,Arsenal,West Ham,ARS,WHU,2,4,,,False
+62,7,2025-10-04T14:00:00Z,Aston Villa,Burnley,AVL,BUR,2,4,,,False
+63,7,2025-10-04T14:00:00Z,Bournemouth,Fulham,BOU,FUL,3,3,,,False
+64,7,2025-10-04T14:00:00Z,Brentford,Man City,BRE,MCI,4,3,,,False
+65,7,2025-10-04T14:00:00Z,Chelsea,Liverpool,CHE,LIV,4,4,,,False
+66,7,2025-10-04T14:00:00Z,Everton,Crystal Palace,EVE,CRY,3,3,,,False
+67,7,2025-10-04T14:00:00Z,Leeds,Spurs,LEE,TOT,3,2,,,False
+68,7,2025-10-04T14:00:00Z,Man Utd,Sunderland,MUN,SUN,2,3,,,False
+69,7,2025-10-04T14:00:00Z,Newcastle,Nott'm Forest,NEW,NFO,3,4,,,False
+70,7,2025-10-04T14:00:00Z,Wolves,Brighton,WOL,BHA,3,3,,,False
+71,8,2025-10-18T14:00:00Z,Brighton,Newcastle,BHA,NEW,3,3,,,False
+72,8,2025-10-18T14:00:00Z,Burnley,Leeds,BUR,LEE,2,2,,,False
+73,8,2025-10-18T14:00:00Z,Crystal Palace,Bournemouth,CRY,BOU,3,3,,,False
+74,8,2025-10-18T14:00:00Z,Fulham,Arsenal,FUL,ARS,4,3,,,False
+75,8,2025-10-18T14:00:00Z,Liverpool,Man Utd,LIV,MUN,3,5,,,False
+76,8,2025-10-18T14:00:00Z,Man City,Everton,MCI,EVE,2,4,,,False
+77,8,2025-10-18T14:00:00Z,Nott'm Forest,Chelsea,NFO,CHE,3,3,,,False
+79,8,2025-10-18T14:00:00Z,Spurs,Aston Villa,TOT,AVL,3,3,,,False
+78,8,2025-10-18T14:00:00Z,Sunderland,Wolves,SUN,WOL,2,2,,,False
+80,8,2025-10-18T14:00:00Z,West Ham,Brentford,WHU,BRE,3,2,,,False
+81,9,2025-10-25T14:00:00Z,Arsenal,Crystal Palace,ARS,CRY,3,4,,,False
+82,9,2025-10-25T14:00:00Z,Aston Villa,Man City,AVL,MCI,4,4,,,False
+83,9,2025-10-25T14:00:00Z,Bournemouth,Nott'm Forest,BOU,NFO,3,3,,,False
+84,9,2025-10-25T14:00:00Z,Brentford,Liverpool,BRE,LIV,4,3,,,False
+85,9,2025-10-25T14:00:00Z,Chelsea,Sunderland,CHE,SUN,2,4,,,False
+86,9,2025-10-25T14:00:00Z,Everton,Spurs,EVE,TOT,3,3,,,False
+87,9,2025-10-25T14:00:00Z,Leeds,West Ham,LEE,WHU,2,2,,,False
+88,9,2025-10-25T14:00:00Z,Man Utd,Brighton,MUN,BHA,3,3,,,False
+89,9,2025-10-25T14:00:00Z,Newcastle,Fulham,NEW,FUL,3,4,,,False
+90,9,2025-10-25T14:00:00Z,Wolves,Burnley,WOL,BUR,2,3,,,False
+91,10,2025-11-01T15:00:00Z,Brighton,Leeds,BHA,LEE,2,3,,,False
+92,10,2025-11-01T15:00:00Z,Burnley,Arsenal,BUR,ARS,4,2,,,False
+93,10,2025-11-01T15:00:00Z,Crystal Palace,Brentford,CRY,BRE,3,3,,,False
+94,10,2025-11-01T15:00:00Z,Fulham,Wolves,FUL,WOL,2,3,,,False
+95,10,2025-11-01T15:00:00Z,Liverpool,Aston Villa,LIV,AVL,3,5,,,False
+96,10,2025-11-01T15:00:00Z,Man City,Bournemouth,MCI,BOU,3,4,,,False
+97,10,2025-11-01T15:00:00Z,Nott'm Forest,Man Utd,NFO,MUN,3,3,,,False
+99,10,2025-11-01T15:00:00Z,Spurs,Chelsea,TOT,CHE,3,3,,,False
+98,10,2025-11-01T15:00:00Z,Sunderland,Everton,SUN,EVE,2,2,,,False
+100,10,2025-11-01T15:00:00Z,West Ham,Newcastle,WHU,NEW,3,2,,,False
+101,11,2025-11-08T15:00:00Z,Aston Villa,Bournemouth,AVL,BOU,3,4,,,False
+102,11,2025-11-08T15:00:00Z,Brentford,Newcastle,BRE,NEW,3,3,,,False
+103,11,2025-11-08T15:00:00Z,Chelsea,Wolves,CHE,WOL,2,4,,,False
+104,11,2025-11-08T15:00:00Z,Crystal Palace,Brighton,CRY,BHA,3,3,,,False
+105,11,2025-11-08T15:00:00Z,Everton,Fulham,EVE,FUL,3,3,,,False
+106,11,2025-11-08T15:00:00Z,Man City,Liverpool,MCI,LIV,4,4,,,False
+107,11,2025-11-08T15:00:00Z,Nott'm Forest,Leeds,NFO,LEE,2,3,,,False
+109,11,2025-11-08T15:00:00Z,Spurs,Man Utd,TOT,MUN,3,3,,,False
+108,11,2025-11-08T15:00:00Z,Sunderland,Arsenal,SUN,ARS,4,2,,,False
+110,11,2025-11-08T15:00:00Z,West Ham,Burnley,WHU,BUR,2,2,,,False
+111,12,2025-11-22T15:00:00Z,Arsenal,Spurs,ARS,TOT,3,4,,,False
+112,12,2025-11-22T15:00:00Z,Bournemouth,West Ham,BOU,WHU,2,3,,,False
+113,12,2025-11-22T15:00:00Z,Brighton,Brentford,BHA,BRE,3,3,,,False
+114,12,2025-11-22T15:00:00Z,Burnley,Chelsea,BUR,CHE,3,2,,,False
+115,12,2025-11-22T15:00:00Z,Fulham,Sunderland,FUL,SUN,2,3,,,False
+116,12,2025-11-22T15:00:00Z,Leeds,Aston Villa,LEE,AVL,3,2,,,False
+117,12,2025-11-22T15:00:00Z,Liverpool,Nott'm Forest,LIV,NFO,3,5,,,False
+118,12,2025-11-22T15:00:00Z,Man Utd,Everton,MUN,EVE,2,3,,,False
+119,12,2025-11-22T15:00:00Z,Newcastle,Man City,NEW,MCI,4,4,,,False
+120,12,2025-11-22T15:00:00Z,Wolves,Crystal Palace,WOL,CRY,3,3,,,False
+121,13,2025-11-29T15:00:00Z,Aston Villa,Wolves,AVL,WOL,2,4,,,False
+122,13,2025-11-29T15:00:00Z,Brentford,Burnley,BRE,BUR,2,3,,,False
+123,13,2025-11-29T15:00:00Z,Chelsea,Arsenal,CHE,ARS,4,4,,,False
+124,13,2025-11-29T15:00:00Z,Crystal Palace,Man Utd,CRY,MUN,3,3,,,False
+125,13,2025-11-29T15:00:00Z,Everton,Newcastle,EVE,NEW,3,3,,,False
+126,13,2025-11-29T15:00:00Z,Man City,Leeds,MCI,LEE,2,4,,,False
+127,13,2025-11-29T15:00:00Z,Nott'm Forest,Brighton,NFO,BHA,3,3,,,False
+129,13,2025-11-29T15:00:00Z,Spurs,Fulham,TOT,FUL,3,3,,,False
+128,13,2025-11-29T15:00:00Z,Sunderland,Bournemouth,SUN,BOU,3,2,,,False
+130,13,2025-11-29T15:00:00Z,West Ham,Liverpool,WHU,LIV,4,2,,,False
+131,14,2025-12-03T20:00:00Z,Arsenal,Brentford,ARS,BRE,3,4,,,False
+132,14,2025-12-03T20:00:00Z,Bournemouth,Everton,BOU,EVE,2,3,,,False
+133,14,2025-12-03T20:00:00Z,Brighton,Aston Villa,BHA,AVL,3,3,,,False
+134,14,2025-12-03T20:00:00Z,Burnley,Crystal Palace,BUR,CRY,3,2,,,False
+135,14,2025-12-03T20:00:00Z,Fulham,Man City,FUL,MCI,4,3,,,False
+136,14,2025-12-03T20:00:00Z,Leeds,Chelsea,LEE,CHE,3,2,,,False
+137,14,2025-12-03T20:00:00Z,Liverpool,Sunderland,LIV,SUN,2,5,,,False
+138,14,2025-12-03T20:00:00Z,Man Utd,West Ham,MUN,WHU,2,3,,,False
+139,14,2025-12-03T20:00:00Z,Newcastle,Spurs,NEW,TOT,3,4,,,False
+140,14,2025-12-03T20:00:00Z,Wolves,Nott'm Forest,WOL,NFO,3,3,,,False
+141,15,2025-12-06T15:00:00Z,Aston Villa,Arsenal,AVL,ARS,4,4,,,False
+142,15,2025-12-06T15:00:00Z,Bournemouth,Chelsea,BOU,CHE,3,3,,,False
+143,15,2025-12-06T15:00:00Z,Brighton,West Ham,BHA,WHU,2,3,,,False
+144,15,2025-12-06T15:00:00Z,Everton,Nott'm Forest,EVE,NFO,3,3,,,False
+145,15,2025-12-06T15:00:00Z,Fulham,Crystal Palace,FUL,CRY,3,3,,,False
+146,15,2025-12-06T15:00:00Z,Leeds,Liverpool,LEE,LIV,4,2,,,False
+147,15,2025-12-06T15:00:00Z,Man City,Sunderland,MCI,SUN,2,4,,,False
+148,15,2025-12-06T15:00:00Z,Newcastle,Burnley,NEW,BUR,2,4,,,False
+149,15,2025-12-06T15:00:00Z,Spurs,Brentford,TOT,BRE,3,3,,,False
+150,15,2025-12-06T15:00:00Z,Wolves,Man Utd,WOL,MUN,3,3,,,False
+151,16,2025-12-13T15:00:00Z,Arsenal,Wolves,ARS,WOL,2,4,,,False
+152,16,2025-12-13T15:00:00Z,Brentford,Leeds,BRE,LEE,2,3,,,False
+153,16,2025-12-13T15:00:00Z,Burnley,Fulham,BUR,FUL,3,2,,,False
+154,16,2025-12-13T15:00:00Z,Chelsea,Everton,CHE,EVE,2,4,,,False
+155,16,2025-12-13T15:00:00Z,Crystal Palace,Man City,CRY,MCI,4,3,,,False
+156,16,2025-12-13T15:00:00Z,Liverpool,Brighton,LIV,BHA,3,5,,,False
+157,16,2025-12-13T15:00:00Z,Man Utd,Bournemouth,MUN,BOU,3,3,,,False
+158,16,2025-12-13T15:00:00Z,Nott'm Forest,Spurs,NFO,TOT,3,3,,,False
+159,16,2025-12-13T15:00:00Z,Sunderland,Newcastle,SUN,NEW,3,2,,,False
+160,16,2025-12-13T15:00:00Z,West Ham,Aston Villa,WHU,AVL,3,2,,,False
+161,17,2025-12-20T15:00:00Z,Aston Villa,Man Utd,AVL,MUN,3,4,,,False
+162,17,2025-12-20T15:00:00Z,Bournemouth,Burnley,BOU,BUR,2,3,,,False
+163,17,2025-12-20T15:00:00Z,Brighton,Sunderland,BHA,SUN,2,3,,,False
+164,17,2025-12-20T15:00:00Z,Everton,Arsenal,EVE,ARS,4,3,,,False
+165,17,2025-12-20T15:00:00Z,Fulham,Nott'm Forest,FUL,NFO,3,3,,,False
+166,17,2025-12-20T15:00:00Z,Leeds,Crystal Palace,LEE,CRY,3,2,,,False
+167,17,2025-12-20T15:00:00Z,Man City,West Ham,MCI,WHU,2,4,,,False
+168,17,2025-12-20T15:00:00Z,Newcastle,Chelsea,NEW,CHE,3,4,,,False
+169,17,2025-12-20T15:00:00Z,Spurs,Liverpool,TOT,LIV,4,3,,,False
+170,17,2025-12-20T15:00:00Z,Wolves,Brentford,WOL,BRE,3,3,,,False
+171,18,2025-12-27T15:00:00Z,Arsenal,Brighton,ARS,BHA,3,4,,,False
+172,18,2025-12-27T15:00:00Z,Brentford,Bournemouth,BRE,BOU,3,3,,,False
+173,18,2025-12-27T15:00:00Z,Burnley,Everton,BUR,EVE,2,2,,,False
+174,18,2025-12-27T15:00:00Z,Chelsea,Aston Villa,CHE,AVL,3,4,,,False
+175,18,2025-12-27T15:00:00Z,Crystal Palace,Spurs,CRY,TOT,3,3,,,False
+176,18,2025-12-27T15:00:00Z,Liverpool,Wolves,LIV,WOL,2,5,,,False
+177,18,2025-12-27T15:00:00Z,Man Utd,Newcastle,MUN,NEW,3,3,,,False
+178,18,2025-12-27T15:00:00Z,Nott'm Forest,Man City,NFO,MCI,4,3,,,False
+179,18,2025-12-27T15:00:00Z,Sunderland,Leeds,SUN,LEE,2,2,,,False
+180,18,2025-12-27T15:00:00Z,West Ham,Fulham,WHU,FUL,3,2,,,False
+181,19,2025-12-30T20:00:00Z,Arsenal,Aston Villa,ARS,AVL,3,4,,,False
+182,19,2025-12-30T20:00:00Z,Brentford,Spurs,BRE,TOT,3,3,,,False
+183,19,2025-12-30T20:00:00Z,Burnley,Newcastle,BUR,NEW,3,2,,,False
+184,19,2025-12-30T20:00:00Z,Chelsea,Bournemouth,CHE,BOU,3,4,,,False
+185,19,2025-12-30T20:00:00Z,Crystal Palace,Fulham,CRY,FUL,3,3,,,False
+186,19,2025-12-30T20:00:00Z,Liverpool,Leeds,LIV,LEE,2,5,,,False
+187,19,2025-12-30T20:00:00Z,Man Utd,Wolves,MUN,WOL,2,3,,,False
+188,19,2025-12-30T20:00:00Z,Nott'm Forest,Everton,NFO,EVE,2,3,,,False
+189,19,2025-12-30T20:00:00Z,Sunderland,Man City,SUN,MCI,4,2,,,False
+190,19,2025-12-30T20:00:00Z,West Ham,Brighton,WHU,BHA,3,2,,,False
+191,20,2026-01-03T15:00:00Z,Aston Villa,Nott'm Forest,AVL,NFO,3,4,,,False
+192,20,2026-01-03T15:00:00Z,Bournemouth,Arsenal,BOU,ARS,4,3,,,False
+193,20,2026-01-03T15:00:00Z,Brighton,Burnley,BHA,BUR,2,3,,,False
+194,20,2026-01-03T15:00:00Z,Everton,Brentford,EVE,BRE,3,3,,,False
+195,20,2026-01-03T15:00:00Z,Fulham,Liverpool,FUL,LIV,4,3,,,False
+196,20,2026-01-03T15:00:00Z,Leeds,Man Utd,LEE,MUN,3,2,,,False
+197,20,2026-01-03T15:00:00Z,Man City,Chelsea,MCI,CHE,3,4,,,False
+198,20,2026-01-03T15:00:00Z,Newcastle,Crystal Palace,NEW,CRY,3,4,,,False
+199,20,2026-01-03T15:00:00Z,Spurs,Sunderland,TOT,SUN,2,3,,,False
+200,20,2026-01-03T15:00:00Z,Wolves,West Ham,WOL,WHU,2,3,,,False
+201,21,2026-01-07T20:00:00Z,Arsenal,Liverpool,ARS,LIV,4,4,,,False
+202,21,2026-01-07T20:00:00Z,Bournemouth,Spurs,BOU,TOT,3,3,,,False
+203,21,2026-01-07T20:00:00Z,Brentford,Sunderland,BRE,SUN,2,3,,,False
+204,21,2026-01-07T20:00:00Z,Burnley,Man Utd,BUR,MUN,3,2,,,False
+205,21,2026-01-07T20:00:00Z,Crystal Palace,Aston Villa,CRY,AVL,3,3,,,False
+206,21,2026-01-07T20:00:00Z,Everton,Wolves,EVE,WOL,2,3,,,False
+207,21,2026-01-07T20:00:00Z,Fulham,Chelsea,FUL,CHE,3,3,,,False
+208,21,2026-01-07T20:00:00Z,Man City,Brighton,MCI,BHA,3,4,,,False
+209,21,2026-01-07T20:00:00Z,Newcastle,Leeds,NEW,LEE,2,4,,,False
+210,21,2026-01-07T20:00:00Z,West Ham,Nott'm Forest,WHU,NFO,3,2,,,False
+211,22,2026-01-17T15:00:00Z,Aston Villa,Everton,AVL,EVE,2,4,,,False
+212,22,2026-01-17T15:00:00Z,Brighton,Bournemouth,BHA,BOU,3,3,,,False
+213,22,2026-01-17T15:00:00Z,Chelsea,Brentford,CHE,BRE,3,4,,,False
+214,22,2026-01-17T15:00:00Z,Leeds,Fulham,LEE,FUL,3,2,,,False
+215,22,2026-01-17T15:00:00Z,Liverpool,Burnley,LIV,BUR,2,5,,,False
+216,22,2026-01-17T15:00:00Z,Man Utd,Man City,MUN,MCI,4,3,,,False
+217,22,2026-01-17T15:00:00Z,Nott'm Forest,Arsenal,NFO,ARS,4,3,,,False
+219,22,2026-01-17T15:00:00Z,Spurs,West Ham,TOT,WHU,2,3,,,False
+218,22,2026-01-17T15:00:00Z,Sunderland,Crystal Palace,SUN,CRY,3,2,,,False
+220,22,2026-01-17T15:00:00Z,Wolves,Newcastle,WOL,NEW,3,3,,,False
+221,23,2026-01-24T15:00:00Z,Arsenal,Man Utd,ARS,MUN,3,4,,,False
+222,23,2026-01-24T15:00:00Z,Bournemouth,Liverpool,BOU,LIV,4,3,,,False
+223,23,2026-01-24T15:00:00Z,Brentford,Nott'm Forest,BRE,NFO,3,3,,,False
+224,23,2026-01-24T15:00:00Z,Burnley,Spurs,BUR,TOT,3,2,,,False
+225,23,2026-01-24T15:00:00Z,Crystal Palace,Chelsea,CRY,CHE,3,3,,,False
+226,23,2026-01-24T15:00:00Z,Everton,Leeds,EVE,LEE,2,3,,,False
+227,23,2026-01-24T15:00:00Z,Fulham,Brighton,FUL,BHA,3,3,,,False
+228,23,2026-01-24T15:00:00Z,Man City,Wolves,MCI,WOL,2,4,,,False
+229,23,2026-01-24T15:00:00Z,Newcastle,Aston Villa,NEW,AVL,3,4,,,False
+230,23,2026-01-24T15:00:00Z,West Ham,Sunderland,WHU,SUN,2,2,,,False
+231,24,2026-01-31T15:00:00Z,Aston Villa,Brentford,AVL,BRE,3,4,,,False
+232,24,2026-01-31T15:00:00Z,Brighton,Everton,BHA,EVE,2,3,,,False
+233,24,2026-01-31T15:00:00Z,Chelsea,West Ham,CHE,WHU,2,4,,,False
+234,24,2026-01-31T15:00:00Z,Leeds,Arsenal,LEE,ARS,4,2,,,False
+235,24,2026-01-31T15:00:00Z,Liverpool,Newcastle,LIV,NEW,3,5,,,False
+236,24,2026-01-31T15:00:00Z,Man Utd,Fulham,MUN,FUL,3,3,,,False
+237,24,2026-01-31T15:00:00Z,Nott'm Forest,Crystal Palace,NFO,CRY,3,3,,,False
+239,24,2026-01-31T15:00:00Z,Spurs,Man City,TOT,MCI,4,3,,,False
+238,24,2026-01-31T15:00:00Z,Sunderland,Burnley,SUN,BUR,2,2,,,False
+240,24,2026-01-31T15:00:00Z,Wolves,Bournemouth,WOL,BOU,3,3,,,False
+241,25,2026-02-07T15:00:00Z,Arsenal,Sunderland,ARS,SUN,2,4,,,False
+242,25,2026-02-07T15:00:00Z,Bournemouth,Aston Villa,BOU,AVL,3,3,,,False
+243,25,2026-02-07T15:00:00Z,Brighton,Crystal Palace,BHA,CRY,3,3,,,False
+244,25,2026-02-07T15:00:00Z,Burnley,West Ham,BUR,WHU,2,2,,,False
+245,25,2026-02-07T15:00:00Z,Fulham,Everton,FUL,EVE,2,3,,,False
+246,25,2026-02-07T15:00:00Z,Leeds,Nott'm Forest,LEE,NFO,3,2,,,False
+247,25,2026-02-07T15:00:00Z,Liverpool,Man City,LIV,MCI,4,5,,,False
+248,25,2026-02-07T15:00:00Z,Man Utd,Spurs,MUN,TOT,3,3,,,False
+249,25,2026-02-07T15:00:00Z,Newcastle,Brentford,NEW,BRE,3,4,,,False
+250,25,2026-02-07T15:00:00Z,Wolves,Chelsea,WOL,CHE,3,3,,,False
+251,26,2026-02-11T20:00:00Z,Aston Villa,Brighton,AVL,BHA,3,4,,,False
+252,26,2026-02-11T20:00:00Z,Brentford,Arsenal,BRE,ARS,4,3,,,False
+253,26,2026-02-11T20:00:00Z,Chelsea,Leeds,CHE,LEE,2,4,,,False
+254,26,2026-02-11T20:00:00Z,Crystal Palace,Burnley,CRY,BUR,2,3,,,False
+255,26,2026-02-11T20:00:00Z,Everton,Bournemouth,EVE,BOU,3,3,,,False
+256,26,2026-02-11T20:00:00Z,Man City,Fulham,MCI,FUL,3,4,,,False
+257,26,2026-02-11T20:00:00Z,Nott'm Forest,Wolves,NFO,WOL,2,3,,,False
+259,26,2026-02-11T20:00:00Z,Spurs,Newcastle,TOT,NEW,3,3,,,False
+258,26,2026-02-11T20:00:00Z,Sunderland,Liverpool,SUN,LIV,4,2,,,False
+260,26,2026-02-11T20:00:00Z,West Ham,Man Utd,WHU,MUN,3,2,,,False
+261,27,2026-02-21T15:00:00Z,Aston Villa,Leeds,AVL,LEE,2,4,,,False
+262,27,2026-02-21T15:00:00Z,Brentford,Brighton,BRE,BHA,3,3,,,False
+263,27,2026-02-21T15:00:00Z,Chelsea,Burnley,CHE,BUR,2,4,,,False
+264,27,2026-02-21T15:00:00Z,Crystal Palace,Wolves,CRY,WOL,2,3,,,False
+265,27,2026-02-21T15:00:00Z,Everton,Man Utd,EVE,MUN,3,3,,,False
+266,27,2026-02-21T15:00:00Z,Man City,Newcastle,MCI,NEW,3,4,,,False
+267,27,2026-02-21T15:00:00Z,Nott'm Forest,Liverpool,NFO,LIV,4,3,,,False
+269,27,2026-02-21T15:00:00Z,Spurs,Arsenal,TOT,ARS,4,3,,,False
+268,27,2026-02-21T15:00:00Z,Sunderland,Fulham,SUN,FUL,3,2,,,False
+270,27,2026-02-21T15:00:00Z,West Ham,Bournemouth,WHU,BOU,3,2,,,False
+271,28,2026-02-28T15:00:00Z,Arsenal,Chelsea,ARS,CHE,3,4,,,False
+272,28,2026-02-28T15:00:00Z,Bournemouth,Sunderland,BOU,SUN,2,3,,,False
+273,28,2026-02-28T15:00:00Z,Brighton,Nott'm Forest,BHA,NFO,3,3,,,False
+274,28,2026-02-28T15:00:00Z,Burnley,Brentford,BUR,BRE,3,2,,,False
+275,28,2026-02-28T15:00:00Z,Fulham,Spurs,FUL,TOT,3,3,,,False
+276,28,2026-02-28T15:00:00Z,Leeds,Man City,LEE,MCI,4,2,,,False
+277,28,2026-02-28T15:00:00Z,Liverpool,West Ham,LIV,WHU,2,5,,,False
+278,28,2026-02-28T15:00:00Z,Man Utd,Crystal Palace,MUN,CRY,3,3,,,False
+279,28,2026-02-28T15:00:00Z,Newcastle,Everton,NEW,EVE,2,4,,,False
+280,28,2026-02-28T15:00:00Z,Wolves,Aston Villa,WOL,AVL,3,3,,,False
+281,29,2026-03-04T20:00:00Z,Aston Villa,Chelsea,AVL,CHE,3,4,,,False
+282,29,2026-03-04T20:00:00Z,Bournemouth,Brentford,BOU,BRE,3,3,,,False
+283,29,2026-03-04T20:00:00Z,Brighton,Arsenal,BHA,ARS,4,3,,,False
+284,29,2026-03-04T20:00:00Z,Everton,Burnley,EVE,BUR,2,3,,,False
+285,29,2026-03-04T20:00:00Z,Fulham,West Ham,FUL,WHU,2,3,,,False
+286,29,2026-03-04T20:00:00Z,Leeds,Sunderland,LEE,SUN,2,2,,,False
+287,29,2026-03-04T20:00:00Z,Man City,Nott'm Forest,MCI,NFO,3,4,,,False
+288,29,2026-03-04T20:00:00Z,Newcastle,Man Utd,NEW,MUN,3,4,,,False
+289,29,2026-03-04T20:00:00Z,Spurs,Crystal Palace,TOT,CRY,3,3,,,False
+290,29,2026-03-04T20:00:00Z,Wolves,Liverpool,WOL,LIV,4,3,,,False
+291,30,2026-03-14T15:00:00Z,Arsenal,Everton,ARS,EVE,2,4,,,False
+292,30,2026-03-14T15:00:00Z,Brentford,Wolves,BRE,WOL,2,3,,,False
+293,30,2026-03-14T15:00:00Z,Burnley,Bournemouth,BUR,BOU,3,2,,,False
+294,30,2026-03-14T15:00:00Z,Chelsea,Newcastle,CHE,NEW,3,4,,,False
+295,30,2026-03-14T15:00:00Z,Crystal Palace,Leeds,CRY,LEE,2,3,,,False
+296,30,2026-03-14T15:00:00Z,Liverpool,Spurs,LIV,TOT,3,5,,,False
+297,30,2026-03-14T15:00:00Z,Man Utd,Aston Villa,MUN,AVL,3,3,,,False
+298,30,2026-03-14T15:00:00Z,Nott'm Forest,Fulham,NFO,FUL,3,3,,,False
+299,30,2026-03-14T15:00:00Z,Sunderland,Brighton,SUN,BHA,3,2,,,False
+300,30,2026-03-14T15:00:00Z,West Ham,Man City,WHU,MCI,4,2,,,False
+301,31,2026-03-21T15:00:00Z,Aston Villa,West Ham,AVL,WHU,2,4,,,False
+302,31,2026-03-21T15:00:00Z,Bournemouth,Man Utd,BOU,MUN,3,3,,,False
+303,31,2026-03-21T15:00:00Z,Brighton,Liverpool,BHA,LIV,4,3,,,False
+304,31,2026-03-21T15:00:00Z,Everton,Chelsea,EVE,CHE,3,3,,,False
+305,31,2026-03-21T15:00:00Z,Fulham,Burnley,FUL,BUR,2,3,,,False
+306,31,2026-03-21T15:00:00Z,Leeds,Brentford,LEE,BRE,3,2,,,False
+307,31,2026-03-21T15:00:00Z,Man City,Crystal Palace,MCI,CRY,3,4,,,False
+308,31,2026-03-21T15:00:00Z,Newcastle,Sunderland,NEW,SUN,2,4,,,False
+309,31,2026-03-21T15:00:00Z,Spurs,Nott'm Forest,TOT,NFO,3,3,,,False
+310,31,2026-03-21T15:00:00Z,Wolves,Arsenal,WOL,ARS,4,3,,,False
+311,32,2026-04-11T14:00:00Z,Arsenal,Bournemouth,ARS,BOU,3,4,,,False
+312,32,2026-04-11T14:00:00Z,Brentford,Everton,BRE,EVE,2,3,,,False
+313,32,2026-04-11T14:00:00Z,Burnley,Brighton,BUR,BHA,3,2,,,False
+314,32,2026-04-11T14:00:00Z,Chelsea,Man City,CHE,MCI,4,4,,,False
+315,32,2026-04-11T14:00:00Z,Crystal Palace,Newcastle,CRY,NEW,3,3,,,False
+316,32,2026-04-11T14:00:00Z,Liverpool,Fulham,LIV,FUL,3,5,,,False
+317,32,2026-04-11T14:00:00Z,Man Utd,Leeds,MUN,LEE,2,3,,,False
+318,32,2026-04-11T14:00:00Z,Nott'm Forest,Aston Villa,NFO,AVL,3,3,,,False
+319,32,2026-04-11T14:00:00Z,Sunderland,Spurs,SUN,TOT,3,2,,,False
+320,32,2026-04-11T14:00:00Z,West Ham,Wolves,WHU,WOL,2,2,,,False
+321,33,2026-04-18T14:00:00Z,Aston Villa,Sunderland,AVL,SUN,2,4,,,False
+322,33,2026-04-18T14:00:00Z,Brentford,Fulham,BRE,FUL,3,3,,,False
+323,33,2026-04-18T14:00:00Z,Chelsea,Man Utd,CHE,MUN,3,4,,,False
+324,33,2026-04-18T14:00:00Z,Crystal Palace,West Ham,CRY,WHU,2,3,,,False
+325,33,2026-04-18T14:00:00Z,Everton,Liverpool,EVE,LIV,4,3,,,False
+326,33,2026-04-18T14:00:00Z,Leeds,Wolves,LEE,WOL,2,2,,,False
+327,33,2026-04-18T14:00:00Z,Man City,Arsenal,MCI,ARS,4,4,,,False
+328,33,2026-04-18T14:00:00Z,Newcastle,Bournemouth,NEW,BOU,3,4,,,False
+329,33,2026-04-18T14:00:00Z,Nott'm Forest,Burnley,NFO,BUR,2,3,,,False
+330,33,2026-04-18T14:00:00Z,Spurs,Brighton,TOT,BHA,3,3,,,False
+331,34,2026-04-25T14:00:00Z,Arsenal,Newcastle,ARS,NEW,3,4,,,False
+332,34,2026-04-25T14:00:00Z,Bournemouth,Leeds,BOU,LEE,2,3,,,False
+333,34,2026-04-25T14:00:00Z,Brighton,Chelsea,BHA,CHE,3,3,,,False
+334,34,2026-04-25T14:00:00Z,Burnley,Man City,BUR,MCI,4,2,,,False
+335,34,2026-04-25T14:00:00Z,Fulham,Aston Villa,FUL,AVL,3,3,,,False
+336,34,2026-04-25T14:00:00Z,Liverpool,Crystal Palace,LIV,CRY,3,5,,,False
+337,34,2026-04-25T14:00:00Z,Man Utd,Brentford,MUN,BRE,3,3,,,False
+338,34,2026-04-25T14:00:00Z,Sunderland,Nott'm Forest,SUN,NFO,3,2,,,False
+339,34,2026-04-25T14:00:00Z,West Ham,Everton,WHU,EVE,2,2,,,False
+340,34,2026-04-25T14:00:00Z,Wolves,Spurs,WOL,TOT,3,3,,,False
+341,35,2026-05-02T14:00:00Z,Arsenal,Fulham,ARS,FUL,3,4,,,False
+342,35,2026-05-02T14:00:00Z,Aston Villa,Spurs,AVL,TOT,3,4,,,False
+343,35,2026-05-02T14:00:00Z,Bournemouth,Crystal Palace,BOU,CRY,3,3,,,False
+344,35,2026-05-02T14:00:00Z,Brentford,West Ham,BRE,WHU,2,3,,,False
+345,35,2026-05-02T14:00:00Z,Chelsea,Nott'm Forest,CHE,NFO,3,4,,,False
+346,35,2026-05-02T14:00:00Z,Everton,Man City,EVE,MCI,4,3,,,False
+347,35,2026-05-02T14:00:00Z,Leeds,Burnley,LEE,BUR,2,2,,,False
+348,35,2026-05-02T14:00:00Z,Man Utd,Liverpool,MUN,LIV,4,3,,,False
+349,35,2026-05-02T14:00:00Z,Newcastle,Brighton,NEW,BHA,3,4,,,False
+350,35,2026-05-02T14:00:00Z,Wolves,Sunderland,WOL,SUN,2,3,,,False
+351,36,2026-05-09T14:00:00Z,Brighton,Wolves,BHA,WOL,2,3,,,False
+352,36,2026-05-09T14:00:00Z,Burnley,Aston Villa,BUR,AVL,3,2,,,False
+353,36,2026-05-09T14:00:00Z,Crystal Palace,Everton,CRY,EVE,2,3,,,False
+354,36,2026-05-09T14:00:00Z,Fulham,Bournemouth,FUL,BOU,3,3,,,False
+355,36,2026-05-09T14:00:00Z,Liverpool,Chelsea,LIV,CHE,3,5,,,False
+356,36,2026-05-09T14:00:00Z,Man City,Brentford,MCI,BRE,3,4,,,False
+357,36,2026-05-09T14:00:00Z,Nott'm Forest,Newcastle,NFO,NEW,3,3,,,False
+359,36,2026-05-09T14:00:00Z,Spurs,Leeds,TOT,LEE,2,3,,,False
+358,36,2026-05-09T14:00:00Z,Sunderland,Man Utd,SUN,MUN,3,2,,,False
+360,36,2026-05-09T14:00:00Z,West Ham,Arsenal,WHU,ARS,4,2,,,False
+361,37,2026-05-17T14:00:00Z,Arsenal,Burnley,ARS,BUR,2,4,,,False
+362,37,2026-05-17T14:00:00Z,Aston Villa,Liverpool,AVL,LIV,4,4,,,False
+363,37,2026-05-17T14:00:00Z,Bournemouth,Man City,BOU,MCI,4,3,,,False
+364,37,2026-05-17T14:00:00Z,Brentford,Crystal Palace,BRE,CRY,3,3,,,False
+365,37,2026-05-17T14:00:00Z,Chelsea,Spurs,CHE,TOT,3,4,,,False
+366,37,2026-05-17T14:00:00Z,Everton,Sunderland,EVE,SUN,2,3,,,False
+367,37,2026-05-17T14:00:00Z,Leeds,Brighton,LEE,BHA,3,2,,,False
+368,37,2026-05-17T14:00:00Z,Man Utd,Nott'm Forest,MUN,NFO,3,3,,,False
+369,37,2026-05-17T14:00:00Z,Newcastle,West Ham,NEW,WHU,2,4,,,False
+370,37,2026-05-17T14:00:00Z,Wolves,Fulham,WOL,FUL,3,3,,,False
+371,38,2026-05-24T15:00:00Z,Brighton,Man Utd,BHA,MUN,3,3,,,False
+372,38,2026-05-24T15:00:00Z,Burnley,Wolves,BUR,WOL,2,2,,,False
+373,38,2026-05-24T15:00:00Z,Crystal Palace,Arsenal,CRY,ARS,4,3,,,False
+374,38,2026-05-24T15:00:00Z,Fulham,Newcastle,FUL,NEW,3,3,,,False
+375,38,2026-05-24T15:00:00Z,Liverpool,Brentford,LIV,BRE,3,5,,,False
+376,38,2026-05-24T15:00:00Z,Man City,Aston Villa,MCI,AVL,3,4,,,False
+377,38,2026-05-24T15:00:00Z,Nott'm Forest,Bournemouth,NFO,BOU,3,3,,,False
+379,38,2026-05-24T15:00:00Z,Spurs,Everton,TOT,EVE,2,3,,,False
+378,38,2026-05-24T15:00:00Z,Sunderland,Chelsea,SUN,CHE,3,2,,,False
+380,38,2026-05-24T15:00:00Z,West Ham,Leeds,WHU,LEE,2,2,,,False
