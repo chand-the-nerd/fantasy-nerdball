@@ -1,0 +1,4 @@
+# Core dependencies for FPL optimizer
+pandas
+requests
+pulp
