@@ -51,10 +51,9 @@ TEAM_MODIFIERS = {
     "Wolves": 0.85,
 }
 
-# Players that should be forced into the squad, despite optimal solution
 FORCED_SELECTIONS = {
-    "GK": ["dúbravka"],
-    "DEF": [],
+    "GK": ["dúbravka"],  # Force Dubravka into any GK slot
+    "DEF": [],           # No forced defenders
     "MID": [],
     "FWD": []
 }
@@ -371,7 +370,7 @@ def select_squad_ilp(df):
                     )
                     break
     
-    # Store forced players info for later display
+    # Store forced selections info for later display
     forced_selections_display = (', '.join(forced_players_info) 
                                 if forced_players_info else None)
     
@@ -587,6 +586,32 @@ def main():
     total_points = starting["fpl_score"].sum()
     print(f"\nTotal Squad Cost: {total_cost:.1f}m")
     print(f"Expected Starting XI Points: {total_points:.2f}")
+
+    # Save squad data to CSV files
+    squad_dir = f"squads/gw{GAMEWEEK}"
+    os.makedirs(squad_dir, exist_ok=True)
+    
+    # Save combined squad with all details
+    squad_combined = pd.concat([starting, bench], ignore_index=True)
+    squad_combined["squad_role"] = (["Starting XI"] * len(starting) + 
+                                   ["Bench"] * len(bench))
+    combined_file = f"{squad_dir}/full_squad.csv"
+    squad_combined.to_csv(combined_file, index=False)
+    
+    # Save simple squad overview
+    simple_squad = squad_combined[["display_name", "position", "now_cost_m", 
+                                  "team", "squad_role"]].copy()
+    simple_squad = simple_squad.rename(columns={
+        "display_name": "player",
+        "now_cost_m": "price",
+        "team": "club"
+    })
+    simple_file = f"{squad_dir}/full_squad_simple.csv"
+    simple_squad.to_csv(simple_file, index=False)
+    
+    print(f"\nSquad saved to {squad_dir}/")
+    print(f"  - {combined_file}")
+    print(f"  - {simple_file}")
 
 
 if __name__ == "__main__":
