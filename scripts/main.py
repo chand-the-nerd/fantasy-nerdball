@@ -15,8 +15,8 @@ FIRST_N_GAMEWEEKS = 5  # How many upcoming fixtures' difficulty to be considered
 
 # These settings should be set based on how you perceive the importance of
 # each factor. They should total 1.0.
-FORM_WEIGHT = 0.2  # Importance of current season average
-HISTORIC_WEIGHT = 0.5  # Importance of historic seasons' average
+FORM_WEIGHT = 0.0  # Importance of current season average
+HISTORIC_WEIGHT = 0.7  # Importance of historic seasons' average
 DIFFICULTY_WEIGHT = 0.3  # Importance of upcoming fixture difficulty
 
 SQUAD_SIZE = {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3}
@@ -336,12 +336,34 @@ def add_next_fixture(df, next_gw=1):
     return df
 
 
-def select_squad_ilp(df):
+def update_forced_selections_from_squad(starting, bench):
+    """Create forced selections dictionary from squad players.
+    
+    Args:
+        starting (pd.DataFrame): Starting XI players.
+        bench (pd.DataFrame): Bench players.
+        
+    Returns:
+        dict: Forced selections dictionary with all squad players.
+    """
+    forced_selections = {"GK": [], "DEF": [], "MID": [], "FWD": []}
+    full_squad = pd.concat([starting, bench], ignore_index=True)
+    
+    for _, player in full_squad.iterrows():
+        pos = player['position']
+        name = player['display_name']
+        forced_selections[pos].append(name)
+    
+    return forced_selections
+
+
+def select_squad_ilp(df, forced_selections):
     """Select optimal FPL squad using Integer Linear Programming with 
     forced player selections.
     
     Args:
         df (pd.DataFrame): Player data with fpl_scores and all required fields.
+        forced_selections (dict): Dictionary of forced player selections.
         
     Returns:
         tuple: (starting_xi_dataframe, bench_dataframe, forced_selections_str)
@@ -352,7 +374,7 @@ def select_squad_ilp(df):
     forced_player_ids = []
     forced_players_info = []
     
-    for pos, players_to_force in FORCED_SELECTIONS.items():
+    for pos, players_to_force in forced_selections.items():
         if not players_to_force:
             continue
             
@@ -470,7 +492,7 @@ def select_squad_ilp(df):
         x[i] * df.iloc[i]["now_cost_m"] for i in range(n)
     ) <= BUDGET
 
-    status = prob.solve()
+    status = prob.solve(pulp.PULP_CBC_CMD(msg=0))
     
     if status != pulp.LpStatusOptimal:
         print(f"Optimization failed with status: {pulp.LpStatus[status]}")
@@ -484,10 +506,11 @@ def select_squad_ilp(df):
     squad_starting = squad[squad["starting_XI"] == 1].copy()
     squad_bench = squad[squad["starting_XI"] == 0].copy()
 
-    # Order bench: GK last
-    bench_order = {"DEF": 1, "MID": 2, "FWD": 3, "GK": 4}
-    squad_bench["bench_order"] = squad_bench["position"].map(bench_order)
-    squad_bench = squad_bench.sort_values("bench_order")
+    # Order bench: GK first, then by descending FPL score
+    gk_bench = squad_bench[squad_bench["position"] == "GK"].copy()
+    non_gk_bench = squad_bench[squad_bench["position"] != "GK"].copy()
+    non_gk_bench = non_gk_bench.sort_values("fpl_score", ascending=False)
+    squad_bench = pd.concat([gk_bench, non_gk_bench], ignore_index=True)
 
     return squad_starting, squad_bench, forced_selections_display
 
@@ -515,11 +538,67 @@ def main():
         DIFFICULTY_WEIGHT
     )
     print("Optimizing squad using PuLP...")
-    starting, bench, forced_selections_display = select_squad_ilp(scored)
+    starting, bench, forced_selections_display = select_squad_ilp(
+        scored,
+        FORCED_SELECTIONS
+    )
 
     if starting.empty:
         print("No valid solution found!")
         return
+    
+    # Create updated forced selections with all squad players
+    updated_forced_selections = update_forced_selections_from_squad(
+        starting, bench
+    )
+    
+    # Show squad table before next match optimization
+    full_squad = pd.concat([starting, bench], ignore_index=True)
+    full_squad = add_next_fixture(full_squad)
+    
+    # Sort by position for display
+    position_order = ["GK", "DEF", "MID", "FWD"]
+    full_squad["position"] = pd.Categorical(
+        full_squad["position"], categories=position_order, ordered=True
+    )
+    full_squad = full_squad.sort_values("position")
+
+    # Show forced selections if any were made
+    if forced_selections_display:
+        print(f"\nForced selections: {forced_selections_display}")
+
+    # Print full squad
+    print("\n=== Full Squad for Next GW ===")
+    print(
+        full_squad[
+            [
+                "display_name",
+                "position",
+                "team",
+                "now_cost_m",
+                "fpl_score",
+                "next_opponent",
+                "venue",
+                "fixture_difficulty",
+            ]
+        ]
+    )
+
+    print("\nFetching difficulty for next fixture...")
+    fixture_scores_next = fetch_player_fixture_difficulty(1, players)
+    scored_next = build_scores(
+        players,
+        fixture_scores_next,
+        FORM_WEIGHT,
+        HISTORIC_WEIGHT,
+        DIFFICULTY_WEIGHT
+    )
+
+    print("Optimizing Starting XI for next match...")
+    starting, bench, _ = select_squad_ilp(
+        scored_next,
+        updated_forced_selections
+    )
 
     starting = add_next_fixture(starting)
     bench = add_next_fixture(bench)
@@ -546,10 +625,6 @@ def main():
             starting.loc[top_two_idx[0], "display_name"] += " (C)"
         if len(top_two_idx) > 1:
             starting.loc[top_two_idx[1], "display_name"] += " (V)"
-
-    # Show forced selections if any were made
-    if forced_selections_display:
-        print(f"\nForced selections: {forced_selections_display}")
 
     print("\n=== Starting XI ===")
     print(
