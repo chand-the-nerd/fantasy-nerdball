@@ -37,14 +37,9 @@ class PointsCalculator:
         # Projected points should already be calculated by ScoringEngine
         df = self.calculate_projected_points(df)
 
-        # Calculate minutes per game (total minutes / games with >0 minutes)
-        games_played = (df["minutes"] > 0).astype(int)
-        df["minspg"] = 0.0
-        played_mask = games_played > 0
-        df.loc[played_mask, "minspg"] = (
-            df.loc[played_mask, "minutes"] / games_played[played_mask]
-        )
-        df["minspg"] = df["minspg"].round(0).astype(int)
+        # Calculate minutes per game as total minutes / gameweeks completed
+        gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
+        df["minspg"] = (df["minutes"] / gameweeks_completed).round(0).astype(int)
 
         # Prepare display columns with exact names requested
         df["form"] = df["form"].round(1)

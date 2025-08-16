@@ -118,46 +118,39 @@ class HistoricalDataManager:
             )
             hist["total_games_past2"] += hist[games_col]
 
-        # Calculate current season reliability based on actual games played
-        # Get current gameweek from FPL API to calculate current season reliability
-        try:
-            from ..api.fpl_client import FPLClient
-            fpl_client = FPLClient()
-            current_gw_data = fpl_client.get_bootstrap_static()
-            current_gw = None
-            for event in current_gw_data["events"]:
-                if event["is_current"]:
-                    current_gw = event["id"]
-                    break
+        # Calculate current season reliability based on starts
+        # Use the gameweek from config - gameweeks completed = current gameweek - 1
+        gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
+        
+        # Simple and reliable: use starts field from the bootstrap data
+        # Reliability = starts / gameweeks_completed
+        current_reliability = current["starts"] / gameweeks_completed
+        current_reliability = current_reliability.clip(upper=1.0)  # Cap at 100%
+        
+        print(f"Calculated reliability based on starts over {gameweeks_completed} completed gameweek(s)")
+        
+        # Debug: Show players with minutes but no starts
+        has_minutes_no_starts = current[(current["minutes"] > 0) & (current["starts"] == 0)]
+        if len(has_minutes_no_starts) > 0:
+            print(f"DEBUG: Found {len(has_minutes_no_starts)} players with minutes but no starts:")
+            for _, player in has_minutes_no_starts.head(5).iterrows():
+                print(f"  {player['display_name']}: {player['minutes']} mins, {player['starts']} starts, form {player['form']}")
+        
+        # Debug: Show some examples of reliability calculation
+        sample_players = current[current["minutes"] > 0].head(5)
+        print(f"DEBUG: Sample reliability calculations:")
+        for _, player in sample_players.iterrows():
+            starts = player["starts"]
+            minutes = player["minutes"]
+            form = player["form"]
+            reliability = starts / gameweeks_completed
+            print(f"  {player['display_name']}: {starts} starts, {minutes} mins, form {form} → {reliability:.0%}")
 
-            # If no current gameweek found, use the highest finished gameweek
-            if current_gw is None:
-                finished_events = [e for e in current_gw_data["events"] if e["finished"]]
-                if finished_events:
-                    current_gw = max(e["id"] for e in finished_events) + 1
-                else:
-                    current_gw = 1  # Fallback to GW1
-
-            # Calculate current season reliability: games played / gameweeks elapsed
-            # Use minutes > 0 as indicator of "appeared in match"
-            current_games_played = (current["minutes"] > 0).astype(int)
-            gameweeks_elapsed = max(
-                1, current_gw - 1
-            )  # At least 1 to avoid division by zero
-
-            current_reliability = current_games_played / gameweeks_elapsed
-            current_reliability = current_reliability.clip(upper=1.0)  # Cap at 100%
-
-        except Exception as e:
-            print(f"Warning: Could not calculate current season reliability: {e}")
-            # Fallback: use a simple heuristic based on minutes played
-            # Assume ~10 gameweeks have passed (adjust this based on when you run it)
-            estimated_gws = 10
-            current_games_played = (current["minutes"] > 0).astype(int)
-            current_reliability = (current_games_played / estimated_gws).clip(upper=1.0)
-
+        # Assign current_reliability to the dataframe BEFORE merging
+        current = current.assign(current_reliability=current_reliability)
+        
         return current.merge(
             hist[["name_key", "avg_ppg_past2", "total_games_past2", "avg_reliability"]],
             on="name_key",
             how="left",
-        ).assign(current_reliability=current_reliability)
+        )
