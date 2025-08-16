@@ -1,0 +1,1 @@
+"""Fantasy Nerdball FPL optimisation package."""
