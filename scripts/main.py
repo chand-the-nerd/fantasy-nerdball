@@ -250,7 +250,6 @@ def load_previous_squad(gameweek):
     try:
         prev_squad = pd.read_csv(squad_file)
         print(f"Loaded previous squad from {squad_file}")
-        print(f"Previous squad had {len(prev_squad)} players")
         return prev_squad
     except Exception as e:
         print(f"Error loading previous squad: {e}")
@@ -301,10 +300,6 @@ def match_players_to_current(prev_squad, current_players):
             ]
             
             if len(fuzzy_matches) > 0:
-                print(
-                    f"Fuzzy match for {prev_name}: "
-                    f"{fuzzy_matches.iloc[0]['display_name']}"
-                      )
                 prev_player_ids.append(fuzzy_matches.iloc[0]['id'])
             else:
                 print(
@@ -312,10 +307,6 @@ def match_players_to_current(prev_squad, current_players):
                     f"{prev_name} ({prev_pos}, {prev_team})"
                     )
     
-    print(
-        f"Successfully matched {len(prev_player_ids)} "
-        "players from previous squad"
-        )
     return prev_player_ids
 
 
@@ -1165,7 +1156,8 @@ def main():
     """
     Main function to run the FPL optimization process.
     """
-    print(f"Planning for Gameweek {GAMEWEEK}")
+    print(f"\n=== WELCOME TO FANTASY NERDBALL ===")
+    print(f"\nPlanning for Gameweek {GAMEWEEK}")
     print(f"Free transfers available: {FREE_TRANSFERS}")
     
     # Load previous squad if available
@@ -1179,7 +1171,6 @@ def main():
     if prev_squad is not None:
         prev_squad_ids = match_players_to_current(prev_squad, players)
     
-    print("Merging historical points...")
     players = merge_past_two_seasons(
         players,
         PAST_SEASONS,
@@ -1372,9 +1363,9 @@ def main():
     starting_display = starting_display.sort_values("position")
     bench_display = bench_display.sort_values("position")
 
-    # Mark captain and vice-captain
+    # Mark captain and vice-captain based on projected points
     if not starting_display.empty:
-        top_two_idx = starting_display["fpl_score"].nlargest(2).index
+        top_two_idx = starting_display["proj_pts"].nlargest(2).index
         if len(top_two_idx) > 0:
             starting_display.loc[top_two_idx[0], "display_name"] += " (C)"
         if len(top_two_idx) > 1:
@@ -1397,6 +1388,7 @@ def main():
             ]
         ]
     )
+    
     print(f"\n=== Bench (in order) for GW{GAMEWEEK} ===")
     print(
         bench_display[
