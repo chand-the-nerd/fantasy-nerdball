@@ -10,9 +10,18 @@ BUDGET = 100.0  # million
 FREE_TRANSFERS = 1
 
 # Transfer efficiency settings
-MIN_TRANSFER_VALUE = 0.5  # Minimum FPL score improvement per transfer required
+MIN_TRANSFER_VALUE = 0.3  # Minimum FPL score improvement per transfer required
 CONSERVATIVE_MODE = False   # If True, be more cautious about making transfers
 TRANSFER_ROLLOVER_VALUE = 0.3  # Value of keeping a transfer for next week
+
+# Points projection settings
+BASELINE_POINTS_PER_GAME = {
+    "GK": 4.0,   # Average points for a decent GK
+    "DEF": 4.5,  # Average points for a decent defender
+    "MID": 5.0,  # Average points for a decent midfielder
+    "FWD": 5.5   # Average points for a decent forward
+}
+FPL_SCORE_TO_POINTS_MULTIPLIER = 1.5  # How much 1 FPL score unit translates to points
 
 # Previous season config
 PAST_SEASONS = ["2024-25", "2023-24"]  # Historic seasons to consider
@@ -60,7 +69,7 @@ TEAM_MODIFIERS = {
 FORCED_SELECTIONS = {
     "GK": ["dúbravka"],  # Force Dubravka into any GK slot
     "DEF": [],           # No forced defenders
-    "MID": [],
+    "MID": ["baleba"],
     "FWD": []
 }
 
@@ -71,7 +80,8 @@ BLACKLIST_PLAYERS = [
 
 
 def get_json(url):
-    """Fetch JSON data from a URL.
+    """
+    Fetch JSON data from a URL.
     
     Args:
         url (str): The URL to fetch JSON data from.
@@ -110,6 +120,74 @@ def normalize_for_matching(text):
     ascii_text = ''.join(c for c in normalized 
                         if unicodedata.category(c) != 'Mn')
     return ascii_text.lower().strip()
+
+
+def calculate_projected_points(df):
+    """
+    Calculate projected points for each player based on their base quality 
+    (when they actually play), not influenced by reliability.
+    
+    Args:
+        df (pd.DataFrame): Player data with base_quality and position.
+        
+    Returns:
+        pd.DataFrame: DataFrame with added projected_points column.
+    """
+    df = df.copy()
+    
+    # Convert position to string if it's categorical
+    if df['position'].dtype.name == 'category':
+        position_values = df['position'].astype(str)
+    else:
+        position_values = df['position']
+    
+    # Calculate baseline points for each position
+    df['baseline_points'] = position_values.map(BASELINE_POINTS_PER_GAME)
+    
+    # Convert base quality to points adjustment (not FPL score)
+    # This represents how good they are WHEN they play
+    df['points_adjustment'] = df['base_quality'] * FPL_SCORE_TO_POINTS_MULTIPLIER
+    
+    # Calculate projected points
+    df['projected_points'] = df['baseline_points'] + df['points_adjustment']
+    
+    # Ensure minimum of 1 point (no player should project negative)
+    df['projected_points'] = df['projected_points'].clip(lower=1.0)
+    
+    return df
+
+
+def add_points_analysis_to_display(df):
+    """
+    Add projected points columns and score components for better display.
+    
+    Args:
+        df (pd.DataFrame): Squad data with FPL scores and base quality.
+        
+    Returns:
+        pd.DataFrame: DataFrame with projected points and score components added.
+    """
+    df = calculate_projected_points(df)
+    
+    # Calculate minutes per game (total minutes / games with >0 minutes)
+    games_played = (df['minutes'] > 0).astype(int)
+    df['minspg'] = 0.0
+    played_mask = games_played > 0
+    df.loc[played_mask, 'minspg'] = df.loc[played_mask, 'minutes'] / games_played[played_mask]
+    df['minspg'] = df['minspg'].round(0).astype(int)
+    
+    # Prepare display columns with exact names requested
+    df['form'] = df['form'].round(1)
+    df['historic_ppg'] = df['avg_ppg_past2'].round(1)
+    
+    # Use the fixture difficulty average from fetch_player_fixture_difficulty
+    # This shows average difficulty over FIRST_N_GAMEWEEKS (same as algorithm uses)
+    df['fixture_diff'] = (6 - df['fixture_bonus']).round(1)
+    
+    df['reliability'] = (df['current_reliability'] * 100).round(0).astype(int)
+    df['proj_pts'] = df['projected_points'].round(1)
+    
+    return df
 
 
 def fetch_current_players():
@@ -172,7 +250,6 @@ def load_previous_squad(gameweek):
     try:
         prev_squad = pd.read_csv(squad_file)
         print(f"Loaded previous squad from {squad_file}")
-        print(f"Previous squad had {len(prev_squad)} players")
         return prev_squad
     except Exception as e:
         print(f"Error loading previous squad: {e}")
@@ -223,10 +300,6 @@ def match_players_to_current(prev_squad, current_players):
             ]
             
             if len(fuzzy_matches) > 0:
-                print(
-                    f"Fuzzy match for {prev_name}: "
-                    f"{fuzzy_matches.iloc[0]['display_name']}"
-                      )
                 prev_player_ids.append(fuzzy_matches.iloc[0]['id'])
             else:
                 print(
@@ -234,60 +307,153 @@ def match_players_to_current(prev_squad, current_players):
                     f"{prev_name} ({prev_pos}, {prev_team})"
                     )
     
-    print(
-        f"Successfully matched {len(prev_player_ids)} "
-        "players from previous squad"
-        )
     return prev_player_ids
 
 
 def fetch_past_season_points(season_folder):
     """
-    Fetch historical points data for a specific season.
+    Fetch historical points per game data for a specific season, with 
+    reliability filtering.
     
     Args:
         season_folder (str): The season folder name (e.g., "2023-24").
         
     Returns:
-        pd.DataFrame: DataFrame containing web_name, total_points, and 
-                     name_key for the specified season.
+        pd.DataFrame: DataFrame containing web_name, points_per_game, 
+                     reliability_factor, and name_key for the specified season.
     """
     url = (
         f"https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/"
         f"master/data/{season_folder}/players_raw.csv"
     )
     df = pd.read_csv(url)
-    df = df[["web_name", "total_points"]].copy()
-    df["name_key"] = df["web_name"].map(normalize_name)
-    df = df.rename(columns={"total_points": f"total_points_{season_folder}"})
-    return df
+    
+    # Calculate games played and reliability
+    df['minutes_played'] = pd.to_numeric(df['minutes'], errors='coerce').fillna(0)
+    df['total_points'] = pd.to_numeric(df['total_points'], errors='coerce').fillna(0)
+    
+    # Calculate games played (assuming 90 minutes = 1 game)
+    df['games_played'] = (df['minutes_played'] / 90).round().clip(lower=0)
+    
+    # Calculate season reliability (games played / max possible games ~38)
+    # Use 30 as reasonable threshold for "full season" to account for injuries
+    df['season_reliability'] = (df['games_played'] / 30).clip(upper=1.0)
+    
+    # Calculate points per game, only for players who actually played
+    df['points_per_game'] = 0.0
+    played_mask = df['games_played'] >= 1
+    df.loc[played_mask, 'points_per_game'] = (
+        df.loc[played_mask, 'total_points'] / df.loc[played_mask, 'games_played']
+    )
+    
+    # Apply reliability penalty for players who weren't regular starters
+    # Players who played <80% of games get their PPG penalized
+    reliability_threshold = 0.8
+    unreliable_mask = df['season_reliability'] < reliability_threshold
+    
+    # Penalty factor: if you played 50% of games, your PPG gets reduced
+    penalty_factor = df['season_reliability'].clip(lower=0.3)  # Minimum 30% value
+    df.loc[unreliable_mask, 'points_per_game'] *= penalty_factor[unreliable_mask]
+    
+    # Select relevant columns
+    result_df = df[["web_name", "points_per_game", "games_played", "season_reliability"]].copy()
+    result_df["name_key"] = result_df["web_name"].map(normalize_name)
+    result_df = result_df.rename(columns={
+        "points_per_game": f"ppg_{season_folder}",
+        "games_played": f"games_{season_folder}",
+        "season_reliability": f"reliability_{season_folder}"
+    })
+    
+    return result_df
 
 
 def merge_past_two_seasons(current, past_seasons, weights):
     """
-    Merge historical points data from multiple seasons with the current 
-    player data.
+    Merge historical points per game data from multiple seasons with the 
+    current player data, calculating reliability based on games played.
     
     Args:
         current (pd.DataFrame): Current season player data.
         past_seasons (list): List of season folder names to fetch data for.
-        weights (list): List of weights to apply to each season's points.
+        weights (list): List of weights to apply to each season's PPG.
         
     Returns:
         pd.DataFrame: Current player data merged with weighted average of
-                     historical points.
+                     historical points per game, adjusted for reliability.
     """
     hist_frames = [fetch_past_season_points(s) for s in past_seasons]
     hist = hist_frames[0]
     for extra in hist_frames[1:]:
         hist = hist.merge(extra, on="name_key", how="outer")
-    point_cols = [c for c in hist.columns if c.startswith("total_points_")]
-    hist["avg_points_past2"] = 0
-    for col, w in zip(point_cols, weights):
-        hist["avg_points_past2"] += hist[col].fillna(0) * w
+    
+    # Get PPG columns, games columns, and reliability columns
+    ppg_cols = [c for c in hist.columns if c.startswith("ppg_")]
+    games_cols = [c for c in hist.columns if c.startswith("games_")]
+    reliability_cols = [c for c in hist.columns if c.startswith("reliability_")]
+    
+    # Calculate weighted average PPG and overall reliability
+    hist["avg_ppg_past2"] = 0.0
+    hist["total_games_past2"] = 0
+    hist["avg_reliability"] = 0.0
+    
+    for ppg_col, games_col, reliability_col, weight in zip(ppg_cols, games_cols, reliability_cols, weights):
+        # Fill NaN values
+        hist[ppg_col] = hist[ppg_col].fillna(0)
+        hist[games_col] = hist[games_col].fillna(0)
+        hist[reliability_col] = hist[reliability_col].fillna(0)
+        
+        # Only include seasons where player had meaningful game time (>=8 games)
+        # This is roughly 20% of a season - minimum for any consideration
+        sufficient_games_mask = hist[games_col] >= 8
+        
+        # Add to weighted averages
+        hist.loc[sufficient_games_mask, "avg_ppg_past2"] += (
+            hist.loc[sufficient_games_mask, ppg_col] * weight
+        )
+        hist.loc[sufficient_games_mask, "avg_reliability"] += (
+            hist.loc[sufficient_games_mask, reliability_col] * weight
+        )
+        hist["total_games_past2"] += hist[games_col]
+    
+    # Calculate current season reliability based on actual games played
+    # Get current gameweek from FPL API to calculate current season reliability
+    try:
+        current_gw_data = get_json("https://fantasy.premierleague.com/api/bootstrap-static/")
+        current_gw = None
+        for event in current_gw_data['events']:
+            if event['is_current']:
+                current_gw = event['id']
+                break
+        
+        # If no current gameweek found, use the highest finished gameweek
+        if current_gw is None:
+            finished_events = [e for e in current_gw_data['events'] if e['finished']]
+            if finished_events:
+                current_gw = max(e['id'] for e in finished_events) + 1
+            else:
+                current_gw = 1  # Fallback to GW1
+        
+        # Calculate current season reliability: games played / gameweeks elapsed
+        # Use minutes > 0 as indicator of "appeared in match"
+        current_games_played = (current['minutes'] > 0).astype(int)
+        gameweeks_elapsed = max(1, current_gw - 1)  # At least 1 to avoid division by zero
+        
+        current_reliability = current_games_played / gameweeks_elapsed
+        current_reliability = current_reliability.clip(upper=1.0)  # Cap at 100%
+        
+    except Exception as e:
+        print(f"Warning: Could not calculate current season reliability: {e}")
+        # Fallback: use a simple heuristic based on minutes played
+        # Assume ~10 gameweeks have passed (adjust this based on when you run it)
+        estimated_gws = 10
+        current_games_played = (current['minutes'] > 0).astype(int)
+        current_reliability = (current_games_played / estimated_gws).clip(upper=1.0)
+    
     return current.merge(
-        hist[["name_key", "avg_points_past2"]], on="name_key", how="left"
-    )
+        hist[["name_key", "avg_ppg_past2", "total_games_past2", "avg_reliability"]], 
+        on="name_key", 
+        how="left"
+    ).assign(current_reliability=current_reliability)
 
 
 def fetch_player_fixture_difficulty(first_n_gws, players, starting_gameweek):
@@ -407,21 +573,29 @@ def fetch_player_fixture_difficulty(first_n_gws, players, starting_gameweek):
 def build_scores(players, fixture_scores, form_weight, historic_weight,
                 diff_weight):
     """
-    Calculate FPL scores for each player based on form, historical 
-    performance, and fixture difficulty.
+    Calculate FPL scores and base quality scores for each player based on form, 
+    historical performance, and fixture difficulty, with reliability considerations.
     
     Args:
-        players (pd.DataFrame): Player data with form and historical points.
+        players (pd.DataFrame): Player data with form and historical PPG.
         fixture_scores (pd.DataFrame): Fixture difficulty data.
         form_weight (float): Weight for current season form.
         historic_weight (float): Weight for historical performance.
         diff_weight (float): Weight for fixture difficulty.
         
     Returns:
-        pd.DataFrame: Player data with calculated fpl_score for each player.
+        pd.DataFrame: Player data with calculated fpl_score and base_quality 
+                     for each player.
     """
     df = players.merge(fixture_scores, on="name_key", how="left")
-    df["avg_points_past2"] = df["avg_points_past2"].fillna(0)
+    
+    # Fill NaN values to prevent PuLP errors
+    df["avg_ppg_past2"] = df["avg_ppg_past2"].fillna(0)
+    df["avg_reliability"] = df["avg_reliability"].fillna(0)
+    df["current_reliability"] = df["current_reliability"].fillna(0)
+    df["fixture_bonus"] = df["fixture_bonus"].fillna(0)
+    
+    # Calculate team and promotion adjustments
     df["promoted_penalty"] = df["team"].apply(
         lambda x: -0.3 if x in PROMOTED_TEAMS else 0
     )
@@ -430,15 +604,65 @@ def build_scores(players, fixture_scores, form_weight, historic_weight,
     )
 
     def z(s):
-        """Z-score normalization."""
-        return (s - s.mean()) / (s.std(ddof=0) + 1e-9)
+        """Z-score normalization with NaN/inf handling."""
+        s_clean = s.fillna(0)  # Replace NaN with 0
+        s_mean = s_clean.mean()
+        s_std = s_clean.std(ddof=0)
+        
+        # Prevent division by zero
+        if s_std == 0 or pd.isna(s_std):
+            return pd.Series([0.0] * len(s_clean), index=s_clean.index)
+        
+        z_scores = (s_clean - s_mean) / s_std
+        
+        # Replace any remaining NaN/inf values
+        z_scores = z_scores.fillna(0)
+        z_scores = z_scores.replace([float('inf'), float('-inf')], 0)
+        
+        return z_scores
 
-    df["fpl_score"] = (
-        form_weight * z(df["form"])
-        + historic_weight * z(df["avg_points_past2"])
-        + diff_weight * z(df["fixture_bonus"])
+    # Calculate base quality components (no reliability factored in)
+    form_component = form_weight * z(df["form"])
+    historic_component = historic_weight * z(df["avg_ppg_past2"])
+    fixture_component = diff_weight * z(df["fixture_bonus"])
+    
+    # Base quality score (for projected points when they DO play)
+    df["base_quality"] = (
+        form_component
+        + historic_component
+        + fixture_component
         + df["promoted_penalty"]
     ) * df["team_modifier"]
+    
+    # Apply reliability adjustments for squad selection
+    # Current season reliability is 5x more important than historical
+    reliability_bonus = (
+        df["current_reliability"] * 1.5 +     # Current season: games/GWs elapsed
+        df["avg_reliability"] * 0.3           # Historical: average games/season ratio
+    ) - 0.75  # Center around 0 (0.75 would be 50% current + 25% historical)
+    
+    # Penalty for historically unreliable players (rotation risks)
+    df["historically_unreliable_penalty"] = 0.0  # Initialize column
+    unreliable_mask = df["avg_reliability"] < 0.6  # Less than 60% historical games
+    df.loc[unreliable_mask, "historically_unreliable_penalty"] = -0.15
+    
+    # Extra penalty for current season rotation risks
+    current_unreliable_mask = df["current_reliability"] < 0.7  # <70% games this season
+    df.loc[current_unreliable_mask, "historically_unreliable_penalty"] -= 0.2
+    
+    # FPL score (for squad selection - includes reliability)
+    df["fpl_score"] = (
+        df["base_quality"]
+        + reliability_bonus
+        + df["historically_unreliable_penalty"]
+    )
+    
+    # Final safety check - replace any NaN/inf in both scores
+    df["base_quality"] = df["base_quality"].fillna(0)
+    df["base_quality"] = df["base_quality"].replace([float('inf'), float('-inf')], 0)
+    df["fpl_score"] = df["fpl_score"].fillna(0)
+    df["fpl_score"] = df["fpl_score"].replace([float('inf'), float('-inf')], 0)
+    
     return df
 
 
@@ -932,7 +1156,8 @@ def main():
     """
     Main function to run the FPL optimization process.
     """
-    print(f"Planning for Gameweek {GAMEWEEK}")
+    print(f"\n=== WELCOME TO FANTASY NERDBALL ===")
+    print(f"\nPlanning for Gameweek {GAMEWEEK}")
     print(f"Free transfers available: {FREE_TRANSFERS}")
     
     # Load previous squad if available
@@ -946,7 +1171,6 @@ def main():
     if prev_squad is not None:
         prev_squad_ids = match_players_to_current(prev_squad, players)
     
-    print("Merging historical points...")
     players = merge_past_two_seasons(
         players,
         PAST_SEASONS,
@@ -1078,19 +1302,22 @@ def main():
     if forced_selections_display:
         print(f"\nForced selections: {forced_selections_display}")
 
-    # Print full squad
+    # Print full squad with projected points
+    full_squad_display = add_points_analysis_to_display(full_squad)
     print(f"\n=== Full Squad for GW{GAMEWEEK} ===")
     print(
-        full_squad[
+        full_squad_display[
             [
                 "display_name",
                 "position",
                 "team",
-                "now_cost_m",
-                "fpl_score",
+                "form",
+                "historic_ppg",
+                "fixture_diff",
+                "reliability",
+                "minspg",
+                "proj_pts",
                 "next_opponent",
-                "venue",
-                "fixture_difficulty",
             ]
         ]
     )
@@ -1117,83 +1344,94 @@ def main():
     starting = add_next_fixture(starting, GAMEWEEK)
     bench = add_next_fixture(bench, GAMEWEEK)
 
+    # Add projected points to starting XI and bench
+    starting_display = add_points_analysis_to_display(starting)
+    bench_display = add_points_analysis_to_display(bench)
+
     # Define position order
     position_order = ["GK", "DEF", "MID", "FWD"]
 
     # Convert 'position' to categorical with the desired order
-    starting["position"] = pd.Categorical(
-        starting["position"], categories=position_order, ordered=True
+    starting_display["position"] = pd.Categorical(
+        starting_display["position"], categories=position_order, ordered=True
     )
-    bench["position"] = pd.Categorical(
-        bench["position"], categories=position_order, ordered=True
+    bench_display["position"] = pd.Categorical(
+        bench_display["position"], categories=position_order, ordered=True
     )
 
     # Sort by position
-    starting = starting.sort_values("position")
-    bench = bench.sort_values("position")
+    starting_display = starting_display.sort_values("position")
+    bench_display = bench_display.sort_values("position")
 
-    # Mark captain and vice-captain
-    if not starting.empty:
-        top_two_idx = starting["fpl_score"].nlargest(2).index
+    # Mark captain and vice-captain based on projected points
+    if not starting_display.empty:
+        top_two_idx = starting_display["proj_pts"].nlargest(2).index
         if len(top_two_idx) > 0:
-            starting.loc[top_two_idx[0], "display_name"] += " (C)"
+            starting_display.loc[top_two_idx[0], "display_name"] += " (C)"
         if len(top_two_idx) > 1:
-            starting.loc[top_two_idx[1], "display_name"] += " (V)"
+            starting_display.loc[top_two_idx[1], "display_name"] += " (V)"
 
     print(f"\n=== Starting XI for GW{GAMEWEEK} ===")
     print(
-        starting[
+        starting_display[
             [
                 "display_name",
                 "position",
                 "team",
-                "now_cost_m",
-                "fpl_score",
+                "form",
+                "historic_ppg",
+                "fixture_diff",
+                "reliability",
+                "minspg",
+                "proj_pts",
                 "next_opponent",
-                "venue",
-                "fixture_difficulty",
             ]
         ]
     )
+    
     print(f"\n=== Bench (in order) for GW{GAMEWEEK} ===")
     print(
-        bench[
+        bench_display[
             [
                 "display_name",
                 "position",
                 "team",
-                "now_cost_m",
-                "fpl_score",
+                "form",
+                "historic_ppg",
+                "fixture_diff",
+                "reliability",
+                "minspg",
+                "proj_pts",
                 "next_opponent",
-                "venue",
-                "fixture_difficulty",
             ]
         ]
     )
 
     total_cost = starting["now_cost_m"].sum() + bench["now_cost_m"].sum()
-    total_points = starting["fpl_score"].sum()
+    total_projected_points = starting_display["projected_points"].sum()
     print(f"\nTotal Squad Cost: {total_cost:.1f}m")
-    print(f"Expected Starting XI Points: {total_points:.2f}")
+    print(f"Projected Starting XI Points: {total_projected_points:.1f}")
 
-    # Save squad data to CSV files
+    # Save squad data to CSV files with projected points
     squad_dir = f"squads/gw{GAMEWEEK}"
     os.makedirs(squad_dir, exist_ok=True)
     
-    # Save combined squad with all details
-    squad_combined = pd.concat([starting, bench], ignore_index=True)
-    squad_combined["squad_role"] = (["Starting XI"] * len(starting) + 
-                                   ["Bench"] * len(bench))
+    # Save combined squad with all details including projected points
+    squad_combined = pd.concat([starting_display, bench_display], 
+                               ignore_index=True)
+    squad_combined["squad_role"] = (["Starting XI"] * len(starting_display) + 
+                                   ["Bench"] * len(bench_display))
     combined_file = f"{squad_dir}/full_squad.csv"
     squad_combined.to_csv(combined_file, index=False)
     
     # Save simple squad overview
     simple_squad = squad_combined[["display_name", "position", "now_cost_m", 
-                                  "team", "squad_role"]].copy()
+                                  "team", "proj_pts", "squad_role"]].copy()
     simple_squad = simple_squad.rename(columns={
         "display_name": "player",
         "now_cost_m": "price",
-        "team": "club"
+        "team": "club",
+        "proj_pts": "projected_points"
     })
     simple_file = f"{squad_dir}/full_squad_simple.csv"
     simple_squad.to_csv(simple_file, index=False)
