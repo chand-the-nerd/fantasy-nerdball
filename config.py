@@ -7,9 +7,9 @@ class Config:
     """Configuration class containing all settings for the FPL optimisation."""
     
     # === BASIC SETTINGS ===
-    GAMEWEEK = 2
+    GAMEWEEK = 1
     BUDGET = 100.0  # million
-    FREE_TRANSFERS = 1
+    FREE_TRANSFERS = 0
     WILDCARD = False
 
     # === TRANSFER EFFICIENCY SETTINGS ===
@@ -29,7 +29,7 @@ class Config:
         "FWD": 5.5,
     }
     # How much 1 FPL score unit translates to points
-    FPL_SCORE_TO_POINTS_MULTIPLIER = 1.5
+    FPL_SCORE_TO_POINTS_MULTIPLIER = 1.0
 
     # === HISTORICAL DATA SETTINGS ===
     # Historic seasons to consider
@@ -41,9 +41,9 @@ class Config:
 
     # === SCORING WEIGHTS ===
     # These should total 1.0
-    FORM_WEIGHT = 0.1       # Importance of current season average
-    HISTORIC_WEIGHT = 0.6   # Importance of historic seasons' average
-    DIFFICULTY_WEIGHT = 0.3 # Importance of upcoming fixture difficulty
+    FORM_WEIGHT = 0.33       # Importance of current season average
+    HISTORIC_WEIGHT = 0.33   # Importance of historic seasons' average
+    DIFFICULTY_WEIGHT = 0.34 # Importance of upcoming fixture difficulty
 
     # === SQUAD COMPOSITION ===
     SQUAD_SIZE = {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3}
@@ -58,7 +58,7 @@ class Config:
     TEAM_MODIFIERS = {
         "Arsenal": 1.0,
         "Aston Villa": 1.0,
-        "Bournemouth": 0.8,
+        "Bournemouth": 1.0,
         "Brentford": 1.0,
         "Brighton": 1.0,
         "Burnley": 1.0,
@@ -68,24 +68,24 @@ class Config:
         "Fulham": 1.0,
         "Leeds": 1.0,
         "Liverpool": 1.0,
-        "Man City": 1.05,
+        "Man City": 1.0,
         "Man Utd": 1.1,
         "Newcastle": 1.0,
-        "Nott'm Forest": 0.7,
+        "Nott'm Forest": 1.0,
         "Sunderland": 1.0,
         "Spurs": 1.1,
-        "West Ham": 0.8,
-        "Wolves": 0.85,
+        "West Ham": 1.0,
+        "Wolves": 1.0,
     }
 
     # === PLAYER SELECTIONS ===
     # Force specific players to be selected (use lowercase names)
     FORCED_SELECTIONS = {
-        "GK": ["dúbravka"], 
+        "GK": [], 
         "DEF": [], 
-        "MID": ["baleba"], 
+        "MID": [], 
         "FWD": []
     }
 
     # Players that should not be considered (use lowercase names)
-    BLACKLIST_PLAYERS = ["isak"]
+    BLACKLIST_PLAYERS = []
