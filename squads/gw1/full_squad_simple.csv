@@ -1,16 +1,16 @@
 player,position,price,club,projected_points,squad_role
-Pickford,GK,5.5,Everton,7.3,Starting XI
-Konsa,DEF,4.5,Aston Villa,6.0,Starting XI
-Collins,DEF,5.0,Brentford,6.3,Starting XI
-Mitchell,DEF,5.0,Crystal Palace,5.9,Starting XI
+Pickford,GK,5.5,Everton,6.6,Starting XI
+Digne,DEF,4.5,Aston Villa,6.0,Starting XI
+Konsa,DEF,4.5,Aston Villa,5.8,Starting XI
+Collins,DEF,5.0,Brentford,5.9,Starting XI
 Pedro Porro,DEF,5.5,Spurs,7.0,Starting XI
-Palmer (V),MID,10.5,Chelsea,9.3,Starting XI
-M.Salah (C),MID,14.5,Liverpool,9.7,Starting XI
-Mbeumo,MID,8.0,Man Utd,8.6,Starting XI
-Kudus,MID,6.5,Spurs,7.6,Starting XI
-Watkins,FWD,9.0,Aston Villa,9.2,Starting XI
-Bowen,FWD,8.0,West Ham,8.8,Starting XI
-Dúbravka,GK,4.0,Burnley,3.4,Bench
-Digne,DEF,4.5,Aston Villa,5.7,Bench
-Baleba,MID,5.0,Brighton,5.8,Bench
+Palmer (V),MID,10.5,Chelsea,8.9,Starting XI
+M.Salah,MID,14.5,Liverpool,8.7,Starting XI
+Mbeumo,MID,8.0,Man Utd,7.8,Starting XI
+Kudus,MID,6.5,Spurs,7.8,Starting XI
+Watkins (C),FWD,9.0,Aston Villa,9.1,Starting XI
+Bowen,FWD,8.0,West Ham,8.5,Starting XI
+Dúbravka,GK,4.0,Burnley,3.5,Bench
+Mitchell,DEF,5.0,Crystal Palace,5.6,Bench
+Baleba,MID,5.0,Brighton,5.9,Bench
 Barnes,FWD,4.5,Burnley,6.5,Bench
