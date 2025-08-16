@@ -8,6 +8,7 @@ import unicodedata
 GAMEWEEK = 2
 BUDGET = 100.0  # million
 FREE_TRANSFERS = 1
+WILDCARD = False
 
 # Transfer efficiency settings
 MIN_TRANSFER_VALUE = 0.3  # Minimum FPL score improvement per transfer required
@@ -120,6 +121,49 @@ def normalize_for_matching(text):
     ascii_text = ''.join(c for c in normalized 
                         if unicodedata.category(c) != 'Mn')
     return ascii_text.lower().strip()
+
+
+def calculate_budget_from_previous_squad(gameweek, current_players):
+    """
+    Calculate available budget based on previous gameweek's squad value.
+    
+    Args:
+        gameweek (int): Current gameweek number
+        current_players (pd.DataFrame): Current player database with prices
+        
+    Returns:
+        float: Available budget in millions, or default BUDGET if no previous squad
+    """
+    if gameweek <= 1:
+        print(f"Using default budget: £{BUDGET:.1f}m (no previous squad)")
+        return BUDGET
+    
+    prev_gw = gameweek - 1
+    prev_squad_file = f"squads/gw{prev_gw}/full_squad.csv"
+    
+    if not os.path.exists(prev_squad_file):
+        print(f"Using default budget: £{BUDGET:.1f}m (no previous squad file)")
+        return BUDGET
+    
+    try:
+        prev_squad = pd.read_csv(prev_squad_file)
+        prev_squad_ids = match_players_to_current(prev_squad, current_players)
+        
+        if not prev_squad_ids:
+            print(f"Using default budget: £{BUDGET:.1f}m (could not match previous squad)")
+            return BUDGET
+        
+        # Calculate total value of previous squad using current prices
+        prev_squad_current_df = current_players[current_players['id'].isin(prev_squad_ids)]
+        total_value = prev_squad_current_df['now_cost_m'].sum()
+        
+        print(f"Previous squad value: £{total_value:.1f}m")
+        return total_value
+        
+    except Exception as e:
+        print(f"Error calculating budget from previous squad: {e}")
+        print(f"Using default budget: £{BUDGET:.1f}m")
+        return BUDGET
 
 
 def get_actual_points_for_gameweek(player_id, gameweek):
@@ -243,6 +287,125 @@ def create_previous_gameweek_results(current_gameweek):
         print(f"❌ Error creating results for GW{prev_gw}: {e}")
         import traceback
         traceback.print_exc()
+
+def get_unavailable_players(df, prev_squad_ids):
+    """
+    Identify players from previous squad who are unavailable for this gameweek.
+    
+    Args:
+        df (pd.DataFrame): Current player database
+        prev_squad_ids (list): Player IDs from previous squad
+        
+    Returns:
+        list: Player IDs who are unavailable
+    """
+    if not prev_squad_ids:
+        return []
+
+def evaluate_substitute_vs_transfer(df, prev_squad_ids, unavailable_player_ids, free_transfers):
+    """
+    Evaluate whether to substitute unavailable players or transfer them out.
+    
+    Args:
+        df (pd.DataFrame): Current player database with scores
+        prev_squad_ids (list): Player IDs from previous squad  
+        unavailable_player_ids (list): IDs of players who can't play this GW
+        free_transfers (int): Number of free transfers available
+        
+    Returns:
+        dict: Analysis of substitute vs transfer options
+    """
+    if not prev_squad_ids or not unavailable_player_ids:
+        return {"recommendation": "no_action", "reason": "No unavailable players or no previous squad"}
+    
+    # Get previous squad dataframe
+    prev_squad_df = df[df['id'].isin(prev_squad_ids)].copy()
+    unavailable_df = prev_squad_df[prev_squad_df['id'].isin(unavailable_player_ids)]
+    available_df = prev_squad_df[~prev_squad_df['id'].isin(unavailable_player_ids)]
+    
+    print(f"\n=== Substitute vs Transfer Analysis ===")
+    print(f"Unavailable players: {len(unavailable_df)}")
+    for _, player in unavailable_df.iterrows():
+        print(f"  - {player['display_name']} ({player['position']}, {player['team']})")
+    
+    substitute_scenarios = []
+    
+    for _, unavailable_player in unavailable_df.iterrows():
+        pos = unavailable_player['position']
+        
+        # Find potential substitutes from bench (same squad, available, different position allowed for bench)
+        potential_subs = available_df[
+            (available_df['id'] != unavailable_player['id']) &
+            (available_df['status'] == 'a')
+        ].copy()
+        
+        if len(potential_subs) == 0:
+            substitute_scenarios.append({
+                'unavailable_player': unavailable_player['display_name'],
+                'position': pos,
+                'unavailable_score': unavailable_player['fpl_score'],
+                'best_substitute': None,
+                'substitute_score': 0,
+                'score_loss': unavailable_player['fpl_score'],
+                'recommendation': 'transfer'
+            })
+            continue
+        
+        # Find best substitute (highest scoring available player)
+        best_sub = potential_subs.loc[potential_subs['fpl_score'].idxmax()]
+        score_loss = unavailable_player['fpl_score'] - best_sub['fpl_score']
+        
+        substitute_scenarios.append({
+            'unavailable_player': unavailable_player['display_name'],
+            'position': pos,
+            'unavailable_score': unavailable_player['fpl_score'],
+            'best_substitute': best_sub['display_name'],
+            'substitute_score': best_sub['fpl_score'],
+            'score_loss': score_loss,
+            'recommendation': 'substitute' if score_loss < 0.5 else 'consider_transfer'
+        })
+    
+    # Calculate total impact of substitutions
+    total_score_loss = sum(scenario['score_loss'] for scenario in substitute_scenarios)
+    forced_transfers = len([s for s in substitute_scenarios if s['best_substitute'] is None])
+    
+    # Decision logic
+    if forced_transfers > free_transfers:
+        decision = {
+            'recommendation': 'wildcard_needed',
+            'reason': f"Need {forced_transfers} forced transfers but only have {free_transfers} free",
+            'total_score_loss': total_score_loss,
+            'scenarios': substitute_scenarios
+        }
+    elif total_score_loss > free_transfers * 0.3:  # If score loss > transfer threshold
+        decision = {
+            'recommendation': 'make_transfers', 
+            'reason': f"Score loss ({total_score_loss:.2f}) justifies using {min(len(substitute_scenarios), free_transfers)} transfers",
+            'total_score_loss': total_score_loss,
+            'scenarios': substitute_scenarios
+        }
+    else:
+        decision = {
+            'recommendation': 'use_substitutes',
+            'reason': f"Score loss ({total_score_loss:.2f}) is acceptable, save transfers",
+            'total_score_loss': total_score_loss,
+            'scenarios': substitute_scenarios
+        }
+    
+    # Print analysis
+    print(f"\nSubstitution scenarios:")
+    for scenario in substitute_scenarios:
+        if scenario['best_substitute']:
+            print(f"  {scenario['unavailable_player']} → {scenario['best_substitute']} "
+                  f"(score loss: {scenario['score_loss']:.2f})")
+        else:
+            print(f"  {scenario['unavailable_player']} → NO SUBSTITUTE AVAILABLE (must transfer)")
+    
+    print(f"\nTotal score loss from substitutions: {total_score_loss:.2f}")
+    print(f"Recommendation: {decision['recommendation'].upper()}")
+    print(f"Reason: {decision['reason']}")
+    
+    return decision
 
 
 def create_summary_analysis(squad_df, gameweek, output_dir):
@@ -1234,7 +1397,8 @@ def select_squad_ilp(
         forced_selections,
         prev_squad_ids=None,
         free_transfers=None,
-        show_transfer_summary=True
+        show_transfer_summary=True,
+        available_budget=None
         ):
     """
     Select optimal FPL squad using Integer Linear Programming with 
@@ -1340,7 +1504,7 @@ def select_squad_ilp(
                 break
 
     # Transfer constraint
-    if prev_squad_ids is not None and free_transfers is not None:
+    if prev_squad_ids is not None and free_transfers is not None and not WILDCARD:
         print(f"Applying transfer constraint: max {free_transfers} transfers")
         
         # Create mapping of player IDs to dataframe indices
@@ -1362,6 +1526,8 @@ def select_squad_ilp(
         
         print(f"Must keep at least {min_players_to_keep} "
               "players from previous squad")
+    elif WILDCARD and prev_squad_ids is not None:
+        print("🃏 WILDCARD ACTIVE: No transfer constraints applied")
 
     # Bench constraints
     prob += (
@@ -1393,9 +1559,10 @@ def select_squad_ilp(
         )
 
     # Budget
+    budget_to_use = available_budget if available_budget is not None else BUDGET
     prob += pulp.lpSum(
         x[i] * df.iloc[i]["now_cost_m"] for i in range(n)
-    ) <= BUDGET
+    ) <= budget_to_use
 
     status = prob.solve(pulp.PULP_CBC_CMD(msg=0))
     
@@ -1462,7 +1629,10 @@ def main():
     """
     print(f"\n=== WELCOME TO FANTASY NERDBALL ===")
     print(f"\nPlanning for Gameweek {GAMEWEEK}")
-    print(f"Free transfers available: {FREE_TRANSFERS}")
+    if WILDCARD:
+        print("🃏 WILDCARD ACTIVE - No transfer limits!")
+    else:
+        print(f"Free transfers available: {FREE_TRANSFERS}")
     
     # Create results for previous gameweek if this is GW2+
     if GAMEWEEK >= 2:
@@ -1474,10 +1644,31 @@ def main():
     print("Fetching current players...")
     players = fetch_current_players()
     
+    # Calculate available budget based on previous squad value
+    available_budget = calculate_budget_from_previous_squad(GAMEWEEK, players)
+    
     # Match previous squad to current players if we have a previous squad
     prev_squad_ids = None
     if prev_squad is not None:
         prev_squad_ids = match_players_to_current(prev_squad, players)
+    
+    # Check for unavailable players and analyze substitute vs transfer options
+    if prev_squad_ids and not WILDCARD:
+        unavailable_players = get_unavailable_players(players, prev_squad_ids)
+        if unavailable_players:
+            substitute_analysis = evaluate_substitute_vs_transfer(
+                players, prev_squad_ids, unavailable_players, FREE_TRANSFERS
+            )
+            
+            # Update strategy based on analysis
+            if substitute_analysis['recommendation'] == 'wildcard_needed':
+                print(f"\n⚠️  RECOMMENDATION: Consider activating wildcard")
+                print(f"   Too many unavailable players for available transfers")
+            elif substitute_analysis['recommendation'] == 'use_substitutes':
+                print(f"\n💡 RECOMMENDATION: Use substitutes, save transfers")
+                print(f"   Substitution score loss acceptable")
+        else:
+            print(f"\n✅ All previous squad players are available")
     
     players = merge_past_two_seasons(
         players,
@@ -1505,7 +1696,9 @@ def main():
         scored,
         FORCED_SELECTIONS,
         prev_squad_ids,
-        FREE_TRANSFERS
+        FREE_TRANSFERS,
+        show_transfer_summary=True,
+        available_budget=available_budget
     )
 
     if starting_with_transfers.empty:
@@ -1523,11 +1716,13 @@ def main():
         prev_squad_ids_set = set(prev_squad_ids)
         transfers_made = len(prev_squad_ids_set - current_squad_ids)
     
+    # If wildcard is active, skip transfer value analysis
+    if WILDCARD:
+        print(f"\n🃏 WILDCARD ACTIVE: Making {transfers_made} changes without constraints")
+        should_make_transfers = True
+        transfer_analysis = {"reason": "Wildcard active - no transfer limits"}
     # If we have previous squad, evaluate whether transfers are worth it
-    should_make_transfers = True
-    transfer_analysis = {}
-    
-    if prev_squad_ids is not None and transfers_made > 0:
+    elif prev_squad_ids is not None and transfers_made > 0:
         print(f"\nEvaluating transfer value...")
         
         # Get best squad with no transfers for comparison
@@ -1559,6 +1754,9 @@ def main():
                   f"{transfer_analysis['rollover_value_lost']:.3f}")
             print(f"Net value: {transfer_analysis['net_value']:.3f}")
             print(f"Decision: {transfer_analysis['reason']}")
+    else:
+        should_make_transfers = True
+        transfer_analysis = {}
     
     # Choose final squad based on transfer analysis
     if should_make_transfers:
@@ -1646,7 +1844,8 @@ def main():
         updated_forced_selections,
         prev_squad_ids,
         FREE_TRANSFERS,
-        show_transfer_summary=False
+        show_transfer_summary=False,
+        available_budget=available_budget
     )
 
     starting = add_next_fixture(starting, GAMEWEEK)

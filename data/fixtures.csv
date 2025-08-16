@@ -1,9 +1,9 @@
 fixture_id,gameweek,kickoff_time,home_team,away_team,home_team_short,away_team_short,home_difficulty,away_difficulty,home_score,away_score,finished
 1,1,2025-08-15T19:00:00Z,Liverpool,Bournemouth,LIV,BOU,3,5,4.0,2.0,True
 2,1,2025-08-16T11:30:00Z,Aston Villa,Newcastle,AVL,NEW,3,4,0.0,0.0,False
-3,1,2025-08-16T14:00:00Z,Brighton,Fulham,BHA,FUL,3,3,,,False
-6,1,2025-08-16T14:00:00Z,Spurs,Burnley,TOT,BUR,2,3,,,False
-5,1,2025-08-16T14:00:00Z,Sunderland,West Ham,SUN,WHU,2,2,,,False
+3,1,2025-08-16T14:00:00Z,Brighton,Fulham,BHA,FUL,3,3,0.0,0.0,False
+6,1,2025-08-16T14:00:00Z,Spurs,Burnley,TOT,BUR,2,3,1.0,0.0,False
+5,1,2025-08-16T14:00:00Z,Sunderland,West Ham,SUN,WHU,2,2,0.0,0.0,False
 7,1,2025-08-16T16:30:00Z,Wolves,Man City,WOL,MCI,4,3,,,False
 8,1,2025-08-17T13:00:00Z,Chelsea,Crystal Palace,CHE,CRY,3,4,,,False
 4,1,2025-08-17T13:00:00Z,Nott'm Forest,Brentford,NFO,BRE,3,3,,,False
