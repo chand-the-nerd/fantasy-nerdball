@@ -222,6 +222,14 @@ def create_previous_gameweek_results(current_gameweek):
         available_columns = [col for col in results_columns if col in prev_squad.columns]
         results_df = prev_squad[available_columns].copy()
         
+        # Round projected_points and related columns to 1 decimal place in results file
+        if 'projected_points' in results_df.columns:
+            results_df['projected_points'] = results_df['projected_points'].round(1)
+        if 'points_difference' in results_df.columns:
+            results_df['points_difference'] = results_df['points_difference'].round(1)
+        if 'absolute_difference' in results_df.columns:
+            results_df['absolute_difference'] = results_df['absolute_difference'].round(1)
+        
         results_file = f"{prev_squad_dir}/full_squad_results.csv"
         results_df.to_csv(results_file, index=False)
         print(f"✅ Results saved to {results_file}")
