@@ -34,7 +34,7 @@ class SquadSelector:
 
         Returns:
             tuple: (starting_xi_dataframe, bench_dataframe, forced_selections_str)
-                   containing the optimal squad selection and info about forced players.
+                containing the optimal squad selection and info about forced players.
         """
         # Process forced selections before DataFrame modifications
         forced_player_ids = []
@@ -72,10 +72,14 @@ class SquadSelector:
         y = [pulp.LpVariable(f"y_{i}", cat="Binary") for i in range(n)]
 
         prob = pulp.LpProblem("FPL_Squad_Selection", pulp.LpMaximize)
+        
+        # CHANGED: Use projected_points instead of fpl_score for starting XI optimization
+        # Use fpl_score for squad selection, projected_points for starting XI
         prob += pulp.lpSum(
-            y[i] * df.iloc[i]["fpl_score"] + 0.2 * (x[i] - y[i]) * df.iloc[i]["fpl_score"]
+            y[i] * df.iloc[i]["projected_points"] + 0.2 * (x[i] - y[i]) * df.iloc[i]["fpl_score"]
             for i in range(n)
         )
+        
         prob += pulp.lpSum(x[i] for i in range(n)) == 15  # Total squad
         prob += pulp.lpSum(y[i] for i in range(n)) == 11  # Starting XI
         for i in range(n):
@@ -95,6 +99,11 @@ class SquadSelector:
         prob += pulp.lpSum(y[i] for i in range(n) if df.iloc[i]["position"] == "MID") <= 5
         prob += pulp.lpSum(y[i] for i in range(n) if df.iloc[i]["position"] == "FWD") >= 1
         prob += pulp.lpSum(y[i] for i in range(n) if df.iloc[i]["position"] == "FWD") <= 3
+
+        # ADDED: Form constraint - only players with form > 0 can be in starting XI
+        for i in range(n):
+            if df.iloc[i]["form"] <= 0:
+                prob += y[i] == 0  # Force players with form <= 0 to not be in starting XI
 
         # Apply forced selections using player IDs
         for player_id in forced_player_ids:

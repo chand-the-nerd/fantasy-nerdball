@@ -55,17 +55,12 @@ class ResultsAnalyser:
             print(f"No previous squad found at {prev_squad_file}")
             return
 
-        print(f"\n=== Creating results for GW{prev_gw} ===")
+        print(f"\n=== GW{prev_gw} SUMMARY ===")
 
         try:
             # Load previous squad
             prev_squad = pd.read_csv(prev_squad_file)
-            print(f"Loaded squad with {len(prev_squad)} players")
-
-            # Get actual points for each player
-            print(f"Fetching actual points for GW{prev_gw}...")
             actual_points = []
-
             for idx, player in prev_squad.iterrows():
                 player_id = player.get("id")
                 player_name = player.get("display_name", "Unknown")
@@ -85,7 +80,7 @@ class ResultsAnalyser:
 
             # Add actual points to dataframe
             prev_squad["actual_points"] = actual_points
-            print(f"Added actual points. Total team points: {sum(actual_points)}")
+            print(f"Total squad points: {sum(actual_points)}")
 
             # Calculate differences (actual - projected)
             if "projected_points" in prev_squad.columns:
@@ -97,7 +92,7 @@ class ResultsAnalyser:
                 total_projected = prev_squad["projected_points"].sum()
                 total_actual = sum(actual_points)
                 print(
-                    f"Total projected: {total_projected:.1f}, Total actual: {total_actual}, Difference: {total_actual - total_projected:+.1f}"
+                    f"Projected (from last week): {total_projected:.1f}, Total Points: {total_actual}, Difference: {total_actual - total_projected:+.1f}"
                 )
             else:
                 print("Warning: No projected_points column found in previous squad")
@@ -138,7 +133,7 @@ class ResultsAnalyser:
             # Create summary.csv
             self.create_summary_analysis(prev_squad, prev_gw, prev_squad_dir)
 
-            print(f"✅ Results creation completed for GW{prev_gw}")
+            print(f"\n✅ Results creation completed for GW{prev_gw}")
 
         except Exception as e:
             print(f"❌ Error creating results for GW{prev_gw}: {e}")
@@ -148,7 +143,7 @@ class ResultsAnalyser:
     def create_summary_analysis(self, squad_df: pd.DataFrame, gameweek: int, output_dir: str):
         """
         Create a summary analysis comparing projected vs actual points.
-        Enhanced with better error handling.
+        Enhanced to focus only on Starting XI players.
 
         Args:
             squad_df (pd.DataFrame): Squad dataframe with projected and actual points
@@ -156,46 +151,26 @@ class ResultsAnalyser:
             output_dir (str): Directory to save the summary
         """
         try:
-            print(f"Creating summary analysis for GW{gameweek}...")
-
-            # Team totals
-            if "projected_points" in squad_df.columns:
-                total_projected = squad_df["projected_points"].sum()
-            else:
-                total_projected = 0
-
-            total_actual = squad_df["actual_points"].sum()
-            total_difference = total_actual - total_projected
-
-            # Starting XI vs Bench breakdown
+            # Focus only on Starting XI players
             starting_xi = squad_df[squad_df.get("squad_role", "") == "Starting XI"]
-            bench = squad_df[squad_df.get("squad_role", "") == "Bench"]
 
             if len(starting_xi) == 0:
                 print("Warning: No Starting XI players found, using all players")
                 starting_xi = squad_df
-                bench = pd.DataFrame()
 
-            starting_projected = (
-                starting_xi["projected_points"].sum()
-                if "projected_points" in starting_xi.columns
-                else 0
-            )
-            starting_actual = starting_xi["actual_points"].sum()
-            starting_difference = starting_actual - starting_projected
+            # Starting XI totals
+            if "projected_points" in starting_xi.columns:
+                total_projected = starting_xi["projected_points"].sum()
+            else:
+                total_projected = 0
 
-            bench_projected = (
-                bench["projected_points"].sum()
-                if "projected_points" in bench.columns
-                else 0
-            )
-            bench_actual = bench["actual_points"].sum()
-            bench_difference = bench_actual - bench_projected
+            total_actual = starting_xi["actual_points"].sum()
+            total_difference = total_actual - total_projected
 
-            # Position breakdown
+            # Position breakdown (Starting XI only)
             position_summary = []
             for position in ["GK", "DEF", "MID", "FWD"]:
-                pos_players = squad_df[squad_df["position"] == position]
+                pos_players = starting_xi[starting_xi["position"] == position]
                 if len(pos_players) > 0:
                     pos_projected = (
                         pos_players["projected_points"].sum()
@@ -220,68 +195,45 @@ class ResultsAnalyser:
                         }
                     )
 
-            # Best and worst performers
-            if "points_difference" in squad_df.columns and len(squad_df) > 0:
-                best_performer = squad_df.loc[squad_df["points_difference"].idxmax()]
-                worst_performer = squad_df.loc[squad_df["points_difference"].idxmin()]
+            # Best and worst performers (Starting XI only)
+            if "points_difference" in starting_xi.columns and len(starting_xi) > 0:
+                best_performer = starting_xi.loc[starting_xi["points_difference"].idxmax()]
+                worst_performer = starting_xi.loc[starting_xi["points_difference"].idxmin()]
             else:
                 best_performer = None
                 worst_performer = None
 
-            # Accuracy metrics
-            if "absolute_difference" in squad_df.columns:
-                mean_absolute_error = squad_df["absolute_difference"].mean()
-                players_within_2pts = len(squad_df[squad_df["absolute_difference"] <= 2])
+            # Accuracy metrics (Starting XI only)
+            if "absolute_difference" in starting_xi.columns:
+                mean_absolute_error = starting_xi["absolute_difference"].mean()
+                players_within_2pts = len(starting_xi[starting_xi["absolute_difference"] <= 2])
                 accuracy_within_2pts = (
-                    (players_within_2pts / len(squad_df)) * 100 if len(squad_df) > 0 else 0
+                    (players_within_2pts / len(starting_xi)) * 100 if len(starting_xi) > 0 else 0
                 )
             else:
                 mean_absolute_error = 0
                 accuracy_within_2pts = 0
                 players_within_2pts = 0
 
-            # Create summary dataframe
+            # Create summary dataframe (Starting XI focus)
             summary_data = []
 
-            # Team totals
+            # Starting XI totals
             summary_data.append(
                 {
-                    "metric": "Total Team Points",
+                    "metric": "Starting XI Total Points",
                     "projected": round(total_projected),
                     "actual": total_actual,
                     "difference": round(total_difference),
-                    "notes": f"Overall team performance for GW{gameweek}",
+                    "notes": f"Total points from {len(starting_xi)} starting players in GW{gameweek}",
                 }
             )
 
-            # Starting XI
-            summary_data.append(
-                {
-                    "metric": "Starting XI Points",
-                    "projected": round(starting_projected),
-                    "actual": starting_actual,
-                    "difference": round(starting_difference),
-                    "notes": f"Points from {len(starting_xi)} starting players",
-                }
-            )
-
-            # Bench
-            if len(bench) > 0:
-                summary_data.append(
-                    {
-                        "metric": "Bench Points",
-                        "projected": round(bench_projected),
-                        "actual": bench_actual,
-                        "difference": round(bench_difference),
-                        "notes": f"Points from {len(bench)} bench players",
-                    }
-                )
-
-            # Position summaries
+            # Position summaries (Starting XI only)
             for pos_data in position_summary:
                 summary_data.append(
                     {
-                        "metric": f'{pos_data["position"]} Total',
+                        "metric": f'{pos_data["position"]} Starting XI',
                         "projected": round(pos_data["projected_points"]),
                         "actual": pos_data["actual_points"],
                         "difference": round(pos_data["difference"]),
@@ -289,32 +241,32 @@ class ResultsAnalyser:
                     }
                 )
 
-            # Accuracy metrics
+            # Accuracy metrics (Starting XI only)
             summary_data.append(
                 {
-                    "metric": "Mean Absolute Error",
+                    "metric": "Mean Absolute Error (XI)",
                     "projected": "-",
                     "actual": f"{mean_absolute_error:.2f}",
                     "difference": "-",
-                    "notes": "Average absolute difference between projected and actual",
+                    "notes": "Average absolute difference for Starting XI projections",
                 }
             )
 
             summary_data.append(
                 {
-                    "metric": "Accuracy (within 2pts)",
+                    "metric": "Accuracy within 2pts (XI)",
                     "projected": "-",
                     "actual": f"{accuracy_within_2pts:.1f}%",
                     "difference": "-",
-                    "notes": f"{players_within_2pts}/{len(squad_df)} players within 2 points of projection",
+                    "notes": f"{players_within_2pts}/{len(starting_xi)} Starting XI players within 2 points",
                 }
             )
 
-            # Best/worst performers
+            # Best/worst performers (Starting XI only)
             if best_performer is not None:
                 summary_data.append(
                     {
-                        "metric": "Best Performer",
+                        "metric": "Best Starting XI Performer",
                         "projected": round(best_performer.get("projected_points", 0)),
                         "actual": best_performer["actual_points"],
                         "difference": round(best_performer.get("points_difference", 0)),
@@ -325,11 +277,31 @@ class ResultsAnalyser:
             if worst_performer is not None:
                 summary_data.append(
                     {
-                        "metric": "Worst Performer",
+                        "metric": "Worst Starting XI Performer",
                         "projected": round(worst_performer.get("projected_points", 0)),
                         "actual": worst_performer["actual_points"],
                         "difference": round(worst_performer.get("points_difference", 0)),
                         "notes": f'{worst_performer["display_name"]} ({worst_performer["position"]})',
+                    }
+                )
+
+            # Captain analysis (if captain data is available)
+            captain_players = starting_xi[starting_xi["display_name"].str.contains(r"\(C\)", na=False)]
+            if len(captain_players) > 0:
+                captain = captain_players.iloc[0]
+                captain_projected = captain.get("projected_points", 0)
+                captain_actual = captain["actual_points"]
+                # Account for captain double points in actual score
+                captain_actual_doubled = captain_actual * 2
+                captain_difference = captain_actual_doubled - (captain_projected * 2)
+                
+                summary_data.append(
+                    {
+                        "metric": "Captain Performance",
+                        "projected": round(captain_projected * 2),  # Show doubled projection
+                        "actual": captain_actual_doubled,
+                        "difference": round(captain_difference),
+                        "notes": f'{captain["display_name"].replace(" (C)", "")} - doubled points included',
                     }
                 )
 
@@ -338,31 +310,31 @@ class ResultsAnalyser:
             # Save summary
             summary_file = f"{output_dir}/summary.csv"
             summary_df.to_csv(summary_file, index=False)
-            print(f"✅ Summary saved to {summary_file}")
+            print(f"✅ Starting XI summary saved to {summary_file}")
 
-            # Print summary to console
-            print(f"\n=== GW{gameweek} Performance Summary ===")
+            # Print summary to console (Starting XI focus)
+            print(f"\n=== GW{gameweek} Starting XI Performance Summary ===")
             print(
-                f"Total Points: {total_actual} (projected: {total_projected:.1f}, difference: {total_difference:+.1f})"
+                f"Starting XI Points: {total_actual} (projected: {total_projected:.1f}, difference: {total_difference:+.1f})"
             )
-            print(
-                f"Starting XI: {starting_actual} (projected: {starting_projected:.1f}, difference: {starting_difference:+.1f})"
-            )
-            if len(bench) > 0:
-                print(
-                    f"Bench: {bench_actual} (projected: {bench_projected:.1f}, difference: {bench_difference:+.1f})"
-                )
             print(f"Mean Absolute Error: {mean_absolute_error:.2f}")
             print(f"Accuracy (within 2pts): {accuracy_within_2pts:.1f}%")
 
             if best_performer is not None:
                 print(
-                    f"Best: {best_performer['display_name']} ({best_performer.get('points_difference', 0):+.1f})"
+                    f"Best XI Performer: {best_performer['display_name']} ({best_performer.get('points_difference', 0):+.1f})"
                 )
             if worst_performer is not None:
                 print(
-                    f"Worst: {worst_performer['display_name']} ({worst_performer.get('points_difference', 0):+.1f})"
+                    f"Worst XI Performer: {worst_performer['display_name']} ({worst_performer.get('points_difference', 0):+.1f})"
                 )
+
+            # Position breakdown in console
+            print(f"\nPosition Breakdown (Starting XI):")
+            for pos_data in position_summary:
+                print(f"  {pos_data['position']}: {pos_data['actual_points']} pts "
+                      f"(projected: {pos_data['projected_points']:.1f}, "
+                      f"diff: {pos_data['difference']:+.1f})")
 
         except Exception as e:
             print(f"❌ Error creating summary analysis: {e}")

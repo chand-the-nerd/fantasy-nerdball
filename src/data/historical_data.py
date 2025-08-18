@@ -128,23 +128,6 @@ class HistoricalDataManager:
         current_reliability = current_reliability.clip(upper=1.0)  # Cap at 100%
         
         print(f"Calculated reliability based on starts over {gameweeks_completed} completed gameweek(s)")
-        
-        # Debug: Show players with minutes but no starts
-        has_minutes_no_starts = current[(current["minutes"] > 0) & (current["starts"] == 0)]
-        if len(has_minutes_no_starts) > 0:
-            print(f"DEBUG: Found {len(has_minutes_no_starts)} players with minutes but no starts:")
-            for _, player in has_minutes_no_starts.head(5).iterrows():
-                print(f"  {player['display_name']}: {player['minutes']} mins, {player['starts']} starts, form {player['form']}")
-        
-        # Debug: Show some examples of reliability calculation
-        sample_players = current[current["minutes"] > 0].head(5)
-        print(f"DEBUG: Sample reliability calculations:")
-        for _, player in sample_players.iterrows():
-            starts = player["starts"]
-            minutes = player["minutes"]
-            form = player["form"]
-            reliability = starts / gameweeks_completed
-            print(f"  {player['display_name']}: {starts} starts, {minutes} mins, form {form} → {reliability:.0%}")
 
         # Assign current_reliability to the dataframe BEFORE merging
         current = current.assign(current_reliability=current_reliability)
