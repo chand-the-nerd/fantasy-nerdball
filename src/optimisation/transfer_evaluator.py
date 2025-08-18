@@ -216,6 +216,27 @@ class TransferEvaluator:
             starting_points = starting["projected_points"].sum()
             net_score = starting_points - penalty_points
             
+            # Get transfer details for logging
+            players_out = prev_squad_ids_set - current_squad_ids
+            players_in = current_squad_ids - prev_squad_ids_set
+            
+            # Format transfer details
+            transfer_details = ""
+            if actual_transfers > 0:
+                out_names = []
+                for player_id in players_out:
+                    prev_player = df[df["id"] == player_id]
+                    if not prev_player.empty:
+                        out_names.append(prev_player.iloc[0]["display_name"])
+                
+                in_names = []
+                for player_id in players_in:
+                    player = pd.concat([starting, bench])[pd.concat([starting, bench])["id"] == player_id].iloc[0]
+                    in_names.append(player["display_name"])
+                
+                if out_names and in_names:
+                    transfer_details = f" (🔄 OUT: {', '.join(out_names)} → IN: {', '.join(in_names)})"
+            
             # Store this scenario
             scenario = {
                 'max_transfers_allowed': max_transfers_allowed,
@@ -226,13 +247,24 @@ class TransferEvaluator:
                 'net_score': net_score,
                 'starting': starting,
                 'bench': bench,
-                'forced_display': forced_display
+                'forced_display': forced_display,
+                'transfer_details': transfer_details
             }
             scenarios.append(scenario)
             
-            print(f"  Scenario {max_transfers_allowed}: {actual_transfers} transfers, "
-                  f"{extra_transfers} extra, penalty: -{penalty_points}, "
-                  f"gross: {starting_points:.1f}, net: {net_score:.1f}")
+            # Enhanced logging with emojis and transfer details
+            if actual_transfers == 0:
+                print(f"  🏠 Scenario {max_transfers_allowed}: {actual_transfers} transfers, "
+                      f"{extra_transfers} extra, penalty: -{penalty_points}, "
+                      f"gross: {starting_points:.1f}, net: {net_score:.1f}")
+            elif extra_transfers == 0:
+                print(f"  ✅ Scenario {max_transfers_allowed}: {actual_transfers} transfers, "
+                      f"{extra_transfers} extra, penalty: -{penalty_points}, "
+                      f"gross: {starting_points:.1f}, net: {net_score:.1f}{transfer_details}")
+            else:
+                print(f"  💰 Scenario {max_transfers_allowed}: {actual_transfers} transfers, "
+                      f"{extra_transfers} extra, penalty: -{penalty_points}, "
+                      f"gross: {starting_points:.1f}, net: {net_score:.1f}{transfer_details}")
         
         if not scenarios:
             print("❌ No valid scenarios found")
