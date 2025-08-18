@@ -96,18 +96,42 @@ class ScoringEngine:
         # Calculate projected points here (moved from PointsCalculator)
         df = self._calculate_projected_points(df)
 
-        # Set both FPL score and projected points to 0 for unavailable players
+        # Apply availability filter based on config setting
+        df = self._apply_availability_filter(df)
+
+        return df
+    
+    def _apply_availability_filter(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Apply availability filter to players based on config setting.
+        
+        Args:
+            df (pd.DataFrame): Player dataframe with scores
+            
+        Returns:
+            pd.DataFrame: Modified dataframe with availability considerations
+        """
+        # Check if EXCLUDE_UNAVAILABLE setting exists, default to True for backwards compatibility
+        exclude_unavailable = getattr(self.config, 'EXCLUDE_UNAVAILABLE', True)
+        
+        if not exclude_unavailable:
+            print("📋 EXCLUDE_UNAVAILABLE = False: Including unavailable players in optimization")
+            return df
+        
+        # Identify unavailable players
         unavailable_mask = (
             (df["status"] != "a") & 
             (df["chance_of_playing_next_round"].fillna(100) < 75)
         )
         
-        if unavailable_mask.any():
-            unavailable_count = unavailable_mask.sum()
-            print(f"\n⚠️  Setting FPL scores and projected points to 0 for {unavailable_count} unavailable players")
+        unavailable_count = unavailable_mask.sum()
+        
+        if unavailable_count > 0:
             df.loc[unavailable_mask, "fpl_score"] = 0.0
             df.loc[unavailable_mask, "projected_points"] = 0.0
-
+        else:
+            print("✅ All players are available for selection")
+        
         return df
     
     def _calculate_projected_points(self, df: pd.DataFrame) -> pd.DataFrame:

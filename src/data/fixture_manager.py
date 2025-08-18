@@ -94,7 +94,6 @@ class FixtureManager:
         # Save fixtures to CSV
         os.makedirs("data", exist_ok=True)
         fixtures_csv.to_csv("data/fixtures.csv", index=False)
-        print(f"Fixture data saved to data/fixtures.csv")
 
         # Filter fixtures for the specified gameweek range
         end_gameweek = starting_gameweek + first_n_gws - 1
@@ -102,11 +101,6 @@ class FixtureManager:
             (pd.to_numeric(fixtures["event"], errors="coerce") >= starting_gameweek)
             & (pd.to_numeric(fixtures["event"], errors="coerce") <= end_gameweek)
         ]
-
-        print(
-            f"Calculating fixture difficulty for gameweeks {starting_gameweek} "
-            f"to {end_gameweek}"
-        )
 
         player_diffs = []
 

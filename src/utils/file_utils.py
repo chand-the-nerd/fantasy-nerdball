@@ -32,7 +32,7 @@ class FileUtils:
 
         try:
             prev_squad = pd.read_csv(squad_file)
-            print(f"Loaded previous squad from {squad_file}")
+            print(f"\nLoaded previous squad from {squad_file}")
             return prev_squad
         except Exception as e:
             print(f"Error loading previous squad: {e}")
