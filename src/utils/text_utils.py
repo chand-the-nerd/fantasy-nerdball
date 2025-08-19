@@ -19,7 +19,8 @@ def normalize_name(s) -> str:
 
 def normalize_for_matching(text: str) -> str:
     """
-    Normalise text for matching by removing accents and converting to lowercase.
+    Normalise text for matching by removing accents and converting to 
+    lowercase.
 
     Args:
         text (str): The text to normalise.
@@ -28,5 +29,7 @@ def normalize_for_matching(text: str) -> str:
         str: The normalised text with accents removed and lowercase.
     """
     normalised = unicodedata.normalize("NFD", text)
-    ascii_text = "".join(c for c in normalised if unicodedata.category(c) != "Mn")
+    ascii_text = "".join(
+        c for c in normalised if unicodedata.category(c) != "Mn"
+    )
     return ascii_text.lower().strip()

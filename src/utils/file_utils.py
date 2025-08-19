@@ -16,7 +16,8 @@ class FileUtils:
             gameweek (int): Current gameweek (will load gameweek-1's squad).
 
         Returns:
-            pd.DataFrame or None: Previous squad data or None if file doesn't exist.
+            pd.DataFrame or None: Previous squad data or None if file 
+                                 doesn't exist.
         """
         if gameweek <= 1:
             print("No previous squad to load (this is GW1 or earlier)")
@@ -27,7 +28,8 @@ class FileUtils:
 
         if not os.path.exists(squad_file):
             print(f"Warning: Previous squad file not found at {squad_file}")
-            print("Proceeding without transfer constraints (assuming new team)")
+            print("Proceeding without transfer constraints "
+                  "(assuming new team)")
             return None
 
         try:
@@ -39,27 +41,43 @@ class FileUtils:
             return None
     
     @staticmethod
-    def save_squad_data(gameweek: int, starting_display: pd.DataFrame, bench_display: pd.DataFrame):
+    def save_squad_data(gameweek: int, starting_display: pd.DataFrame, 
+                       bench_display: pd.DataFrame):
         """
         Save squad data to CSV files with projected points.
 
         Args:
             gameweek (int): Current gameweek number.
-            starting_display (pd.DataFrame): Starting XI with display formatting.
+            starting_display (pd.DataFrame): Starting XI with display format.
             bench_display (pd.DataFrame): Bench with display formatting.
         """
         squad_dir = f"squads/gw{gameweek}"
         os.makedirs(squad_dir, exist_ok=True)
 
         # Save combined squad with all details including projected points
-        squad_combined = pd.concat([starting_display, bench_display], ignore_index=True)
-        squad_combined["squad_role"] = ["Starting XI"] * len(starting_display) + [
-            "Bench"
-        ] * len(bench_display)
+        squad_combined = pd.concat([starting_display, bench_display], 
+                                 ignore_index=True)
+        squad_combined["squad_role"] = (
+            ["Starting XI"] * len(starting_display) + 
+            ["Bench"] * len(bench_display)
+        )
+        
         combined_file = f"{squad_dir}/full_squad.csv"
         squad_combined.to_csv(combined_file, index=False)
 
         # Save simple squad overview with projected points included
+        simple_squad = FileUtils._create_simple_squad_overview(squad_combined)
+        simple_file = f"{squad_dir}/full_squad_simple.csv"
+        simple_squad.to_csv(simple_file, index=False)
+
+        print(f"\nSquad saved to {squad_dir}/")
+        print(f"  - {combined_file}")
+        print(f"  - {simple_file}")
+    
+    @staticmethod
+    def _create_simple_squad_overview(
+        squad_combined: pd.DataFrame) -> pd.DataFrame:
+        """Create simplified squad overview for easier reading."""
         simple_squad = squad_combined[
             [
                 "display_name",
@@ -70,6 +88,7 @@ class FileUtils:
                 "squad_role",
             ]
         ].copy()
+        
         simple_squad = simple_squad.rename(
             columns={
                 "display_name": "player",
@@ -78,9 +97,5 @@ class FileUtils:
                 "projected_points": "projected_points",
             }
         )
-        simple_file = f"{squad_dir}/full_squad_simple.csv"
-        simple_squad.to_csv(simple_file, index=False)
-
-        print(f"\nSquad saved to {squad_dir}/")
-        print(f"  - {combined_file}")
-        print(f"  - {simple_file}")
+        
+        return simple_squad
