@@ -309,11 +309,11 @@ def optimise_squad(
             available_budget, 
             components['squad_selector']
         )
-        starting_with_transfers,
+        (starting_with_transfers,
         bench_with_transfers,
         _,
         transfers_made,
-        penalty_points = result
+        penalty_points) = result
     else:
         # Use standard optimisation
         starting_with_transfers, bench_with_transfers, _ = (
