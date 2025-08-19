@@ -8,9 +8,9 @@ class Config:
     """Configuration class containing all settings for the FPL optimisation."""
     
     # === BASIC SETTINGS ===
-    GAMEWEEK = 2
+    GAMEWEEK = 1
     BUDGET = 100.0  # Will be overridden by value of squad from prev gameweek
-    FREE_TRANSFERS = 1
+    FREE_TRANSFERS = 0
     ACCEPT_TRANSFER_PENALTY = False
     # Set to False to include unavailable players in optimisation
     EXCLUDE_UNAVAILABLE = True
@@ -42,9 +42,9 @@ class Config:
 
     # === SCORING WEIGHTS ===
     # These should total 1.0
-    FORM_WEIGHT = 0.15      # Importance of current season average
-    HISTORIC_WEIGHT = 0.50   # Importance of historic seasons' average
-    DIFFICULTY_WEIGHT = 0.35 # Importance of upcoming fixture difficulty
+    FORM_WEIGHT = 0.4      # Importance of current season average
+    HISTORIC_WEIGHT = 0.4   # Importance of historic seasons' average
+    DIFFICULTY_WEIGHT = 0.2 # Importance of upcoming fixture difficulty
 
     # === SQUAD COMPOSITION ===
     SQUAD_SIZE = {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3}
@@ -59,24 +59,24 @@ class Config:
     TEAM_MODIFIERS = {
         "Arsenal": 1.0,
         "Aston Villa": 1.0,
-        "Bournemouth": 0.8,
-        "Brentford": 0.8,
+        "Bournemouth": 1.0,
+        "Brentford": 1.0,
         "Brighton": 1.0,
         "Burnley": 1.0,
         "Chelsea": 1.0,
         "Crystal Palace": 1.0,
         "Everton": 1.0,
         "Fulham": 1.0,
-        "Leeds": 1.1,
+        "Leeds": 1.0,
         "Liverpool": 1.0,
         "Man City": 1.0,
-        "Man Utd": 1.1,
-        "Newcastle": 0.9,
-        "Nott'm Forest": 0.8,
+        "Man Utd": 1.0,
+        "Newcastle": 1.0,
+        "Nott'm Forest": 1.0,
         "Sunderland": 1.0,
-        "Spurs": 1.1,
-        "West Ham": 0.8,
-        "Wolves": 0.7,
+        "Spurs": 1.0,
+        "West Ham": 1.0,
+        "Wolves": 1.0,
     }
 
     # === PLAYER SELECTIONS ===
@@ -89,4 +89,4 @@ class Config:
     }
 
     # Players that should not be considered (use lowercase names)
-    BLACKLIST_PLAYERS = ["isak"]
+    BLACKLIST_PLAYERS = []
