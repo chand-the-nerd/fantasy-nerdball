@@ -1,4 +1,5 @@
 """
+COPY THIS CONFIG AND SAVE IN ROOT DIRECTORY AS config.py
 Configuration settings for Fantasy Nerdball FPL optimisation tool.
 Edit this file to customise your optimisation preferences.
 """
