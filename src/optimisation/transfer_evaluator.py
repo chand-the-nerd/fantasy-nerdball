@@ -153,6 +153,7 @@ class TransferEvaluator:
                 )
 
         print(f"\nTotal score loss from substitutions: {total_score_loss:.1f} pts")
+        print("(note that negative score loss is good)")
         print(f"Transfer threshold: {self.config.MIN_TRANSFER_VALUE} pts")
         print(f"Recommendation: {decision['recommendation'].upper()}")
         print(f"Reason: {decision['reason']}")
