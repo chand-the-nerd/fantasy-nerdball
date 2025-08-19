@@ -208,3 +208,5 @@ __marimo__/
 
 /data/
 /squads/
+/config.py
+.DS_Store
