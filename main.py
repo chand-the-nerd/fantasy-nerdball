@@ -287,7 +287,7 @@ def main():
         else:
             print(f"\n✅ All previous squad players are available")
     
-    print("\n🧠 Thinking with xG intelligence...")
+    print("\n🧠 Thinking...")
 
     # Get the best squad - either with penalty consideration or standard approach
     if config.ACCEPT_TRANSFER_PENALTY and prev_squad_ids is not None and not config.WILDCARD:

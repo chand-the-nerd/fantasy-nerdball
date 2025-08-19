@@ -131,7 +131,6 @@ class ScoringEngine:
         unavailable_count = unavailable_mask.sum()
         
         if unavailable_count > 0:
-            print(f"⚠️  Setting FPL scores and projected points to 0 for {unavailable_count} unavailable players")
             df.loc[unavailable_mask, "fpl_score"] = 0.0
             df.loc[unavailable_mask, "projected_points"] = 0.0
         else:

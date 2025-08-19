@@ -109,9 +109,6 @@ class PlayerProcessor:
             min_xgc_threshold = 0.15
             min_games_started = 2
         
-        print(f"🔍 Analyzing current season xG performance (after {gameweeks_completed} GW)...")
-        print(f"   Thresholds: xGI≥{min_xg_threshold}/game, xGC≥{min_xgc_threshold}/game, starts≥{min_games_started}")
-        
         # Calculate per-game metrics for current season to match historical approach
         df["current_xgi_per_game"] = 0.0
         df["current_gi_per_game"] = 0.0  
@@ -156,7 +153,6 @@ class PlayerProcessor:
         
         attacking_count = attacking_mask.sum()
         if attacking_count > 0:
-            print(f"   Found {attacking_count} players with sufficient attacking data")
             df.loc[attacking_mask, "attacking_xOP"] = (
                 df.loc[attacking_mask, "current_gi_per_game"] / 
                 df.loc[attacking_mask, "current_xgi_per_game"]
@@ -171,7 +167,6 @@ class PlayerProcessor:
         
         defensive_count = defensive_mask.sum()
         if defensive_count > 0:
-            print(f"   Found {defensive_count} players with sufficient defensive data")
             # For GC, higher ratio = better performance (conceding less than expected)
             df.loc[defensive_mask, "defensive_xOP"] = (
                 df.loc[defensive_mask, "current_xgc_per_game"] / 
@@ -240,10 +235,6 @@ class PlayerProcessor:
             ["position", "current_xg_context"]
         ).size().reset_index(name="count")
         
-        if not context_summary.empty:
-            print("   📊 xG Analysis Breakdown:")
-            for _, row in context_summary.iterrows():
-                print(f"      {row['position']}: {row['count']} players ({row['current_xg_context']})")
         
         # Clean up temporary columns
         df = df.drop(columns=["attacking_xOP", "defensive_xOP", "current_xgi_per_game", 
