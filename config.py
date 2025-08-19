@@ -11,7 +11,8 @@ class Config:
     BUDGET = 100.0  # Will be overriden by value of squad from prev gameweek
     FREE_TRANSFERS = 1
     ACCEPT_TRANSFER_PENALTY = True
-    EXCLUDE_UNAVAILABLE = True  # Set to False to include unavailable players in optimization
+    # Set to False to include unavailable players in optimization
+    EXCLUDE_UNAVAILABLE = True
     WILDCARD = False
 
     # === TRANSFER EFFICIENCY SETTINGS ===

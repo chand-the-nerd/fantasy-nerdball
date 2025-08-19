@@ -160,6 +160,35 @@ class TransferEvaluator:
 
         return decision
     
+    def _calculate_minimum_transfers_needed(self, forced_selections: dict, prev_squad_ids: list, df: pd.DataFrame) -> int:
+        """
+        Calculate the minimum number of transfers needed to satisfy forced selections.
+        
+        Args:
+            forced_selections (dict): Dictionary of forced player selections
+            prev_squad_ids (list): Player IDs from previous squad
+            df (pd.DataFrame): Current player database
+            
+        Returns:
+            int: Minimum transfers needed
+        """
+        if not prev_squad_ids or not any(forced_selections.values()):
+            return 0
+            
+        prev_squad_ids_set = set(prev_squad_ids)
+        forced_player_ids = set()
+        
+        # Get all forced player IDs
+        for position, player_names in forced_selections.items():
+            for player_name in player_names:
+                player_match = df[df["display_name"].str.lower() == player_name.lower()]
+                if not player_match.empty:
+                    forced_player_ids.add(player_match.iloc[0]["id"])
+        
+        # Count how many forced players are not in previous squad
+        forced_not_in_prev = forced_player_ids - prev_squad_ids_set
+        return len(forced_not_in_prev)
+    
     def get_optimal_squad_with_penalties(
         self, df: pd.DataFrame, forced_selections: dict, prev_squad_ids: list, 
         free_transfers: int, available_budget: float, squad_selector
@@ -191,10 +220,17 @@ class TransferEvaluator:
         
         scenarios = []
         
-        # Test different transfer scenarios - always test up to free_transfers + 3
-        max_transfers_to_test = free_transfers + 3
+        # Calculate minimum transfers needed for forced selections
+        min_transfers_needed = self._calculate_minimum_transfers_needed(forced_selections, prev_squad_ids, df)
         
-        for max_transfers_allowed in range(0, max_transfers_to_test + 1):
+        # Test different transfer scenarios - start from minimum needed transfers
+        max_transfers_to_test = free_transfers + 3
+        start_transfers = min_transfers_needed  # Start from minimum needed, not 0
+        
+        if min_transfers_needed > 0:
+            print(f"📋 Forced selections require minimum {min_transfers_needed} transfer(s)")
+        
+        for max_transfers_allowed in range(start_transfers, max_transfers_to_test + 1):
             # Get optimal squad with this transfer limit
             starting, bench, forced_display = squad_selector.select_squad_ilp(
                 df, forced_selections, prev_squad_ids, max_transfers_allowed,
@@ -274,11 +310,16 @@ class TransferEvaluator:
         # Find the best scenario by net score
         best_scenario = max(scenarios, key=lambda x: x['net_score'])
         
-        # Get the 0-transfer baseline for MIN_TRANSFER_VALUE comparison
-        baseline_scenario = next((s for s in scenarios if s['actual_transfers'] == 0), None)
+        # Get the baseline scenario (minimum transfers needed) for MIN_TRANSFER_VALUE comparison
+        baseline_scenario = next((s for s in scenarios if s['actual_transfers'] == min_transfers_needed), None)
+        
+        # If no baseline found, use the scenario with minimum actual transfers
+        if baseline_scenario is None:
+            min_actual_transfers = min(s['actual_transfers'] for s in scenarios)
+            baseline_scenario = next((s for s in scenarios if s['actual_transfers'] == min_actual_transfers), None)
         
         if baseline_scenario is None:
-            print("❌ No baseline (0 transfers) scenario found")
+            print("❌ No baseline scenario found")
             return pd.DataFrame(), pd.DataFrame(), None, 0, 0
         
         print(f"\n🎯 Best scenario analysis:")
@@ -291,25 +332,31 @@ class TransferEvaluator:
             print(f"   #{i}: {scenario['actual_transfers']} transfers → "
                   f"Net: {scenario['net_score']:.1f} points{status}")
         
-        # Apply MIN_TRANSFER_VALUE threshold check
-        if best_scenario['actual_transfers'] > 0:
+        # Apply MIN_TRANSFER_VALUE threshold check only if we have more transfers than minimum needed
+        if best_scenario['actual_transfers'] > baseline_scenario['actual_transfers']:
             baseline_score = baseline_scenario['net_score']
             best_score = best_scenario['net_score']
             improvement = best_score - baseline_score
+            extra_transfers_for_improvement = best_scenario['actual_transfers'] - baseline_scenario['actual_transfers']
             
             print(f"\n📊 Transfer Value Check:")
-            print(f"   Baseline (0 transfers): {baseline_score:.1f} points")
+            print(f"   Baseline ({baseline_scenario['actual_transfers']} transfers): {baseline_score:.1f} points")
             print(f"   Best scenario ({best_scenario['actual_transfers']} transfers): {best_score:.1f} points")
             print(f"   Improvement: {improvement:.1f} points")
+            print(f"   Extra transfers for improvement: {extra_transfers_for_improvement}")
+            print(f"   Improvement per extra transfer: {improvement/extra_transfers_for_improvement:.1f}")
             print(f"   Minimum threshold: {self.config.MIN_TRANSFER_VALUE} points")
             
-            if improvement < self.config.MIN_TRANSFER_VALUE:
-                print(f"   ❌ INSUFFICIENT VALUE GAINED: Using baseline (0 transfers) instead")
+            if improvement < self.config.MIN_TRANSFER_VALUE * extra_transfers_for_improvement:
+                print(f"   ❌ INSUFFICIENT VALUE GAINED: Using baseline ({baseline_scenario['actual_transfers']} transfers) instead")
                 best_scenario = baseline_scenario
-                print(f"   ⭐ SELECTED: 0 transfers → {best_scenario['net_score']:.1f} points")
-            else:
-                print(f"   ✅ SUFFICIENT VALUE: Transfers are worthwhile")
                 print(f"   ⭐ SELECTED: {best_scenario['actual_transfers']} transfers → {best_scenario['net_score']:.1f} points")
+            else:
+                print(f"   ✅ SUFFICIENT VALUE: Extra transfers are worthwhile")
+                print(f"   ⭐ SELECTED: {best_scenario['actual_transfers']} transfers → {best_scenario['net_score']:.1f} points")
+        else:
+            print(f"\n📊 Using optimal scenario with {best_scenario['actual_transfers']} transfers")
+            print(f"   ⭐ SELECTED: {best_scenario['actual_transfers']} transfers → {best_scenario['net_score']:.1f} points")
         
         # Extract best solution (after MIN_TRANSFER_VALUE check)
         starting = best_scenario['starting']
@@ -352,7 +399,7 @@ class TransferEvaluator:
             print(f"\n=== Optimal Transfer Strategy ===")
             print(f"Total transfers: 0")
             print(f"Recommended action: Keep current squad")
-            print(f"Reason: Transfer improvements below minimum threshold ({self.config.MIN_TRANSFER_VALUE} pts per transfer)")
+            print(f"Reason: No transfers needed")
         
         return starting, bench, best_forced_display, best_transfers, best_penalty
     

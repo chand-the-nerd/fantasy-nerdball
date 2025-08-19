@@ -11,21 +11,8 @@ from config import Config
 from src.data.player_history_tracker import PlayerHistoryTracker
 
 
-def setup_logging():
-    """Set up logging to see what's happening."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler('player_history_update.log')
-        ]
-    )
-
-
 def main():
     """Update player history data for the previous gameweek."""
-    setup_logging()
     
     config = Config()
     tracker = PlayerHistoryTracker(config)
