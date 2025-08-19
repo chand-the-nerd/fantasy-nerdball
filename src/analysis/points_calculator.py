@@ -42,7 +42,8 @@ class PointsCalculator:
 
         # Calculate minutes per game as total minutes / gameweeks completed
         gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
-        df["minspg"] = (df["minutes"] / gameweeks_completed).round(0).astype(int)
+        df["minspg"] = (
+            df["minutes"] / gameweeks_completed).round(0).astype(int)
 
         # Prepare display columns with exact names requested
         df = self._prepare_display_columns(df)
@@ -57,13 +58,14 @@ class PointsCalculator:
         # Historic PPG from past seasons
         df["historic_ppg"] = df["avg_ppg_past2"].round(1)
 
-        # Use the fixture difficulty average from fetch_player_fixture_difficulty
-        # This shows average difficulty over FIRST_N_GAMEWEEKS 
-        # (same as algorithm uses)
+        # Use the fixture difficulty average from 
+        # fetch_player_fixture_difficulty. This shows average difficulty over 
+        # FIRST_N_GAMEWEEKS (same as algorithm uses)
         df["fixture_diff"] = (6 - df["fixture_bonus"]).round(1)
 
         # Reliability as percentage (starts/games)
-        df["reliability"] = (df["current_reliability"] * 100).round(0).astype(int)
+        df["reliability"] = (
+            df["current_reliability"] * 100).round(0).astype(int)
         
         # Projected points rounded to 1 decimal
         df["proj_pts"] = df["projected_points"].round(1)

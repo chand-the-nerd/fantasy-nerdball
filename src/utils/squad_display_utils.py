@@ -48,7 +48,9 @@ class SquadDisplayUtils:
         )
         return pd.concat([gk_bench, non_gk_bench], ignore_index=True)
     
-    def apply_captain_and_vice(self, starting_df: pd.DataFrame) -> pd.DataFrame:
+    def apply_captain_and_vice(
+            self,
+            starting_df: pd.DataFrame) -> pd.DataFrame:
         """
         Apply captain and vice-captain designations to starting XI.
         
@@ -70,7 +72,7 @@ class SquadDisplayUtils:
             captain_idx = top_two_idx[0]
             df.loc[captain_idx, "display_name"] += " (C)"
             
-            # Create display column for projected points with captain multiplier
+            # Create display column for projected points with (c)) multiplier
             captain_original_points = df.loc[captain_idx, "proj_pts"]
             df.loc[captain_idx, "proj_pts_display"] = (
                 f"{captain_original_points:.1f} (x2)"
@@ -123,7 +125,10 @@ class SquadDisplayUtils:
         display_cols = [rename_map[c] for c in available_cols]
         print(renamed[display_cols])
     
-    def select_starting_xi_fallback(self, squad_players: pd.DataFrame) -> pd.DataFrame:
+    def select_starting_xi_fallback(
+            self,
+            squad_players: pd.DataFrame
+            ) -> pd.DataFrame:
         """
         Fallback function to select starting XI when optimisation fails.
         Uses simple greedy selection based on projected points.

@@ -43,13 +43,14 @@ class TransferEvaluator:
         unavailable_player_ids: list, free_transfers: int
     ) -> dict:
         """
-        Evaluate whether to substitute unavailable players or transfer them out.
+        Evaluate whether to substitute unavailable players or transfer them 
+        out.
 
         Args:
             df (pd.DataFrame): Current player database with scores
             prev_squad_ids (list): Player IDs from previous squad
-            unavailable_player_ids (list): IDs of players who can't play this GW
-            free_transfers (int): Number of free transfers available
+            unavailable_player_ids (list): IDs of players who can't play this 
+            GW free_transfers (int): Number of free transfers available
 
         Returns:
             dict: Analysis of substitute vs transfer options
@@ -90,7 +91,8 @@ class TransferEvaluator:
                 substitute_scenarios.append({
                     "unavailable_player": unavailable_player["display_name"],
                     "position": pos,
-                    "unavailable_score": unavailable_player["projected_points"],
+                    "unavailable_score": unavailable_player[
+                        "projected_points"],
                     "best_substitute": None,
                     "substitute_score": 0,
                     "score_loss": unavailable_player["projected_points"],
@@ -155,21 +157,25 @@ class TransferEvaluator:
             decision = {
                 "recommendation": "make_transfers",
                 "reason": (f"Score loss ({total_score_loss:.1f}) exceeds "
-                          f"transfer threshold ({self.config.MIN_TRANSFER_VALUE})"),
+                          f"transfer threshold "
+                          f"({self.config.MIN_TRANSFER_VALUE})"),
                 "total_score_loss": total_score_loss,
                 "scenarios": substitute_scenarios,
             }
         else:
             decision = {
                 "recommendation": "use_substitutes",
-                "reason": (f"Score loss ({total_score_loss:.1f}) is acceptable, "
-                          f"save transfers"),
+                "reason": (f"Score loss ({total_score_loss:.1f}) is "
+                           "acceptable, save transfers"),
                 "total_score_loss": total_score_loss,
                 "scenarios": substitute_scenarios,
             }
 
-        self._print_substitution_analysis(substitute_scenarios, total_score_loss, 
-                                        decision)
+        self._print_substitution_analysis(
+            substitute_scenarios,
+            total_score_loss, 
+            decision
+            )
         return decision
     
     def _print_substitution_analysis(self, substitute_scenarios: list, 
@@ -185,7 +191,8 @@ class TransferEvaluator:
                 print(f"  {scenario['unavailable_player']} → "
                       f"NO SUBSTITUTE AVAILABLE (must transfer)")
 
-        print(f"\nTotal score loss from substitutions: {total_score_loss:.1f} pts")
+        print(f"\nTotal score loss from substitutions: {total_score_loss:.1f} "
+              "pts")
         print("(note that negative score loss is good)")
         print(f"Transfer threshold: {self.config.MIN_TRANSFER_VALUE} pts")
         print(f"Recommendation: {decision['recommendation'].upper()}")
@@ -270,8 +277,11 @@ class TransferEvaluator:
     
     def _evaluate_transfer_scenarios(self, df: pd.DataFrame, 
                                    forced_selections: dict, 
-                                   prev_squad_ids: list, free_transfers: int,
-                                   available_budget: float, squad_selector) -> list:
+                                   prev_squad_ids: list,
+                                   free_transfers: int,
+                                   available_budget: float,
+                                   squad_selector
+                                   ) -> list:
         """Evaluate different transfer scenarios and return results."""
         scenarios = []
         
@@ -280,7 +290,8 @@ class TransferEvaluator:
             forced_selections, prev_squad_ids, df
         )
         
-        # Test different transfer scenarios - start from minimum needed transfers
+        # Test different transfer scenarios - 
+        # start from minimum needed transfers
         max_transfers_to_test = free_transfers + 3
         start_transfers = min_transfers_needed
         
@@ -436,7 +447,8 @@ class TransferEvaluator:
         
         min_actual_transfers = min(s['actual_transfers'] for s in scenarios)
         return next(
-            (s for s in scenarios if s['actual_transfers'] == min_actual_transfers), 
+            (s for s in scenarios if s[
+                'actual_transfers'] == min_actual_transfers), 
             None
         )
     
@@ -452,7 +464,8 @@ class TransferEvaluator:
     def _apply_value_threshold(self, best_scenario: dict, 
                              baseline_scenario: dict) -> dict:
         """Apply MIN_TRANSFER_VALUE threshold check."""
-        if best_scenario['actual_transfers'] > baseline_scenario['actual_transfers']:
+        if best_scenario[
+            'actual_transfers'] > baseline_scenario['actual_transfers']:
             baseline_score = baseline_scenario['net_score']
             best_score = best_scenario['net_score']
             improvement = best_score - baseline_score
@@ -462,15 +475,17 @@ class TransferEvaluator:
             )
             
             print(f"\n📊 Transfer Value Check:")
-            print(f"   Baseline ({baseline_scenario['actual_transfers']} transfers): "
-                  f"{baseline_score:.1f} points")
-            print(f"   Best scenario ({best_scenario['actual_transfers']} transfers): "
-                  f"{best_score:.1f} points")
+            print(f"   Baseline ({baseline_scenario['actual_transfers']} "
+                  f"transfers): {baseline_score:.1f} points")
+            print(f"   Best scenario ({best_scenario['actual_transfers']} "
+                  f"transfers): {best_score:.1f} points")
             print(f"   Improvement: {improvement:.1f} points")
-            print(f"   Extra transfers for improvement: {extra_transfers_for_improvement}")
+            print(f"   Extra transfers for improvement: "
+                  f"{extra_transfers_for_improvement}")
             print(f"   Improvement per extra transfer: "
                   f"{improvement/extra_transfers_for_improvement:.1f}")
-            print(f"   Minimum threshold: {self.config.MIN_TRANSFER_VALUE} points")
+            print(f"   Minimum threshold: "
+                  f"{self.config.MIN_TRANSFER_VALUE} points")
             
             required_improvement = (
                 self.config.MIN_TRANSFER_VALUE * extra_transfers_for_improvement
@@ -478,19 +493,20 @@ class TransferEvaluator:
             
             if improvement < required_improvement:
                 print(f"   ❌ INSUFFICIENT VALUE GAINED: Using baseline "
-                      f"({baseline_scenario['actual_transfers']} transfers) instead")
+                      f"({baseline_scenario['actual_transfers']} transfers) "
+                      "instead")
                 best_scenario = baseline_scenario
-                print(f"   ⭐ SELECTED: {best_scenario['actual_transfers']} transfers → "
-                      f"{best_scenario['net_score']:.1f} points")
+                print(f"   ⭐ SELECTED: {best_scenario['actual_transfers']} "
+                      f"transfers → {best_scenario['net_score']:.1f} points")
             else:
-                print(f"   ✅ SUFFICIENT VALUE: Extra transfers are worthwhile")
-                print(f"   ⭐ SELECTED: {best_scenario['actual_transfers']} transfers → "
-                      f"{best_scenario['net_score']:.1f} points")
+                print(f"   ✅ SUFFICIENT VALUE: Extra transfers worthwhile")
+                print(f"   ⭐ SELECTED: {best_scenario['actual_transfers']} "
+                      f"transfers → {best_scenario['net_score']:.1f} points")
         else:
             print(f"\n📊 Using optimal scenario with "
                   f"{best_scenario['actual_transfers']} transfers")
-            print(f"   ⭐ SELECTED: {best_scenario['actual_transfers']} transfers → "
-                  f"{best_scenario['net_score']:.1f} points")
+            print(f"   ⭐ SELECTED: {best_scenario['actual_transfers']} "
+                  f"transfers → {best_scenario['net_score']:.1f} points")
         
         return best_scenario
     
@@ -517,7 +533,9 @@ class TransferEvaluator:
         """Print final transfer summary."""
         if best_transfers > 0:
             current_squad_ids = set(
-                pd.concat([best_scenario['starting'], best_scenario['bench']])["id"]
+                pd.concat(
+                [best_scenario['starting'], best_scenario['bench']]
+                )["id"]
             )
             prev_squad_ids_set = set(
                 # This would need to be passed in - simplified for now
@@ -529,7 +547,8 @@ class TransferEvaluator:
             if best_penalty > 0:
                 print(f"Extra transfers: {best_transfers - free_transfers}")
                 print(f"Transfer penalty: -{best_penalty} points")
-            print(f"Gross projected points: {best_scenario['starting_points']:.1f}")
+            print(f"Gross projected points: "
+                  f"{best_scenario['starting_points']:.1f}")
             print(f"Net projected points: {best_scenario['net_score']:.1f}")
         else:
             print(f"\n=== Optimal Transfer Strategy ===")
@@ -546,7 +565,7 @@ class TransferEvaluator:
         points improvement.
 
         Args:
-            no_transfer_squad (pd.DataFrame): Starting XI with no transfers made.
+            no_transfer_squad (pd.DataFrame): Starting XI with no transfers.
             transfer_squad (pd.DataFrame): Starting XI with transfers made.
             transfers_made (int): Number of transfers that would be made.
 
@@ -562,7 +581,9 @@ class TransferEvaluator:
         points_improvement = transfer_points - no_transfer_points
 
         # Check against minimum transfer value threshold
-        min_improvement_needed = self.config.MIN_TRANSFER_VALUE * transfers_made
+        min_improvement_needed = (
+        self.config.MIN_TRANSFER_VALUE * transfers_made
+        )
         
         analysis = {
             "transfers_made": transfers_made,
@@ -570,7 +591,8 @@ class TransferEvaluator:
             "transfer_points": transfer_points,
             "points_improvement": points_improvement,
             "improvement_per_transfer": (
-                points_improvement / transfers_made if transfers_made > 0 else 0
+                points_improvement / transfers_made
+                if transfers_made > 0 else 0
             ),
             "min_improvement_needed": min_improvement_needed,
             "threshold_per_transfer": self.config.MIN_TRANSFER_VALUE,
@@ -592,7 +614,8 @@ class TransferEvaluator:
 
         return True, {
             **analysis, 
-            "reason": f"Transfers provide sufficient improvement ({points_improvement:.1f} pts)"
+            "reason": f"Transfers provide sufficient improvement "
+            f"({points_improvement:.1f} pts)"
         }
     
     def get_no_transfer_squad(self, df: pd.DataFrame, 
@@ -606,7 +629,7 @@ class TransferEvaluator:
             prev_squad_ids (list): Player IDs from previous squad.
 
         Returns:
-            pd.DataFrame: Best possible starting XI using only previous players.
+            pd.DataFrame: Best starting XI using only previous players.
         """
         if prev_squad_ids is None:
             return pd.DataFrame()
@@ -627,7 +650,9 @@ class TransferEvaluator:
         # Simple optimisation for starting XI using projected_points
         return self._optimise_starting_xi_from_squad(prev_squad_df)
     
-    def _optimise_starting_xi_from_squad(self, prev_squad_df: pd.DataFrame) -> pd.DataFrame:
+    def _optimise_starting_xi_from_squad(
+            self,
+            prev_squad_df: pd.DataFrame) -> pd.DataFrame:
         """Optimise starting XI from a given squad using ILP."""
         n = len(prev_squad_df)
         y = [pulp.LpVariable(f"y_{i}", cat="Binary") for i in range(n)]
@@ -681,7 +706,8 @@ class TransferEvaluator:
         Returns:
             tuple: (starting_xi_dataframe, bench_dataframe)
         """
-        full_no_transfer_squad = scored[scored["id"].isin(prev_squad_ids)].copy()
+        full_no_transfer_squad = scored[
+            scored["id"].isin(prev_squad_ids)].copy()
         starting = self.get_no_transfer_squad(scored, prev_squad_ids)
         bench = full_no_transfer_squad[
             ~full_no_transfer_squad["id"].isin(starting["id"])
@@ -726,21 +752,25 @@ class TransferEvaluator:
         if self.config.ACCEPT_TRANSFER_PENALTY:
             extra_transfers = max(0, transfers_made - free_transfers)
             penalty_points = extra_transfers * 4
-            print(f"\n✅ TRANSFER PENALTY MODE: Making {transfers_made} transfers")
+            print(f"\n✅ TRANSFER PENALTY MODE: Making {transfers_made} "
+                  "transfers")
             if penalty_points > 0:
                 print(f"   Transfer penalty: -{penalty_points} points "
                       f"(already factored into optimisation)")
-            return True, {"reason": "Transfer penalty mode - transfers already optimised"}
+            return True, {"reason": "Transfer penalty mode - transfers "
+                          "already optimised"}
         
         # If we have previous squad, evaluate whether transfers are worth it
         elif prev_squad_ids is not None and transfers_made > 0:
             print(f"\nEvaluating transfer value...")
 
             # Get best squad with no transfers for comparison
-            no_transfer_starting = self.get_no_transfer_squad(scored, prev_squad_ids)
+            no_transfer_starting = self.get_no_transfer_squad(
+                scored, prev_squad_ids)
 
             if not no_transfer_starting.empty:
-                should_make_transfers, transfer_analysis = self.evaluate_transfer_value(
+                (should_make_transfers,
+                transfer_analysis) = self.evaluate_transfer_value(
                     no_transfer_starting,  # Starting XI with no transfers
                     starting_with_transfers,  # Starting XI with transfers
                     transfers_made
@@ -755,10 +785,16 @@ class TransferEvaluator:
         """Print transfer value analysis results."""
         print(f"\n=== Transfer Value Analysis ===")
         print(f"Transfers to be made: {transfer_analysis['transfers_made']}")
-        print(f"No-transfer points: {transfer_analysis['no_transfer_points']:.1f}")
-        print(f"With-transfer points: {transfer_analysis['transfer_points']:.1f}")
-        print(f"Points improvement: {transfer_analysis['points_improvement']:.1f}")
-        print(f"Improvement per transfer: {transfer_analysis['improvement_per_transfer']:.1f}")
-        print(f"Threshold per transfer: {transfer_analysis['threshold_per_transfer']:.1f}")
-        print(f"Minimum improvement needed: {transfer_analysis['min_improvement_needed']:.1f}")
+        print(f"No-transfer points: "
+              f"{transfer_analysis['no_transfer_points']:.1f}")
+        print(f"With-transfer points: "
+              f"{transfer_analysis['transfer_points']:.1f}")
+        print(f"Points improvement: "
+              f"{transfer_analysis['points_improvement']:.1f}")
+        print(f"Improvement per transfer: "
+              f"{transfer_analysis['improvement_per_transfer']:.1f}")
+        print(f"Threshold per transfer: "
+              f"{transfer_analysis['threshold_per_transfer']:.1f}")
+        print(f"Minimum improvement needed: "
+              f"{transfer_analysis['min_improvement_needed']:.1f}")
         print(f"Decision: {transfer_analysis['reason']}")

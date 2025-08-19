@@ -28,8 +28,9 @@ class PlayerProcessor:
         Enhanced with current season xG performance analysis.
 
         Returns:
-            pd.DataFrame: DataFrame containing current player data with calculated
-                         fields for cost, position, team info, name keys, and xG metrics.
+            pd.DataFrame: DataFrame containing current player data with 
+                         calculated fields for cost, position, team info, 
+                         name keys, and xG metrics.
         """
         data = self.fpl_client.get_bootstrap_static()
         players = pd.DataFrame(data["elements"])
@@ -100,11 +101,14 @@ class PlayerProcessor:
         df = self._calculate_position_weighted_xop(df, thresholds)
         
         # Add xG trend display for easy interpretation
-        df["xg_trend"] = df.apply(lambda row: self._format_xg_trend(row), axis=1)
+        df["xg_trend"] = df.apply(
+            lambda row: self._format_xg_trend(row), axis=1)
         
         # Print summary
-        players_with_data = len(df[df["current_xg_context"] != "insufficient_data"])
-        print(f"   ✅ {players_with_data} players have current season xG analysis")
+        players_with_data = len(
+            df[df["current_xg_context"] != "insufficient_data"])
+        print(f"   ✅ {players_with_data} players have current season xG "
+              "analysis")
         
         # Clean up temporary columns
         df = self._cleanup_temporary_columns(df)
@@ -125,7 +129,8 @@ class PlayerProcessor:
         
         for col_name, df_col in xg_columns.items():
             if df_col in df.columns:
-                df[col_name] = pd.to_numeric(df[df_col], errors="coerce").fillna(0)
+                df[col_name] = pd.to_numeric(
+                    df[df_col], errors="coerce").fillna(0)
             else:
                 df[col_name] = 0.0
                 print(f"Warning: {df_col} not found in current season data")
@@ -134,7 +139,7 @@ class PlayerProcessor:
     
     def _initialise_xg_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         """Initialise granular xG performance columns."""
-        df["current_xOP"] = 1.0  # Current season Expected Overperformance ratio
+        df["current_xOP"] = 1.0  # Current season Expected Overperformance 
         df["current_xg_context"] = "insufficient_data"
         df["attacking_xOP"] = 1.0  # Separate tracking for debugging
         df["defensive_xOP"] = 1.0  # Separate tracking for debugging
@@ -221,7 +226,7 @@ class PlayerProcessor:
         )
         
         if defensive_mask.any():
-            # For GC, higher ratio = better performance (conceding less than expected)
+            # For GC, higher ratio = better performance
             df.loc[defensive_mask, "defensive_xOP"] = (
                 df.loc[defensive_mask, "current_xgc_per_game"] / 
                 df.loc[defensive_mask, "current_gc_per_game"].clip(lower=0.01)
@@ -352,15 +357,19 @@ class PlayerProcessor:
     def _cleanup_temporary_columns(self, df: pd.DataFrame) -> pd.DataFrame:
         """Clean up temporary columns used in xG analysis."""
         temp_columns = [
-            "attacking_xOP", "defensive_xOP", "current_xgi_per_game", 
-            "current_gi_per_game", "current_xgc_per_game", "current_gc_per_game"
+            "attacking_xOP",
+            "defensive_xOP",
+            "current_xgi_per_game", 
+            "current_gi_per_game",
+            "current_xgc_per_game",
+            "current_gc_per_game"
         ]
         
         existing_temp_cols = [col for col in temp_columns if col in df.columns]
         return df.drop(columns=existing_temp_cols)
     
-    def calculate_budget_from_previous_squad(self, gameweek: int, 
-                                           current_players: pd.DataFrame) -> float:
+    def calculate_budget_from_previous_squad(
+            self, gameweek: int, current_players: pd.DataFrame) -> float:
         """
         Calculate available budget based on previous gameweek's squad value.
 
@@ -369,7 +378,8 @@ class PlayerProcessor:
             current_players (pd.DataFrame): Current player database with prices
 
         Returns:
-            float: Available budget in millions, or default BUDGET if no previous squad
+            float: Available budget in millions, or default BUDGET if no
+                   previous squad
         """
         if gameweek <= 1:
             print(f"Using default budget: £{self.config.BUDGET:.1f}m "
@@ -419,12 +429,14 @@ class PlayerProcessor:
             current_players (pd.DataFrame): Current player database.
 
         Returns:
-            list: List of player IDs from previous squad that are still available.
+            list: List of player IDs from previous squad that are still
+                  available.
         """
         prev_player_ids = []
 
         for _, prev_player in prev_squad.iterrows():
-            player_id = self._find_matching_player(prev_player, current_players)
+            player_id = self._find_matching_player(
+                prev_player, current_players)
             if player_id:
                 prev_player_ids.append(player_id)
 
@@ -447,7 +459,8 @@ class PlayerProcessor:
         if len(exact_matches) == 1:
             return exact_matches.iloc[0]["id"]
         elif len(exact_matches) > 1:
-            print(f"Warning: Multiple matches for {prev_name}, taking first match")
+            print(f"Warning: Multiple matches for {prev_name}, taking first "
+                  "match")
             return exact_matches.iloc[0]["id"]
         
         # Try fuzzy matching on name

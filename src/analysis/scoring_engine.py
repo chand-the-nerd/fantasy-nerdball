@@ -1,4 +1,5 @@
-"""Module for calculating player scores based on form, history, and fixtures."""
+"""Module for calculating player scores based on form, history, and 
+fixtures."""
 
 import pandas as pd
 
@@ -12,16 +13,17 @@ class ScoringEngine:
     def build_scores(self, players: pd.DataFrame, 
                     fixture_scores: pd.DataFrame) -> pd.DataFrame:
         """
-        Calculate FPL scores and base quality scores for each player based on form,
-        historical performance, and fixture difficulty, with reliability considerations.
+        Calculate FPL scores and base quality scores for each player based on 
+        form, historical performance, and fixture difficulty, with reliability
+        considerations.
 
         Args:
             players (pd.DataFrame): Player data with form and historical PPG.
             fixture_scores (pd.DataFrame): Fixture difficulty data.
 
         Returns:
-            pd.DataFrame: Player data with calculated fpl_score and base_quality
-                         for each player.
+            pd.DataFrame: Player data with calculated fpl_score and 
+                          base_quality for each player.
         """
         df = players.merge(fixture_scores, on="name_key", how="left")
 
@@ -133,7 +135,8 @@ class ScoringEngine:
 
         # Extra penalty for current season rotation risks
         current_unreliable_mask = df["current_reliability"] < 0.7  # <70% games
-        df.loc[current_unreliable_mask, "historically_unreliable_penalty"] -= 0.2
+        df.loc[current_unreliable_mask,
+               "historically_unreliable_penalty"] -= 0.2
 
         # FPL score (for squad selection - includes reliability)
         df["fpl_score"] = (
@@ -165,7 +168,9 @@ class ScoringEngine:
         )
 
         # Calculate projected points
-        df["projected_points"] = df["baseline_points"] + df["points_adjustment"]
+        df["projected_points"] = (
+            df["baseline_points"] + df["points_adjustment"]
+        )
 
         # Ensure minimum of 1 point (no player should project negative)
         df["projected_points"] = df["projected_points"].clip(lower=1.0)

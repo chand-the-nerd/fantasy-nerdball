@@ -28,18 +28,21 @@ def main():
         command = sys.argv[1].lower()
         
         if command == "update":
-            print(f"Updating all players with GW{config.GAMEWEEK - 1} data (with overwrite)...")
-            logging.info(f"About to update all players for GW{config.GAMEWEEK - 1} with overwrite")
+            print(f"Updating all players with GW{config.GAMEWEEK - 1} data "
+                  "(with overwrite)...")
+            logging.info(f"About to update all players for "
+                         f"GW{config.GAMEWEEK - 1} with overwrite")
             
             try:
-                # Update all players with previous gameweek data - FORCE OVERWRITE
+                # FORCE OVERWRITE
                 tracker.update_all_players(force_overwrite=True)
                 logging.info(f"Update completed with overwrite")
                 print(f"Update completed!")
                 
                 # Show some stats after update
                 stats = tracker.get_summary_stats()
-                print(f"Total records now: {stats.get('total_records', 'Unknown')}")
+                print(f"Total records now: "
+                      f"{stats.get('total_records', 'Unknown')}")
                 
             except Exception as e:
                 logging.error(f"Error during update: {str(e)}", exc_info=True)
@@ -47,8 +50,10 @@ def main():
                 
         elif command == "update-safe":
             # New command for non-overwrite update
-            print(f"Updating all players with GW{config.GAMEWEEK - 1} data (safe mode - no overwrite)...")
-            logging.info(f"About to update all players for GW{config.GAMEWEEK - 1} without overwrite")
+            print(f"Updating all players with GW{config.GAMEWEEK - 1} data "
+                  "(safe mode - no overwrite)...")
+            logging.info(f"About to update all players for "
+                         f"GW{config.GAMEWEEK - 1} without overwrite")
             
             try:
                 # Update all players with previous gameweek data - NO OVERWRITE
@@ -58,10 +63,12 @@ def main():
                 
                 # Show some stats after update
                 stats = tracker.get_summary_stats()
-                print(f"Total records now: {stats.get('total_records', 'Unknown')}")
+                print(f"Total records now: "
+                      f"{stats.get('total_records', 'Unknown')}")
                 
             except Exception as e:
-                logging.error(f"Error during safe update: {str(e)}", exc_info=True)
+                logging.error(f"Error during safe update: "
+                              f"{str(e)}", exc_info=True)
                 print(f"Error during safe update: {str(e)}")
                 
         elif command == "debug":
@@ -92,7 +99,8 @@ def main():
                 print(f"Force update completed!")
                 
             except Exception as e:
-                logging.error(f"Error during force update: {str(e)}", exc_info=True)
+                logging.error(f"Error during force update: "
+                              f"{str(e)}", exc_info=True)
                 print(f"Error during force update: {str(e)}")
                 
         elif command == "stats":
@@ -103,7 +111,8 @@ def main():
                 print(f"Total players tracked: {stats['total_players']}")
                 print(f"Total gameweek records: {stats['total_records']}")
                 print(f"Teams covered: {stats['total_teams']}")
-                print(f"Average records per player: {stats['average_records_per_player']:.1f}")
+                print(f"Average records per player: "
+                      f"{stats['average_records_per_player']:.1f}")
                     
             except Exception as e:
                 logging.error(f"Error getting stats: {str(e)}", exc_info=True)
@@ -116,7 +125,8 @@ def main():
                 try:
                     keep_weeks = int(sys.argv[2])
                 except ValueError:
-                    print("Invalid number for cleanup. Using default 38 gameweeks.")
+                    print("Invalid number for cleanup. Using default 38 "
+                          "gameweeks.")
             
             try:
                 tracker.cleanup_old_data(keep_weeks)
@@ -129,8 +139,10 @@ def main():
         elif command == "player":
             # Show specific player data
             if len(sys.argv) < 4:
-                print("Usage: python update_player_history.py player <player_name> <team_name>")
-                print("Example: python update_player_history.py player cunha wolves")
+                print("Usage: python update_player_history.py player "
+                      "<player_name> <team_name>")
+                print("Example: python update_player_history.py player "
+                      "cunha wolves")
                 return
             
             player_name = sys.argv[2]
@@ -142,16 +154,24 @@ def main():
                     print(f"No data found for {player_name} at {team_name}")
                 else:
                     print(f"\n=== {player_name} ({team_name}) History ===")
-                    print(history[['round', 'total_points', 'minutes', 'goals_scored', 'assists']].to_string(index=False))
+                    print(history[[
+                        'round',
+                        'total_points',
+                        'minutes',
+                        'goals_scored',
+                        'assists'
+                        ]].to_string(index=False))
                     
             except Exception as e:
-                logging.error(f"Error getting player data: {str(e)}", exc_info=True)
+                logging.error(f"Error getting player data: "
+                              f"{str(e)}", exc_info=True)
                 print(f"Error getting player data: {str(e)}")
                 
         elif command == "team":
             # Show team data
             if len(sys.argv) < 3:
-                print("Usage: python update_player_history.py team <team_name>")
+                print("Usage: python update_player_history.py team "
+                      "<team_name>")
                 print("Example: python update_player_history.py team wolves")
                 return
             
@@ -159,16 +179,26 @@ def main():
             last_gw = config.GAMEWEEK - 1
             
             try:
-                team_data = tracker.get_team_history(team_name, gameweeks=[last_gw])
+                team_data = tracker.get_team_history(
+                    team_name, gameweeks=[last_gw])
                 if team_data.empty:
                     print(f"No data found for {team_name} in GW{last_gw}")
                 else:
                     print(f"\n=== {team_name} GW{last_gw} Performance ===")
-                    summary = team_data[['player_name', 'total_points', 'minutes', 'goals_scored', 'assists']].sort_values('total_points', ascending=False)
+                    summary = team_data[[
+                        'player_name',
+                        'total_points',
+                        'minutes',
+                        'goals_scored',
+                        'assists']].sort_values(
+                            'total_points',
+                            ascending=False
+                            )
                     print(summary.to_string(index=False))
                     
             except Exception as e:
-                logging.error(f"Error getting team data: {str(e)}", exc_info=True)
+                logging.error(f"Error getting team data: "
+                              f"{str(e)}", exc_info=True)
                 print(f"Error getting team data: {str(e)}")
         else:
             print("Unknown command. See usage below.")
@@ -180,14 +210,22 @@ def main():
 def show_usage():
     """Show usage instructions."""
     print(f"\nUsage:")
-    print(f"  python update_player_history.py update          # Update all players with previous GW data (with overwrite)")
-    print(f"  python update_player_history.py update-safe     # Update all players but skip existing data")
-    print(f"  python update_player_history.py debug           # Show debug information")
-    print(f"  python update_player_history.py force           # Force update even if data exists (same as 'update')")
-    print(f"  python update_player_history.py stats           # Show summary statistics")
-    print(f"  python update_player_history.py cleanup [weeks] # Clean up old data (default: keep 38 weeks)")
-    print(f"  python update_player_history.py player <name> <team>  # Show player history")
-    print(f"  python update_player_history.py team <team>     # Show team's last gameweek performance")
+    print(f"  python update_player_history.py update          "
+          "# Update all players with previous GW data (with overwrite)")
+    print(f"  python update_player_history.py update-safe     "
+          "# Update all players but skip existing data")
+    print(f"  python update_player_history.py debug           "
+          "# Show debug information")
+    print(f"  python update_player_history.py force           "
+          "# Force update even if data exists (same as 'update')")
+    print(f"  python update_player_history.py stats           "
+          "# Show summary statistics")
+    print(f"  python update_player_history.py cleanup [weeks] "
+          "# Clean up old data (default: keep 38 weeks)")
+    print(f"  python update_player_history.py player <name> <team>  "
+          "# Show player history")
+    print(f"  python update_player_history.py team <team>     "
+          "# Show team's last gameweek performance")
     print(f"\nExamples:")
     print(f"  python update_player_history.py update")
     print(f"  python update_player_history.py update-safe")

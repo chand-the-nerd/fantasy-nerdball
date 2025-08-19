@@ -49,7 +49,9 @@ def prompt_player_history_update(config):
     print("This captures the previous gameweek's performance data.")
     
     while True:
-        response = input("Update player history? (y/n/s for stats): ").lower().strip()
+        response = input(
+            "Update player history? (y/n/s for stats): "
+            ).lower().strip()
         
         if response in ['y', 'yes']:
             print("Updating player history data...")
@@ -280,7 +282,12 @@ def analyse_unavailable_players(components, config, scored, prev_squad_ids):
         print(f"\n✅ All previous squad players are available")
 
 
-def optimise_squad(components, config, scored, prev_squad_ids, available_budget):
+def optimise_squad(
+        components,
+        config, scored,
+        prev_squad_ids,
+        available_budget
+        ):
     """Optimise squad selection with transfer considerations."""
     print("\n🧠 Thinking...")
 
@@ -292,12 +299,21 @@ def optimise_squad(components, config, scored, prev_squad_ids, available_budget)
     
     if penalty_mode:
         # Use transfer penalty optimisation
-        result = components['transfer_evaluator'].get_optimal_squad_with_penalties(
-            scored, config.FORCED_SELECTIONS, prev_squad_ids, 
-            config.FREE_TRANSFERS, available_budget, 
+        result = components[
+            'transfer_evaluator'
+            ].get_optimal_squad_with_penalties(
+            scored,
+            config.FORCED_SELECTIONS,
+            prev_squad_ids, 
+            config.FREE_TRANSFERS,
+            available_budget, 
             components['squad_selector']
         )
-        starting_with_transfers, bench_with_transfers, _, transfers_made, penalty_points = result
+        starting_with_transfers,
+        bench_with_transfers,
+        _,
+        transfers_made,
+        penalty_points = result
     else:
         # Use standard optimisation
         starting_with_transfers, bench_with_transfers, _ = (
@@ -313,7 +329,9 @@ def optimise_squad(components, config, scored, prev_squad_ids, available_budget)
         penalty_points = 0
         if prev_squad_ids is not None:
             current_squad_ids = set(
-                pd.concat([starting_with_transfers, bench_with_transfers])["id"]
+                pd.concat(
+                [starting_with_transfers, bench_with_transfers]
+                )["id"]
             )
             prev_squad_ids_set = set(prev_squad_ids)
             transfers_made = len(prev_squad_ids_set - current_squad_ids)
@@ -356,7 +374,9 @@ def finalise_squad_selection(components, config, should_make_transfers,
     else:
         print(f"\n❌ Transfers not worth it - keeping current squad")
         if prev_squad_ids is not None:
-            return components['transfer_evaluator'].get_no_transfer_squad_optimised(
+            return components[
+                'transfer_evaluator'
+                ].get_no_transfer_squad_optimised(
                 scored, prev_squad_ids
             )
         else:
@@ -373,7 +393,10 @@ def optimise_starting_xi(components, config, starting, bench, players,
     )
     
     scoring_engine_next = ScoringEngine(config)
-    scored_next = scoring_engine_next.build_scores(players, fixture_scores_next)
+    scored_next = scoring_engine_next.build_scores(
+        players,
+        fixture_scores_next
+        )
 
     print(f"Optimising Starting XI for GW{config.GAMEWEEK}...")
     
@@ -403,13 +426,17 @@ def optimise_starting_xi(components, config, starting, bench, players,
         ].copy()
         
         if len(squad_players) >= 11:
-            starting_optimised = components['display_utils'].select_starting_xi_fallback(
+            starting_optimised = components[
+                'display_utils'
+                ].select_starting_xi_fallback(
                 squad_players
             )
             bench_optimised = squad_players[
                 ~squad_players["id"].isin(starting_optimised["id"])
             ].copy()
-            bench_optimised = components['display_utils'].sort_and_format_bench(
+            bench_optimised = components[
+                'display_utils'
+                ].sort_and_format_bench(
                 bench_optimised
             )
         else:
@@ -534,16 +561,30 @@ def main():
     players, scored, available_budget = process_player_data(components, config)
 
     # Generate theoretical best squad for comparison
-    theoretical_display, theoretical_points, theoretical_cost = (
-        generate_theoretical_squad(components, config, players, available_budget)
+    _, theoretical_points, theoretical_cost = (
+        generate_theoretical_squad(
+            components,
+            config,
+            players,
+            available_budget
+        )
     )
 
     # Analyse unavailable players
     analyse_unavailable_players(components, config, scored, prev_squad_ids)
 
     # Optimise squad
-    starting_with_transfers, bench_with_transfers, transfers_made, penalty_points = (
-        optimise_squad(components, config, scored, prev_squad_ids, available_budget)
+    (starting_with_transfers,
+    bench_with_transfers,
+    transfers_made,
+    penalty_points) = (
+        optimise_squad(
+            components,
+            config,
+            scored,
+            prev_squad_ids,
+            available_budget
+        )
     )
 
     # Evaluate transfer strategy

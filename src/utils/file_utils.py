@@ -28,7 +28,8 @@ class FileUtils:
 
         if not os.path.exists(squad_file):
             print(f"Warning: Previous squad file not found at {squad_file}")
-            print("Proceeding without transfer constraints (assuming new team)")
+            print("Proceeding without transfer constraints "
+                  "(assuming new team)")
             return None
 
         try:
@@ -47,7 +48,7 @@ class FileUtils:
 
         Args:
             gameweek (int): Current gameweek number.
-            starting_display (pd.DataFrame): Starting XI with display formatting.
+            starting_display (pd.DataFrame): Starting XI with display format.
             bench_display (pd.DataFrame): Bench with display formatting.
         """
         squad_dir = f"squads/gw{gameweek}"
@@ -74,7 +75,8 @@ class FileUtils:
         print(f"  - {simple_file}")
     
     @staticmethod
-    def _create_simple_squad_overview(squad_combined: pd.DataFrame) -> pd.DataFrame:
+    def _create_simple_squad_overview(
+        squad_combined: pd.DataFrame) -> pd.DataFrame:
         """Create simplified squad overview for easier reading."""
         simple_squad = squad_combined[
             [

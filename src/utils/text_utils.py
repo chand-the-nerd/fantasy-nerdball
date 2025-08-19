@@ -19,7 +19,8 @@ def normalize_name(s) -> str:
 
 def normalize_for_matching(text: str) -> str:
     """
-    Normalise text for matching by removing accents and converting to lowercase.
+    Normalise text for matching by removing accents and converting to 
+    lowercase.
 
     Args:
         text (str): The text to normalise.

@@ -22,7 +22,7 @@ class FixtureManager:
         Args:
             first_n_gws (int): Number of gameweeks to consider for fixture 
                               difficulty.
-            players (pd.DataFrame): Player data containing team_id and name_key.
+            players (pd.DataFrame): Player data containing team_id and name_key
             starting_gameweek (int): The gameweek to start calculating from.
 
         Returns:
@@ -33,7 +33,8 @@ class FixtureManager:
 
         # Get team names for fixture CSV
         teams_data = self.fpl_client.get_bootstrap_static()
-        teams_df = pd.DataFrame(teams_data["teams"])[["id", "name", "short_name"]]
+        teams_df = pd.DataFrame(
+            teams_data["teams"])[["id", "name", "short_name"]]
 
         # Process and save fixture data
         self._save_fixture_data(fixtures, teams_df)
@@ -41,15 +42,19 @@ class FixtureManager:
         # Filter fixtures for the specified gameweek range
         end_gameweek = starting_gameweek + first_n_gws - 1
         fixtures = fixtures[
-            (pd.to_numeric(fixtures["event"], errors="coerce") >= starting_gameweek)
-            & (pd.to_numeric(fixtures["event"], errors="coerce") <= end_gameweek)
+            (pd.to_numeric(
+            fixtures["event"], errors="coerce") >= starting_gameweek)
+            & (pd.to_numeric(
+            fixtures["event"], errors="coerce") <= end_gameweek)
         ]
 
         # Calculate player difficulties
-        return self._calculate_player_difficulties(fixtures, players, 
-                                                 starting_gameweek, end_gameweek)
+        return self._calculate_player_difficulties(
+            fixtures, players, starting_gameweek, end_gameweek
+        )
     
-    def _save_fixture_data(self, fixtures: pd.DataFrame, teams_df: pd.DataFrame):
+    def _save_fixture_data(
+            self, fixtures: pd.DataFrame, teams_df: pd.DataFrame):
         """Process and save fixture data to CSV."""
         # Create a copy of fixtures for saving to CSV
         fixtures_for_csv = fixtures.copy()
@@ -122,22 +127,27 @@ class FixtureManager:
         """Calculate difficulty scores for each player."""
         player_diffs = []
 
-        for _, row in fixtures.iterrows():
+        for _, fixture_row in fixtures.iterrows():
             for home_away, team_col, diff_col in [
                 ("home", "team_h", "team_h_difficulty"),
                 ("away", "team_a", "team_a_difficulty"),
             ]:
-                team_id = row[team_col]
-                diff = row[diff_col]
-                for idx, p in players[players["team_id"] == team_id].iterrows():
-                    player_diffs.append(
-                        {"name_key": p["name_key"], "gw": row["event"], "diff": diff}
-                    )
+                team_id = fixture_row[team_col]
+                diff = fixture_row[diff_col]
+                
+                # Get players for this team
+                team_players = players[players["team_id"] == team_id]
+                for _, player_row in team_players.iterrows():
+                    player_diffs.append({
+                        "name_key": player_row["name_key"],
+                        "gw": fixture_row["event"],
+                        "diff": diff
+                    })
 
         df = pd.DataFrame(player_diffs)
         if df.empty:
-            print(f"Warning: No fixtures found for gameweeks {starting_gameweek} "
-                  f"to {end_gameweek}")
+            print(f"Warning: No fixtures found for gameweeks "
+                  f"{starting_gameweek} to {end_gameweek}")
             # Return empty dataframe with correct structure
             return pd.DataFrame(columns=["name_key", "diff", "fixture_bonus"])
 
@@ -185,8 +195,8 @@ class FixtureManager:
         """Process fixtures for each player."""
         next_fixtures = []
 
-        for _, p in df.iterrows():
-            team_id = p["team_id"]
+        for _, player_row in df.iterrows():
+            team_id = player_row["team_id"]
             
             # Find fixtures for this team
             team_fixtures = gw_fixtures[
@@ -195,7 +205,7 @@ class FixtureManager:
             ]
             
             if not team_fixtures.empty:
-                fixture = team_fixtures.iloc[0]  # Take first fixture if multiple
+                fixture = team_fixtures.iloc[0]  # Take first fixture
                 
                 if fixture["team_h"] == team_id:
                     # Home game
@@ -209,14 +219,14 @@ class FixtureManager:
                     difficulty = fixture["team_a_difficulty"]
                 
                 next_fixtures.append({
-                    "name_key": p["name_key"],
+                    "name_key": player_row["name_key"],
                     "next_opponent_id": opponent_id,
                     "venue": venue,
                     "fixture_difficulty": difficulty,
                 })
             else:
                 next_fixtures.append({
-                    "name_key": p["name_key"],
+                    "name_key": player_row["name_key"],
                     "next_opponent_id": None,
                     "venue": "No fixture",
                     "fixture_difficulty": None,
@@ -230,7 +240,7 @@ class FixtureManager:
         nf_df = pd.DataFrame(next_fixtures)
         teams = pd.DataFrame(self.fpl_client.get_bootstrap_static()["teams"])
         
-        # Only merge for players who have fixtures (next_opponent_id is not None)
+        # Only merge for players who have fixtures
         has_fixture_mask = nf_df["next_opponent_id"].notna()
         
         if has_fixture_mask.any():
@@ -262,7 +272,8 @@ class FixtureManager:
         nf_df["next_opponent"] = nf_df["next_opponent"].fillna("No fixture")
 
         df = df.merge(
-            nf_df[["name_key", "next_opponent", "venue", "fixture_difficulty"]],
+            nf_df[
+                ["name_key", "next_opponent", "venue", "fixture_difficulty"]],
             on="name_key",
             how="left",
         )

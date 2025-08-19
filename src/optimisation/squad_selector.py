@@ -28,7 +28,7 @@ class SquadSelector:
             df (pd.DataFrame): Player data with fpl_scores and all required 
                               fields.
             forced_selections (dict): Dictionary of forced player selections.
-            prev_squad_ids (list, optional): List of player IDs from prev squad.
+            prev_squad_ids (list, optional): Lst of player IDs from prev squad.
             free_transfers (int, optional): Number of free transfers available.
             show_transfer_summary (bool): Whether to display transfer 
                                         information.
@@ -60,7 +60,8 @@ class SquadSelector:
         self._add_position_constraints(prob, x, y, df, n)
         self._add_form_constraints(prob, y, df, n)
         self._add_forced_selection_constraints(prob, x, forced_player_ids, df)
-        self._add_transfer_constraints(prob, x, prev_squad_ids, free_transfers, df)
+        self._add_transfer_constraints(
+            prob, x, prev_squad_ids, free_transfers, df)
         self._add_bench_constraints(prob, x, y, df, n)
         self._add_team_constraints(prob, x, df, n)
         self._add_budget_constraint(prob, x, df, available_budget, n)
@@ -134,7 +135,8 @@ class SquadSelector:
         """Set up the main optimisation problem with objective function."""
         prob = pulp.LpProblem("FPL_Squad_Selection", pulp.LpMaximize)
         
-        # Use projected_points for starting XI optimisation, fpl_score for squad
+        # Use projected_points for starting XI optimisation,
+        # fpl_score for squad
         prob += pulp.lpSum(
             y[i] * df.iloc[i]["projected_points"] + 
             0.2 * (x[i] - y[i]) * df.iloc[i]["fpl_score"]
@@ -252,8 +254,14 @@ class SquadSelector:
                 <= self.config.MAX_PER_TEAM
             )
     
-    def _add_budget_constraint(self, prob: pulp.LpProblem, x: list, 
-                             df: pd.DataFrame, available_budget: float, n: int):
+    def _add_budget_constraint(
+            self,
+            prob: pulp.LpProblem,
+            x: list, 
+            df: pd.DataFrame,
+            available_budget: float,
+            n: int
+            ):
         """Add budget constraint."""
         budget_to_use = (
             available_budget if available_budget is not None 
@@ -313,7 +321,7 @@ class SquadSelector:
         squad_starting = squad[squad["starting_XI"] == 1].copy()
         squad_bench = squad[squad["starting_XI"] == 0].copy()
 
-        # Order bench: GK first, then remaining 3 by descending projected points
+        # Order bench: GK first, then remaining by descending projected points
         gk_bench = squad_bench[squad_bench["position"] == "GK"].copy()
         non_gk_bench = squad_bench[squad_bench["position"] != "GK"].copy()
         non_gk_bench = non_gk_bench.sort_values(

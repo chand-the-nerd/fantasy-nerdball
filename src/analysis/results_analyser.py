@@ -83,7 +83,8 @@ class ResultsAnalyser:
         print(f"Total squad points: {total_actual}")
 
         # Calculate differences (actual - projected)
-        prev_squad = self._calculate_point_differences(prev_squad, total_actual)
+        prev_squad = self._calculate_point_differences(
+            prev_squad, total_actual)
         
         # Create results files
         self._create_results_files(prev_squad, prev_gw, prev_squad_dir)
@@ -134,10 +135,12 @@ class ResultsAnalyser:
                   f"Total Points: {total_actual}, "
                   f"Difference: {difference:+.1f}")
         else:
-            print("Warning: No projected_points column found in previous squad")
+            print("Warning: No projected_points column found in previous "
+                  "squad")
             prev_squad["projected_points"] = 0  # Add dummy column
             prev_squad["points_difference"] = prev_squad["actual_points"]
-            prev_squad["absolute_difference"] = abs(prev_squad["actual_points"])
+            prev_squad["absolute_difference"] = abs(
+                prev_squad["actual_points"])
         
         return prev_squad
     
@@ -192,7 +195,8 @@ class ResultsAnalyser:
             ]
 
             if len(starting_xi) == 0:
-                print("Warning: No Starting XI players found, using all players")
+                print("Warning: No Starting XI players found, using all "
+                      "players")
                 starting_xi = squad_df
 
             # Calculate starting XI totals and metrics
@@ -304,7 +308,7 @@ class ResultsAnalyser:
                 "projected": "-",
                 "actual": f"{mean_absolute_error:.2f}",
                 "difference": "-",
-                "notes": "Average absolute difference for Starting XI projections",
+                "notes": "Average abs. difference for Starting XI projections",
             },
             {
                 "metric": "Accuracy within 2pts (XI)",
@@ -318,7 +322,8 @@ class ResultsAnalyser:
         
         return accuracy_metrics
     
-    def _calculate_performance_metrics(self, starting_xi: pd.DataFrame) -> list:
+    def _calculate_performance_metrics(
+            self, starting_xi: pd.DataFrame) -> list:
         """Calculate best and worst performer metrics."""
         performance_metrics = []
         
@@ -334,17 +339,21 @@ class ResultsAnalyser:
             performance_metrics.extend([
                 {
                     "metric": "Best Starting XI Performer",
-                    "projected": round(best_performer.get("projected_points", 0)),
+                    "projected": round(best_performer.get(
+                        "projected_points", 0)),
                     "actual": best_performer["actual_points"],
-                    "difference": round(best_performer.get("points_difference", 0)),
+                    "difference": round(best_performer.get(
+                        "points_difference", 0)),
                     "notes": (f'{best_performer["display_name"]} '
                              f'({best_performer["position"]})'),
                 },
                 {
                     "metric": "Worst Starting XI Performer",
-                    "projected": round(worst_performer.get("projected_points", 0)),
+                    "projected": round(worst_performer.get(
+                        "projected_points", 0)),
                     "actual": worst_performer["actual_points"],
-                    "difference": round(worst_performer.get("points_difference", 0)),
+                    "difference": round(worst_performer.get(
+                        "points_difference", 0)),
                     "notes": (f'{worst_performer["display_name"]} '
                              f'({worst_performer["position"]})'),
                 }
@@ -367,11 +376,13 @@ class ResultsAnalyser:
             captain_actual = captain["actual_points"]
             # Account for captain double points in actual score
             captain_actual_doubled = captain_actual * 2
-            captain_difference = captain_actual_doubled - (captain_projected * 2)
+            captain_difference = (
+                captain_actual_doubled - (captain_projected * 2)
+            )
             
             captain_metrics.append({
                 "metric": "Captain Performance",
-                "projected": round(captain_projected * 2),  # Show doubled projection
+                "projected": round(captain_projected * 2),
                 "actual": captain_actual_doubled,
                 "difference": round(captain_difference),
                 "notes": (f'{captain["display_name"].replace(" (C)", "")} - '
@@ -431,7 +442,10 @@ class ResultsAnalyser:
         # Position breakdown in console
         print(f"\nPosition Breakdown (Starting XI):")
         for item in summary_data:
-            if " Starting XI" in item["metric"] and item["metric"] != "Starting XI Total Points":
+            if (
+                " Starting XI" in item["metric"]
+                and item["metric"] != "Starting XI Total Points"
+                ):
                 pos = item["metric"].split(" ")[0]
                 print(f"  {pos}: {item['actual']} pts "
                       f"(projected: {item['projected']:.1f}, "

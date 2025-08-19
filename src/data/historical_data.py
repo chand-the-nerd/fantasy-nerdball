@@ -6,7 +6,8 @@ from ..utils.text_utils import normalize_name
 
 
 class HistoricalDataManager:
-    """Handles fetching and processing of historical player data with xG performance metrics."""
+    """Handles fetching and processing of historical player data with xG 
+    performance metrics."""
     
     def __init__(self, config):
         self.config = config
@@ -39,8 +40,9 @@ class HistoricalDataManager:
                          weighted xG analysis.
         """
         url = (
-            f"https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/"
-            f"master/data/{season_folder}/players_raw.csv"
+            f"https://raw.githubusercontent.com/vaastav/"
+            f"Fantasy-Premier-League/master/data/"
+            f"{season_folder}/players_raw.csv"
         )
         df = pd.read_csv(url)
 
@@ -93,14 +95,17 @@ class HistoricalDataManager:
         # Safely extract xG metrics
         for col_name, df_col in xg_columns.items():
             if df_col in df.columns:
-                df[col_name] = pd.to_numeric(df[df_col], errors="coerce").fillna(0)
+                df[col_name] = pd.to_numeric(
+                    df[df_col], errors="coerce").fillna(0)
             else:
                 df[col_name] = 0.0
-                print(f"Warning: {df_col} not found in {season_folder}, using 0")
+                print(f"Warning: {df_col} not found in {season_folder}, "
+                      "using 0")
         
         return df
     
-    def _calculate_historical_per_game_metrics(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _calculate_historical_per_game_metrics(
+            self, df: pd.DataFrame) -> pd.DataFrame:
         """Calculate per-game metrics for players who played."""
         played_mask = df["games_played"] >= 1
         
@@ -157,7 +162,8 @@ class HistoricalDataManager:
 
         return df
     
-    def _calculate_historical_xg_performance(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _calculate_historical_xg_performance(
+            self, df: pd.DataFrame) -> pd.DataFrame:
         """Calculate position-weighted xG performance ratios."""
         # Initialise xG performance columns
         df["historical_xOP"] = 1.0  # Historical Expected Overperformance ratio
@@ -166,9 +172,10 @@ class HistoricalDataManager:
         
         # Calculate attacking component for relevant positions
         attacking_hist_mask = (
-            (df["xgi_per_game"] > self.historical_thresholds['min_xgi_per_game']) & 
+            (df["xgi_per_game"] >
+             self.historical_thresholds['min_xgi_per_game']) & 
             (df["games_played"] >= self.historical_thresholds['min_games']) & 
-            df["element_type"].isin([2, 3, 4])  # DEF, MID, FWD can have attacking
+            df["element_type"].isin([2, 3, 4])  # DEF, MID, FWD 
         )
         
         if attacking_hist_mask.any():
@@ -179,16 +186,20 @@ class HistoricalDataManager:
         
         # Calculate defensive component for relevant positions
         defensive_hist_mask = (
-            (df["xgc_per_game"] > self.historical_thresholds['min_xgc_per_game']) & 
+            (df["xgc_per_game"] >
+             self.historical_thresholds['min_xgc_per_game']) & 
             (df["games_played"] >= self.historical_thresholds['min_games']) & 
-            df["element_type"].isin([1, 2, 3])  # GK, DEF, MID can have defensive
+            df["element_type"].isin([1, 2, 3])  # GK, DEF, MID
         )
         
         if defensive_hist_mask.any():
-            # For GC, higher ratio = better performance (conceding less than expected)
+            # For GC, higher ratio = 
+            # better performance (conceding less than expected)
             df.loc[defensive_hist_mask, "defensive_xOP_hist"] = (
-                df.loc[defensive_hist_mask, "xgc_per_game"] / 
-                df.loc[defensive_hist_mask, "goals_conceded_per_game"].clip(lower=0.01)
+                df.loc[defensive_hist_mask,"xgc_per_game"] / 
+                df.loc[defensive_hist_mask, "goals_conceded_per_game"].clip(
+                lower=0.01
+                )
             ).clip(0.2, 3.0)
         
         # Calculate weighted historical xOP for each player
@@ -197,7 +208,8 @@ class HistoricalDataManager:
             if position_id not in self.position_weights:
                 continue
                 
-            weighted_xop = self._calculate_weighted_historical_xop(row, position_id)
+            weighted_xop = self._calculate_weighted_historical_xop(
+                row, position_id)
             df.loc[idx, "historical_xOP"] = round(weighted_xop, 2)
 
         # Clean up temporary columns
@@ -218,20 +230,23 @@ class HistoricalDataManager:
         # Check if we have sufficient data for each component
         has_attacking_data = (
             attacking_weight > 0 and 
-            row["xgi_per_game"] > self.historical_thresholds['min_xgi_per_game'] and 
-            row["games_played"] >= self.historical_thresholds['min_games']
+            row["xgi_per_game"] >
+            self.historical_thresholds['min_xgi_per_game'] 
+            and row["games_played"] >= self.historical_thresholds['min_games']
         )
         
         has_defensive_data = (
             defensive_weight > 0 and 
-            row["xgc_per_game"] > self.historical_thresholds['min_xgc_per_game'] and 
+            row["xgc_per_game"] >
+            self.historical_thresholds['min_xgc_per_game'] and 
             row["games_played"] >= self.historical_thresholds['min_games']
         )
         
         # Calculate weighted xOP based on available data
         if has_attacking_data and has_defensive_data:
             # Both components available - use full weighting
-            return (attacking_xop * attacking_weight) + (defensive_xop * defensive_weight)
+            return ((attacking_xop * attacking_weight) +
+                    (defensive_xop * defensive_weight))
             
         elif has_attacking_data and attacking_weight > 0:
             # Only attacking data available
@@ -250,7 +265,10 @@ class HistoricalDataManager:
         reliability_threshold = 0.8
         unreliable_mask = df["season_reliability"] < reliability_threshold
         penalty_factor = df["season_reliability"].clip(lower=0.3)
-        df.loc[unreliable_mask, "points_per_game"] *= penalty_factor[unreliable_mask]
+        df.loc[
+            unreliable_mask,
+            "points_per_game"
+            ] *= penalty_factor[unreliable_mask]
         
         return df
     
@@ -258,9 +276,16 @@ class HistoricalDataManager:
                                 season_folder: str) -> pd.DataFrame:
         """Prepare output dataframe with relevant columns."""
         output_cols = [
-            "web_name", "element_type", "points_per_game", "games_played", 
-            "season_reliability", "historical_xOP", "goal_involvements_per_game",
-            "goals_conceded_per_game", "xgi_per_game", "xgc_per_game"
+            "web_name",
+            "element_type",
+            "points_per_game",
+            "games_played", 
+            "season_reliability",
+            "historical_xOP",
+            "goal_involvements_per_game",
+            "goals_conceded_per_game",
+            "xgi_per_game",
+            "xgc_per_game"
         ]
         
         # Only include columns that exist
@@ -287,7 +312,8 @@ class HistoricalDataManager:
         and volatility.
         
         Args:
-            player_data (dict): Player's historical and current xG performance data
+            player_data (dict): Player's historical and current xG performance 
+            data
             
         Returns:
             float: Performance modifier (1.0 = neutral, >1.0 = expected 
@@ -300,7 +326,10 @@ class HistoricalDataManager:
         
         # Get current season performance
         current_xop = player_data.get('current_xOP', 1.0)
-        current_xg_context = player_data.get('current_xg_context', 'insufficient_data')
+        current_xg_context = player_data.get(
+            'current_xg_context',
+            'insufficient_data'
+            )
         
         # Calculate season progression factor
         gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
@@ -347,7 +376,8 @@ class HistoricalDataManager:
         
         return None
 
-    def _calculate_season_progression_factor(self, gameweeks_completed: int) -> float:
+    def _calculate_season_progression_factor(
+            self, gameweeks_completed: int) -> float:
         """
         Calculate how reliable current season stats are based on games played.
         
@@ -430,7 +460,8 @@ class HistoricalDataManager:
         deviation_from_neutral = current_xop - 1.0
         
         if season_progression < 0.6:
-            # Early season: high volatility, limited trust in current performance
+            # Early season: high volatility,
+            # limited trust in current performance
             if current_xop > 1.3:  # Very high performance
                 modifier = 1.0 + (deviation_from_neutral * 0.1)
                 volatility = 0.35
@@ -530,7 +561,7 @@ class HistoricalDataManager:
         hist = self._calculate_weighted_historical_averages(hist)
         
         # Calculate xG performance modifiers
-        hist = self._calculate_xg_consistency_modifiers(hist, current)
+        hist = self._calculate_xg_consistency_modifiers(hist)
         
         # Calculate current season reliability
         current_reliability = self._calculate_current_reliability(current)
@@ -559,7 +590,8 @@ class HistoricalDataManager:
         for i, extra in enumerate(hist_frames[1:], 1):
             season = self.config.PAST_SEASONS[i]
             
-            # Only keep season-specific columns and name_key from extra dataframe
+            # Only keep season-specific columns and name_key from 
+            # extra dataframe
             season_specific_cols = ["name_key"]
             for col in extra.columns:
                 if col.endswith(f"_{season}"):
@@ -571,23 +603,32 @@ class HistoricalDataManager:
         
         return hist
     
-    def _calculate_weighted_historical_averages(self, hist: pd.DataFrame) -> pd.DataFrame:
+    def _calculate_weighted_historical_averages(
+            self, hist: pd.DataFrame) -> pd.DataFrame:
         """Calculate weighted averages from historical data."""
         # Get relevant columns for calculations
-        ppg_cols = [c for c in hist.columns if c.startswith("ppg_")]
-        games_cols = [c for c in hist.columns if c.startswith("games_")]
-        reliability_cols = [c for c in hist.columns if c.startswith("reliability_")]
-        historical_xop_cols = [c for c in hist.columns if c.startswith("historical_xOP_")]
+        ppg_cols = [
+            c for c in hist.columns if c.startswith("ppg_")]
+        games_cols = [
+            c for c in hist.columns if c.startswith("games_")]
+        reliability_cols = [
+            c for c in hist.columns if c.startswith("reliability_")]
+        historical_xop_cols = [
+            c for c in hist.columns if c.startswith("historical_xOP_")]
 
         # Initialise averages
         hist["avg_ppg_past2"] = 0.0
         hist["total_games_past2"] = 0
         hist["avg_reliability"] = 0.0
-        hist["historical_xOP"] = 1.0  # Weighted historical Expected Overperformance
+        hist["historical_xOP"] = 1.0
+        # Weighted historical Expected Overperformance
 
         # Calculate traditional weighted averages
         for ppg_col, games_col, reliability_col, weight in zip(
-            ppg_cols, games_cols, reliability_cols, self.config.HISTORIC_SEASON_WEIGHTS
+            ppg_cols,
+            games_cols,
+            reliability_cols,
+            self.config.HISTORIC_SEASON_WEIGHTS
         ):
             hist[ppg_col] = hist[ppg_col].fillna(0)
             hist[games_col] = hist[games_col].fillna(0)
@@ -603,7 +644,10 @@ class HistoricalDataManager:
             hist["total_games_past2"] += hist[games_col]
 
         # Calculate weighted historical xOP
-        for xop_col, weight in zip(historical_xop_cols, self.config.HISTORIC_SEASON_WEIGHTS):
+        for xop_col, weight in zip(
+            historical_xop_cols,
+            self.config.HISTORIC_SEASON_WEIGHTS
+            ):
             if xop_col in hist.columns:
                 hist[xop_col] = hist[xop_col].fillna(1.0)  # Default to neutral
                 # Only include seasons where player had sufficient games
@@ -615,20 +659,23 @@ class HistoricalDataManager:
                     if xop_col == historical_xop_cols[0]:
                         hist["historical_xOP"] = 1.0
                     # Add weighted contribution
-                    hist.loc[sufficient_games_mask, "historical_xOP"] += (
-                        (hist.loc[sufficient_games_mask, xop_col] - 1.0) * weight
-                    )
+                    hist.loc[
+                        sufficient_games_mask,
+                        "historical_xOP"] += (
+                            (hist.loc[sufficient_games_mask, xop_col]
+                             - 1.0) * weight
+                        )
 
         # Round historical_xOP to 2 decimal places
         hist["historical_xOP"] = hist["historical_xOP"].round(2)
         
         return hist
     
-    def _calculate_xg_consistency_modifiers(self, hist: pd.DataFrame, 
-                                          current: pd.DataFrame) -> pd.DataFrame:
+    def _calculate_xg_consistency_modifiers(
+            self, hist: pd.DataFrame) -> pd.DataFrame:
         """Calculate xG performance modifiers for each player."""
         hist["xConsistency"] = 1.0  # Final Expected modifier
-        hist["xOP_historical_baseline"] = np.nan  # Track if player has historical baseline
+        hist["xOP_historical_baseline"] = np.nan
         
         for idx, row in hist.iterrows():
             player_data = row.to_dict()
@@ -639,16 +686,23 @@ class HistoricalDataManager:
             
             if has_historical_data:
                 # Calculate normal xG modifier
-                xg_modifier = self.calculate_xg_performance_modifier(player_data)
-                hist.loc[idx, "xOP_historical_baseline"] = row.get("historical_xOP", 1.0)
+                xg_modifier = self.calculate_xg_performance_modifier(
+                    player_data)
+                hist.loc[
+                    idx,
+                    "xOP_historical_baseline"
+                    ] = row.get("historical_xOP", 1.0)
             else:
                 # New player - calculate modifier but mark baseline as NA
-                xg_modifier = self.calculate_xg_performance_modifier(player_data)
+                xg_modifier = self.calculate_xg_performance_modifier(
+                    player_data)
                 hist.loc[idx, "xOP_historical_baseline"] = np.nan
             
             # Apply data availability factor
             if has_historical_data:
-                availability_factor = self.calculate_data_availability_factor(player_data)
+                availability_factor = self.calculate_data_availability_factor(
+                    player_data
+                    )
             else:
                 availability_factor = 0.7  # Give new players moderate impact
             
@@ -670,7 +724,8 @@ class HistoricalDataManager:
                 return True
         return False
     
-    def _calculate_current_reliability(self, current: pd.DataFrame) -> pd.Series:
+    def _calculate_current_reliability(
+            self, current: pd.DataFrame) -> pd.Series:
         """Calculate current season reliability."""
         gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
         current_reliability = current["starts"] / gameweeks_completed
