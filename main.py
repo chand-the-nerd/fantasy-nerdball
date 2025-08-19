@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Fantasy Nerdball - FPL Squad Optimisation Tool
-Main entry point for the application.
+Main entry point for the application with enhanced xG analysis.
 """
 
 import sys
@@ -19,6 +19,22 @@ from src.optimisation.squad_selector import SquadSelector
 from src.optimisation.transfer_evaluator import TransferEvaluator
 from src.utils.file_utils import FileUtils
 
+rename_map = {
+    "display_name": "name",
+    "position": "pos",
+    "team": "team",
+    "now_cost_m": "cost",
+    "form": "form",
+    "historic_ppg": "his_ppg",
+    "fixture_diff": "fix_diff",
+    "reliability": "start_pct",
+    "historical_xOP": "hist_xOP",
+    "current_xOP": "cur_xOP",
+    "xConsistency": "xMod",
+    "minspg": "minspg",
+    "proj_pts": "proj_pts",
+    "next_opponent": "next_fix"
+}
 
 def prompt_player_history_update(config):
     """Prompt user to update player history data."""
@@ -115,7 +131,7 @@ def main():
     # Load previous squad if available
     prev_squad = FileUtils.load_previous_squad(config.GAMEWEEK)
 
-    print("Fetching current players...")
+    print("Fetching current players with xG analysis...")
     players = player_processor.fetch_current_players()
 
     # Calculate available budget based on previous squad value
@@ -128,7 +144,8 @@ def main():
     if prev_squad is not None:
         prev_squad_ids = player_processor.match_players_to_current(prev_squad, players)
 
-    # Merge historical data
+    # Merge historical data with enhanced xG analysis
+    print("Analyzing historical xG performance...")
     players = historical_manager.merge_past_seasons(players)
     
     print(f"Fetching player-level fixture difficulty from GW{config.GAMEWEEK}...")
@@ -136,7 +153,7 @@ def main():
         config.FIRST_N_GAMEWEEKS, players, config.GAMEWEEK
     )
     
-    print("Scoring players...")
+    print("Scoring players with xG performance modifiers...")
     scored = scoring_engine.build_scores(players, fixture_scores)
 
     # === NEW STAGE: Show theoretical best squad for comparison ===
@@ -213,17 +230,33 @@ def main():
         if "proj_pts_display" not in theoretical_bench_display.columns:
             theoretical_bench_display["proj_pts_display"] = theoretical_bench_display["proj_pts"].round(1).astype(str)
         
-        # Display columns to match your format
+        # Display columns with enhanced granular xG analysis
         columns_to_show = [
-            "display_name", "position", "team", "form", "historic_ppg", 
-            "fixture_diff", "reliability", "minspg", "proj_pts_display", "next_opponent"  # Use display column
+            "display_name", 
+            "position", 
+            "team", 
+            "now_cost_m",
+            "form", 
+            "historic_ppg", 
+            "fixture_diff", 
+            "reliability", 
+            "historical_xOP",  # Historical Expected Overperformance
+            "current_xOP",     # Current Expected Overperformance  
+            "xConsistency",    # Final Expected modifier
+            "minspg", 
+            "proj_pts_display",
+            "next_opponent"
         ]
         
+        # Only include columns that exist
+        available_theoretical_cols = [col for col in columns_to_show if col in theoretical_starting_display.columns]
+        
         print(f"\n=== NERDBALL XI for GW{config.GAMEWEEK} ===")
-        print(theoretical_starting_display[columns_to_show])
+        _print_with_renamed_headers(theoretical_starting_display)
         
         print(f"\n=== SUBS (in order) for GW{config.GAMEWEEK} ===")
-        print(theoretical_bench_display[columns_to_show])
+        available_bench_theoretical_cols = [col for col in columns_to_show if col in theoretical_bench_display.columns]
+        _print_with_renamed_headers(theoretical_bench_display)
         
         theoretical_cost = theoretical_starting["now_cost_m"].sum() + theoretical_bench["now_cost_m"].sum()
         theoretical_points_with_captain = theoretical_starting_display["projected_points"].sum()
@@ -254,7 +287,7 @@ def main():
         else:
             print(f"\n✅ All previous squad players are available")
     
-    print("\n🧠 Thinking...")
+    print("\n🧠 Thinking with xG intelligence...")
 
     # Get the best squad - either with penalty consideration or standard approach
     if config.ACCEPT_TRANSFER_PENALTY and prev_squad_ids is not None and not config.WILDCARD:
@@ -352,12 +385,17 @@ def main():
         else:
             print("💡 Not bad, could be better.")
 
-
+def _print_with_renamed_headers(df: pd.DataFrame):
+    """Helper to print dataframe with renamed headers and filtered columns."""
+    available_cols = [c for c in rename_map.keys() if c in df.columns]
+    renamed = df.rename(columns=rename_map)
+    print(renamed[[rename_map[c] for c in available_cols]])
+          
 def _finalise_and_display_results(
     config, starting, bench, fixture_manager, points_calculator, scored, 
     players, prev_squad_ids, available_budget, squad_selector
 ):
-    """Finalise squad selection and display results."""
+    """Finalise squad selection and display results with enhanced xG analysis."""
     # Create updated forced selections with all squad players
     updated_forced_selections = squad_selector.update_forced_selections_from_squad(starting, bench)
 
@@ -372,25 +410,31 @@ def _finalise_and_display_results(
     )
     full_squad = full_squad.sort_values("position")
 
-    # Print full squad with projected points
+    # Print full squad with projected points and xG analysis
     full_squad_display = points_calculator.add_points_analysis_to_display(full_squad)
     print(f"\n=== Full Squad for GW{config.GAMEWEEK} ===")
-    print(
-        full_squad_display[
-            [
-                "display_name",
-                "position",
-                "team",
-                "form",
-                "historic_ppg",
-                "fixture_diff",
-                "reliability",
-                "minspg",
-                "proj_pts",
-                "next_opponent",
-            ]
-        ]
-    )
+    
+    # Enhanced columns to include granular xG analysis
+    full_squad_columns = [
+        "display_name",
+        "position", 
+        "team",
+        "now_cost_m",
+        "form",
+        "historic_ppg",
+        "fixture_diff",
+        "reliability",
+        "historical_xOP",  # Historical Expected Overperformance
+        "current_xOP",     # Current Expected Overperformance
+        "xConsistency",    # Final Expected modifier
+        "minspg",
+        "proj_pts",
+        "next_opponent",
+    ]
+    
+    # Only include columns that exist
+    available_full_squad_cols = [col for col in full_squad_columns if col in full_squad_display.columns]
+    _print_with_renamed_headers(full_squad_display)
 
     # Optimise starting XI for the specific gameweek
     print(f"\nFetching difficulty for GW{config.GAMEWEEK} fixture...")
@@ -488,18 +532,26 @@ def _finalise_and_display_results(
         mask = starting_display["proj_pts_display"].isna()
         starting_display.loc[mask, "proj_pts_display"] = starting_display.loc[mask, "proj_pts"].round(1).astype(str)
 
-    # Display final results
+    # Also create display column for bench
+    if "proj_pts_display" not in bench_display.columns:
+        bench_display["proj_pts_display"] = bench_display["proj_pts"].round(1).astype(str)
+
+    # Display final results with enhanced xG analysis
     print(f"\n=== Starting XI for GW{config.GAMEWEEK} ===")
     
-    # Check if we have the next_opponent column before displaying
+    # Enhanced columns to include granular xG analysis
     columns_to_display = [
         "display_name",
         "position",
-        "team",
+        "team", 
+        "now_cost_m",
         "form",
         "historic_ppg",
         "fixture_diff",
         "reliability",
+        "historical_xOP",  # Historical Expected Overperformance
+        "current_xOP",     # Current Expected Overperformance
+        "xConsistency",    # Final Expected modifier
         "minspg",
         "proj_pts_display",  # Use display column instead of proj_pts
     ]
@@ -507,15 +559,15 @@ def _finalise_and_display_results(
     if "next_opponent" in starting_display.columns:
         columns_to_display.append("next_opponent")
     
-    print(starting_display[columns_to_display])
+    # Only include columns that exist
+    available_cols = [col for col in columns_to_display if col in starting_display.columns]
+    _print_with_renamed_headers(starting_display)
 
     print(f"\n=== Bench (in order) for GW{config.GAMEWEEK} ===")
     
-    # Also create display column for bench
-    if "proj_pts_display" not in bench_display.columns:
-        bench_display["proj_pts_display"] = bench_display["proj_pts"].round(1).astype(str)
-    
-    print(bench_display[columns_to_display])
+    # Only include columns that exist for bench display
+    available_bench_cols = [col for col in columns_to_display if col in bench_display.columns]
+    _print_with_renamed_headers(bench_display)
 
     total_cost = starting["now_cost_m"].sum() + bench["now_cost_m"].sum()
     total_projected_points = starting_display["projected_points"].sum()

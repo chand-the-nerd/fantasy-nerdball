@@ -29,6 +29,7 @@ class ScoringEngine:
         df["avg_reliability"] = df["avg_reliability"].fillna(0)
         df["current_reliability"] = df["current_reliability"].fillna(0)
         df["fixture_bonus"] = df["fixture_bonus"].fillna(0)
+        df["xConsistency"] = df["xConsistency"].fillna(1.0)  # Neutral if no data
 
         # Calculate team and promotion adjustments
         df["promoted_penalty"] = df["team"].apply(
@@ -62,9 +63,12 @@ class ScoringEngine:
         fixture_component = self.config.DIFFICULTY_WEIGHT * z(df["fixture_bonus"])
 
         # Base quality score (for projected points when they DO play)
+        # Now includes xG performance modifier
         df["base_quality"] = (
-            form_component + historic_component + fixture_component + df["promoted_penalty"]
-        ) * df["team_modifier"]
+            (form_component + historic_component + fixture_component + df["promoted_penalty"]) 
+            * df["team_modifier"] 
+            * df["xConsistency"]
+        )
 
         # Apply reliability adjustments for squad selection
         # Current season reliability is 5x more important than historical
@@ -127,6 +131,7 @@ class ScoringEngine:
         unavailable_count = unavailable_mask.sum()
         
         if unavailable_count > 0:
+            print(f"⚠️  Setting FPL scores and projected points to 0 for {unavailable_count} unavailable players")
             df.loc[unavailable_mask, "fpl_score"] = 0.0
             df.loc[unavailable_mask, "projected_points"] = 0.0
         else:
