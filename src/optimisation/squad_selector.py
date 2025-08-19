@@ -115,7 +115,6 @@ class SquadSelector:
 
         # Transfer constraint
         if prev_squad_ids is not None and free_transfers is not None and not self.config.WILDCARD:
-            print(f"Applying transfer constraint: max {free_transfers} transfers")
 
             # Create mapping of player IDs to dataframe indices
             id_to_index = {df.iloc[i]["id"]: i for i in range(n)}
@@ -134,7 +133,6 @@ class SquadSelector:
             min_players_to_keep = 15 - free_transfers
             prob += prev_players_kept >= min_players_to_keep
 
-            print(f"Must keep at least {min_players_to_keep} players from previous squad")
         elif self.config.WILDCARD and prev_squad_ids is not None:
             print("🃏 WILDCARD ACTIVE: No transfer constraints applied")
 

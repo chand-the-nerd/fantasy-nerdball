@@ -29,11 +29,13 @@ class Config:
     # How much 1 FPL score unit translates to points
     FPL_SCORE_TO_POINTS_MULTIPLIER = 1.0
 
-    # === HISTORICAL DATA SETTINGS ===
-    # Historic seasons to consider
-    PAST_SEASONS = ["2024-25", "2023-24"]
-    # Relative weights for seasons (should match PAST_SEASONS length)
-    HISTORIC_SEASON_WEIGHTS = [0.7, 0.3]
+
+    # === HISTORICAL DATA SETTINGS (Enhanced for xG Analysis) ===
+    # Only include seasons with xG data available (2022-23 onwards)
+    PAST_SEASONS = ["2024-25", "2023-24", "2022-23"]
+    # Recent seasons weighted more heavily for xG consistency detection
+    # Redistributed weights to maintain same relative importance
+    HISTORIC_SEASON_WEIGHTS = [0.5, 0.3, 0.2]  # Sums to 1.0
     # How many upcoming fixtures' difficulty to consider
     FIRST_N_GAMEWEEKS = 5
 
