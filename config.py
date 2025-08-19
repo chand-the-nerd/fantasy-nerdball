@@ -3,15 +3,16 @@ Configuration settings for Fantasy Nerdball FPL optimisation tool.
 Edit this file to customise your optimisation preferences.
 """
 
+
 class Config:
     """Configuration class containing all settings for the FPL optimisation."""
     
     # === BASIC SETTINGS ===
     GAMEWEEK = 2
-    BUDGET = 100.0  # Will be overriden by value of squad from prev gameweek
+    BUDGET = 100.0  # Will be overridden by value of squad from prev gameweek
     FREE_TRANSFERS = 1
-    ACCEPT_TRANSFER_PENALTY = True
-    # Set to False to include unavailable players in optimization
+    ACCEPT_TRANSFER_PENALTY = False
+    # Set to False to include unavailable players in optimisation
     EXCLUDE_UNAVAILABLE = True
     WILDCARD = False
 
@@ -29,7 +30,6 @@ class Config:
     }
     # How much 1 FPL score unit translates to points
     FPL_SCORE_TO_POINTS_MULTIPLIER = 1.0
-
 
     # === HISTORICAL DATA SETTINGS (Enhanced for xG Analysis) ===
     # Only include seasons with xG data available (2022-23 onwards)

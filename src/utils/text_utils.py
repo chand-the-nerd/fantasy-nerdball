@@ -28,5 +28,7 @@ def normalize_for_matching(text: str) -> str:
         str: The normalised text with accents removed and lowercase.
     """
     normalised = unicodedata.normalize("NFD", text)
-    ascii_text = "".join(c for c in normalised if unicodedata.category(c) != "Mn")
+    ascii_text = "".join(
+        c for c in normalised if unicodedata.category(c) != "Mn"
+    )
     return ascii_text.lower().strip()

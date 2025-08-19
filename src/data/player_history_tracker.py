@@ -1,375 +1,248 @@
-"""Module for tracking individual player performance history."""
+#!/usr/bin/env python3
+"""
+Standalone script to update player history data.
+Run this after each gameweek to capture the previous gameweek's data.
+"""
 
-import os
-import pandas as pd
+import sys
+import logging
 from datetime import datetime
-from ..api.fpl_client import FPLClient
-from ..utils.text_utils import normalize_name
+from config import Config
+from src.data.player_history_tracker import PlayerHistoryTracker
 
 
-class PlayerHistoryTracker:
-    """Handles individual player performance tracking and CSV storage."""
+def main():
+    """Update player history data for the previous gameweek."""
     
-    def __init__(self, config):
-        self.config = config
-        self.fpl_client = FPLClient()
-        self.base_dir = "data/players"
+    config = Config()
+    tracker = PlayerHistoryTracker(config)
     
-    def update_all_players(self, force_overwrite=False):
-        """
-        Update all players' CSV files with the previous gameweek's data.
-        Only fetches data for the previous gameweek to avoid large API calls.
-        
-        Args:
-            force_overwrite (bool): If True, overwrites existing data for the gameweek
-        """
-        target_gameweek = self.config.GAMEWEEK - 1
-        
-        if target_gameweek < 1:
-            print("No previous gameweek to update (current gameweek is 1)")
-            return
-        
-        print(f"\n=== Updating Player History for GW{target_gameweek} ===")
-        if force_overwrite:
-            print("🔄 Force overwrite mode enabled - existing data will be replaced")
-        
-        # Get current player list to know who to track
-        bootstrap_data = self.fpl_client.get_bootstrap_static()
-        players_df = pd.DataFrame(bootstrap_data["elements"])
-        teams_df = pd.DataFrame(bootstrap_data["teams"])
-        
-        # Create team name mapping
-        team_map = dict(zip(teams_df["id"], teams_df["name"]))
-        
-        successful_updates = 0
-        failed_updates = 0
-        skipped_updates = 0
-        
-        for _, player in players_df.iterrows():
-            try:
-                team_name = team_map.get(player["team"], "unknown")
-                result = self._update_player_history(player, team_name, target_gameweek, force_overwrite)
-                
-                if result == "updated":
-                    successful_updates += 1
-                elif result == "skipped":
-                    skipped_updates += 1
-                
-                # Progress indicator
-                if (successful_updates + skipped_updates) % 50 == 0:
-                    print(f"  Processed {successful_updates + skipped_updates} players...")
-                    
-            except Exception as e:
-                print(f"  Error updating {player.get('web_name', 'Unknown')}: {e}")
-                failed_updates += 1
-        
-        print(f"\n✅ Update complete: {successful_updates} updated, {skipped_updates} skipped, {failed_updates} failed")
+    print(f"Fantasy Nerdball - Player History Updater")
+    print(f"Current gameweek: {config.GAMEWEEK}")
+    print(f"Timestamp: {datetime.now()}")
     
-    def _update_player_history(self, player, team_name, target_gameweek, force_overwrite=False):
-        """
-        Update a single player's CSV file with data from the target gameweek.
+    # Add some debug info
+    logging.info(f"Starting update - Current GW: {config.GAMEWEEK}")
+    
+    if len(sys.argv) > 1:
+        command = sys.argv[1].lower()
         
-        Args:
-            player (dict): Player data from bootstrap API
-            team_name (str): Team name for directory structure
-            target_gameweek (int): Gameweek to fetch data for
-            force_overwrite (bool): If True, overwrites existing data for the gameweek
-            
-        Returns:
-            str: "updated", "skipped", or "error"
-        """
-        player_id = player["id"]
-        player_name = self._clean_filename(player["web_name"])
-        team_dir_name = self._clean_filename(team_name)
-        
-        # Create directory structure
-        player_dir = os.path.join(self.base_dir, team_dir_name)
-        os.makedirs(player_dir, exist_ok=True)
-        
-        csv_path = os.path.join(player_dir, f"{player_name}.csv")
-        
-        # Check if we already have this gameweek's data (only skip if not forcing overwrite)
-        if not force_overwrite and self._gameweek_already_exists(csv_path, target_gameweek):
-            return "skipped"  # Skip if already updated and not forcing overwrite
-        
-        # Fetch player's detailed data
-        player_data = self.fpl_client.get_player_summary(player_id)
-        
-        # Find the target gameweek's data
-        gameweek_data = None
-        for gw_record in player_data.get("history", []):
-            if gw_record["round"] == target_gameweek:
-                gameweek_data = gw_record
-                break
-        
-        if gameweek_data is None:
-            # Player didn't play this gameweek - create zero record
-            gameweek_data = self._create_zero_record(target_gameweek, player)
-        
-        # Add additional player info
-        gameweek_data.update({
-            "player_name": player["web_name"],
-            "team": team_name,
-            "position": self._get_position_name(player["element_type"]),
-            "price": player["now_cost"] / 10.0,
-            "updated_at": datetime.now().isoformat()
-        })
-        
-        # Convert to DataFrame
-        new_row = pd.DataFrame([gameweek_data])
-        
-        # Load existing data or create new
-        if os.path.exists(csv_path):
-            existing_df = pd.read_csv(csv_path)
-            # Always remove any existing data for this gameweek (enables overwriting)
-            existing_df = existing_df[existing_df["round"] != target_gameweek]
-            # Append new data
-            updated_df = pd.concat([existing_df, new_row], ignore_index=True)
+        if command == "update":
+            handle_update_command(tracker, config)
+        elif command == "update-safe":
+            handle_update_safe_command(tracker, config)
+        elif command == "debug":
+            handle_debug_command(tracker, config)
+        elif command == "force":
+            handle_force_command(tracker, config)
+        elif command == "stats":
+            handle_stats_command(tracker)
+        elif command == "cleanup":
+            handle_cleanup_command(tracker, sys.argv)
+        elif command == "player":
+            handle_player_command(tracker, sys.argv)
+        elif command == "team":
+            handle_team_command(tracker, sys.argv, config)
         else:
-            updated_df = new_row
-        
-        # Sort by gameweek
-        updated_df = updated_df.sort_values("round")
-        
-        # Save to CSV
-        updated_df.to_csv(csv_path, index=False)
-        
-        return "updated"
+            print("Unknown command. See usage below.")
+            show_usage()
+    else:
+        show_usage()
+
+
+def handle_update_command(tracker, config):
+    """Handle the 'update' command."""
+    print(f"Updating all players with GW{config.GAMEWEEK - 1} data "
+          f"(with overwrite)...")
+    logging.info(f"About to update all players for GW{config.GAMEWEEK - 1} "
+                 f"with overwrite")
     
-    def update_specific_gameweek(self, gameweek, force_overwrite=True):
-        """
-        Update all players' CSV files with data from a specific gameweek.
+    try:
+        # Update all players with previous gameweek data - FORCE OVERWRITE
+        tracker.update_all_players(force_overwrite=True)
+        logging.info(f"Update completed with overwrite")
+        print(f"Update completed!")
         
-        Args:
-            gameweek (int): The gameweek to update
-            force_overwrite (bool): If True, overwrites existing data for the gameweek
-        """
-        if gameweek < 1 or gameweek > 38:
-            print(f"Invalid gameweek: {gameweek}. Must be between 1 and 38.")
-            return
+        # Show some stats after update
+        stats = tracker.get_summary_stats()
+        print(f"Total records now: {stats.get('total_records', 'Unknown')}")
         
-        print(f"\n=== Updating Player History for GW{gameweek} ===")
-        if force_overwrite:
-            print("🔄 Force overwrite mode enabled - existing data will be replaced")
-        
-        # Get current player list to know who to track
-        bootstrap_data = self.fpl_client.get_bootstrap_static()
-        players_df = pd.DataFrame(bootstrap_data["elements"])
-        teams_df = pd.DataFrame(bootstrap_data["teams"])
-        
-        # Create team name mapping
-        team_map = dict(zip(teams_df["id"], teams_df["name"]))
-        
-        successful_updates = 0
-        failed_updates = 0
-        skipped_updates = 0
-        
-        for _, player in players_df.iterrows():
-            try:
-                team_name = team_map.get(player["team"], "unknown")
-                result = self._update_player_history(player, team_name, gameweek, force_overwrite)
-                
-                if result == "updated":
-                    successful_updates += 1
-                elif result == "skipped":
-                    skipped_updates += 1
-                
-                # Progress indicator
-                if (successful_updates + skipped_updates) % 50 == 0:
-                    print(f"  Processed {successful_updates + skipped_updates} players...")
-                    
-            except Exception as e:
-                print(f"  Error updating {player.get('web_name', 'Unknown')}: {e}")
-                failed_updates += 1
-        
-        print(f"\n✅ Update complete: {successful_updates} updated, {skipped_updates} skipped, {failed_updates} failed")
+    except Exception as e:
+        logging.error(f"Error during update: {str(e)}", exc_info=True)
+        print(f"Error during update: {str(e)}")
+
+
+def handle_update_safe_command(tracker, config):
+    """Handle the 'update-safe' command."""
+    print(f"Updating all players with GW{config.GAMEWEEK - 1} data "
+          f"(safe mode - no overwrite)...")
+    logging.info(f"About to update all players for GW{config.GAMEWEEK - 1} "
+                 f"without overwrite")
     
-    def _gameweek_already_exists(self, csv_path, gameweek):
-        """Check if a gameweek already exists in the CSV file."""
-        if not os.path.exists(csv_path):
-            return False
+    try:
+        # Update all players with previous gameweek data - NO OVERWRITE
+        tracker.update_all_players(force_overwrite=False)
+        logging.info(f"Safe update completed")
+        print(f"Safe update completed!")
         
+        # Show some stats after update
+        stats = tracker.get_summary_stats()
+        print(f"Total records now: {stats.get('total_records', 'Unknown')}")
+        
+    except Exception as e:
+        logging.error(f"Error during safe update: {str(e)}", exc_info=True)
+        print(f"Error during safe update: {str(e)}")
+
+
+def handle_debug_command(tracker, config):
+    """Handle the 'debug' command."""
+    print(f"\n=== Debug Information ===")
+    try:
+        stats = tracker.get_summary_stats()
+        print(f"Current statistics: {stats}")
+        
+        # Check if data exists for previous gameweek
+        prev_gw = config.GAMEWEEK - 1
+        print(f"Checking for existing GW{prev_gw} data...")
+        
+        logging.info(f"Debug info - Stats: {stats}")
+        
+    except Exception as e:
+        logging.error(f"Error in debug: {str(e)}", exc_info=True)
+        print(f"Debug error: {str(e)}")
+
+
+def handle_force_command(tracker, config):
+    """Handle the 'force' command."""
+    print(f"Force updating GW{config.GAMEWEEK - 1} data...")
+    logging.info(f"Force update initiated for GW{config.GAMEWEEK - 1}")
+    
+    try:
+        tracker.update_all_players(force_overwrite=True)
+        logging.info(f"Force update completed")
+        print(f"Force update completed!")
+        
+    except Exception as e:
+        logging.error(f"Error during force update: {str(e)}", exc_info=True)
+        print(f"Error during force update: {str(e)}")
+
+
+def handle_stats_command(tracker):
+    """Handle the 'stats' command."""
+    try:
+        stats = tracker.get_summary_stats()
+        print(f"\n=== Player History Statistics ===")
+        print(f"Total players tracked: {stats['total_players']}")
+        print(f"Total gameweek records: {stats['total_records']}")
+        print(f"Teams covered: {stats['total_teams']}")
+        print(f"Average records per player: "
+              f"{stats['average_records_per_player']:.1f}")
+            
+    except Exception as e:
+        logging.error(f"Error getting stats: {str(e)}", exc_info=True)
+        print(f"Error getting stats: {str(e)}")
+
+
+def handle_cleanup_command(tracker, argv):
+    """Handle the 'cleanup' command."""
+    keep_weeks = 38
+    if len(argv) > 2:
         try:
-            df = pd.read_csv(csv_path)
-            return gameweek in df["round"].values
-        except:
-            return False
+            keep_weeks = int(argv[2])
+        except ValueError:
+            print("Invalid number for cleanup. Using default 38 gameweeks.")
     
-    def _create_zero_record(self, gameweek, player):
-        """Create a zero-stats record for players who didn't play."""
-        return {
-            "round": gameweek,
-            "total_points": 0,
-            "minutes": 0,
-            "goals_scored": 0,
-            "assists": 0,
-            "clean_sheets": 0,
-            "goals_conceded": 0,
-            "own_goals": 0,
-            "penalties_saved": 0,
-            "penalties_missed": 0,
-            "yellow_cards": 0,
-            "red_cards": 0,
-            "saves": 0,
-            "bonus": 0,
-            "bps": 0,
-            "influence": "0.0",
-            "creativity": "0.0",
-            "threat": "0.0",
-            "ict_index": "0.0",
-            "starts": 0,
-            "expected_goals": "0.0",
-            "expected_assists": "0.0",
-            "expected_goal_involvements": "0.0",
-            "expected_goals_conceded": "0.0",
-            "value": player["now_cost"],
-            "transfers_balance": 0,
-            "selected": 0,
-            "transfers_in": 0,
-            "transfers_out": 0
-        }
+    try:
+        tracker.cleanup_old_data(keep_weeks)
+        print(f"Cleanup completed - kept last {keep_weeks} gameweeks")
+        
+    except Exception as e:
+        logging.error(f"Error during cleanup: {str(e)}", exc_info=True)
+        print(f"Error during cleanup: {str(e)}")
+
+
+def handle_player_command(tracker, argv):
+    """Handle the 'player' command."""
+    if len(argv) < 4:
+        print("Usage: python update_player_history.py player "
+              "<player_name> <team_name>")
+        print("Example: python update_player_history.py player cunha wolves")
+        return
     
-    def _get_position_name(self, element_type):
-        """Convert element_type number to position name."""
-        position_map = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
-        return position_map.get(element_type, "Unknown")
+    player_name = argv[2]
+    team_name = argv[3]
     
-    def _clean_filename(self, name):
-        """Clean a name to be safe for use as a filename."""
-        # Remove or replace characters that aren't safe for filenames
-        clean_name = name.replace(" ", "_")
-        clean_name = clean_name.replace("'", "")
-        clean_name = clean_name.replace(".", "")
-        clean_name = clean_name.replace("/", "_")
-        clean_name = clean_name.replace("\\", "_")
-        clean_name = clean_name.replace(":", "_")
-        clean_name = clean_name.replace("*", "_")
-        clean_name = clean_name.replace("?", "_")
-        clean_name = clean_name.replace('"', "_")
-        clean_name = clean_name.replace("<", "_")
-        clean_name = clean_name.replace(">", "_")
-        clean_name = clean_name.replace("|", "_")
-        return clean_name.lower()
-    
-    def get_player_history(self, player_name, team_name, gameweeks=None):
-        """
-        Retrieve a player's historical data from their CSV file.
-        
-        Args:
-            player_name (str): Player's web name
-            team_name (str): Team name
-            gameweeks (list, optional): Specific gameweeks to retrieve
-            
-        Returns:
-            pd.DataFrame: Player's historical data
-        """
-        player_filename = self._clean_filename(player_name)
-        team_dir_name = self._clean_filename(team_name)
-        csv_path = os.path.join(self.base_dir, team_dir_name, f"{player_filename}.csv")
-        
-        if not os.path.exists(csv_path):
-            return pd.DataFrame()
-        
-        df = pd.read_csv(csv_path)
-        
-        if gameweeks is not None:
-            df = df[df["round"].isin(gameweeks)]
-        
-        return df
-    
-    def get_team_history(self, team_name, gameweeks=None):
-        """
-        Retrieve all players' data for a specific team.
-        
-        Args:
-            team_name (str): Team name
-            gameweeks (list, optional): Specific gameweeks to retrieve
-            
-        Returns:
-            pd.DataFrame: All team players' historical data
-        """
-        team_dir_name = self._clean_filename(team_name)
-        team_dir = os.path.join(self.base_dir, team_dir_name)
-        
-        if not os.path.exists(team_dir):
-            return pd.DataFrame()
-        
-        all_data = []
-        
-        for csv_file in os.listdir(team_dir):
-            if csv_file.endswith('.csv'):
-                csv_path = os.path.join(team_dir, csv_file)
-                try:
-                    df = pd.read_csv(csv_path)
-                    if gameweeks is not None:
-                        df = df[df["round"].isin(gameweeks)]
-                    all_data.append(df)
-                except Exception as e:
-                    print(f"Error reading {csv_file}: {e}")
-        
-        if all_data:
-            return pd.concat(all_data, ignore_index=True)
+    try:
+        history = tracker.get_player_history(player_name, team_name)
+        if history.empty:
+            print(f"No data found for {player_name} at {team_name}")
         else:
-            return pd.DataFrame()
-    
-    def cleanup_old_data(self, keep_gameweeks=38):
-        """
-        Remove old gameweek data to keep file sizes manageable.
-        
-        Args:
-            keep_gameweeks (int): Number of recent gameweeks to keep
-        """
-        current_gw = self.config.GAMEWEEK
-        min_gameweek = max(1, current_gw - keep_gameweeks)
-        
-        print(f"Cleaning up data older than GW{min_gameweek}...")
-        
-        cleaned_files = 0
-        
-        for root, dirs, files in os.walk(self.base_dir):
-            for file in files:
-                if file.endswith('.csv'):
-                    csv_path = os.path.join(root, file)
-                    try:
-                        df = pd.read_csv(csv_path)
-                        original_len = len(df)
-                        
-                        # Keep only recent gameweeks
-                        df = df[df["round"] >= min_gameweek]
-                        
-                        if len(df) < original_len:
-                            df.to_csv(csv_path, index=False)
-                            cleaned_files += 1
-                            
-                    except Exception as e:
-                        print(f"Error cleaning {csv_path}: {e}")
-        
-        print(f"✅ Cleaned {cleaned_files} files")
-    
-    def get_summary_stats(self):
-        """Get summary statistics about the stored data."""
-        total_files = 0
-        total_records = 0
-        teams = []
-        
-        for root, dirs, files in os.walk(self.base_dir):
-            for file in files:
-                if file.endswith('.csv'):
-                    total_files += 1
-                    csv_path = os.path.join(root, file)
-                    try:
-                        df = pd.read_csv(csv_path)
-                        total_records += len(df)
-                    except:
-                        pass
+            print(f"\n=== {player_name} ({team_name}) History ===")
+            display_cols = ['round', 'total_points', 'minutes', 
+                          'goals_scored', 'assists']
+            print(history[display_cols].to_string(index=False))
             
-            # Count teams (directories)
-            if dirs:
-                teams.extend(dirs)
-        
-        return {
-            "total_players": total_files,
-            "total_records": total_records,
-            "total_teams": len(teams),
-            "average_records_per_player": total_records / max(1, total_files)
-        }
+    except Exception as e:
+        logging.error(f"Error getting player data: {str(e)}", exc_info=True)
+        print(f"Error getting player data: {str(e)}")
+
+
+def handle_team_command(tracker, argv, config):
+    """Handle the 'team' command."""
+    if len(argv) < 3:
+        print("Usage: python update_player_history.py team <team_name>")
+        print("Example: python update_player_history.py team wolves")
+        return
+    
+    team_name = argv[2]
+    last_gw = config.GAMEWEEK - 1
+    
+    try:
+        team_data = tracker.get_team_history(team_name, gameweeks=[last_gw])
+        if team_data.empty:
+            print(f"No data found for {team_name} in GW{last_gw}")
+        else:
+            print(f"\n=== {team_name} GW{last_gw} Performance ===")
+            summary_cols = ['player_name', 'total_points', 'minutes', 
+                          'goals_scored', 'assists']
+            summary = team_data[summary_cols].sort_values(
+                'total_points', ascending=False
+            )
+            print(summary.to_string(index=False))
+            
+    except Exception as e:
+        logging.error(f"Error getting team data: {str(e)}", exc_info=True)
+        print(f"Error getting team data: {str(e)}")
+
+
+def show_usage():
+    """Show usage instructions."""
+    print(f"\nUsage:")
+    print(f"  python update_player_history.py update          # Update all "
+          f"players with previous GW data (with overwrite)")
+    print(f"  python update_player_history.py update-safe     # Update all "
+          f"players but skip existing data")
+    print(f"  python update_player_history.py debug           # Show debug "
+          f"information")
+    print(f"  python update_player_history.py force           # Force update "
+          f"even if data exists (same as 'update')")
+    print(f"  python update_player_history.py stats           # Show summary "
+          f"statistics")
+    print(f"  python update_player_history.py cleanup [weeks] # Clean up old "
+          f"data (default: keep 38 weeks)")
+    print(f"  python update_player_history.py player <name> <team>  # Show "
+          f"player history")
+    print(f"  python update_player_history.py team <team>     # Show team's "
+          f"last gameweek performance")
+    print(f"\nExamples:")
+    print(f"  python update_player_history.py update")
+    print(f"  python update_player_history.py update-safe")
+    print(f"  python update_player_history.py debug")
+    print(f"  python update_player_history.py force")
+    print(f"  python update_player_history.py player cunha wolves")
+    print(f"  python update_player_history.py team 'man utd'")
+    print(f"  python update_player_history.py cleanup 20")
+
+
+if __name__ == "__main__":
+    main()
