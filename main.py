@@ -152,7 +152,12 @@ def process_player_data(components, config):
     )
     
     print("Scoring players with xG performance modifiers...")
-    scored = components['scoring_engine'].build_scores(players, fixture_scores)
+    scored, involvement_stats = components['scoring_engine'].build_scores(
+        players, fixture_scores
+    )
+    
+    # Display involvement statistics (only once, here)
+    _display_involvement_stats(involvement_stats, config.GAMEWEEK)
     
     return players, scored, available_budget
 
@@ -171,7 +176,7 @@ def generate_theoretical_squad(components, config, players, available_budget):
     scoring_engine_comparison = ScoringEngine(config)
     scored_comparison = scoring_engine_comparison.build_scores(
         players, fixture_scores_comparison
-    )
+    )[0]  # Take only the dataframe, ignore stats
     
     budget_for_comparison = (
         available_budget if available_budget is not None else config.BUDGET
@@ -394,9 +399,8 @@ def optimise_starting_xi(components, config, starting, bench, players,
     
     scoring_engine_next = ScoringEngine(config)
     scored_next = scoring_engine_next.build_scores(
-        players,
-        fixture_scores_next
-        )
+        players, fixture_scores_next
+    )[0]
 
     print(f"Optimising Starting XI for GW{config.GAMEWEEK}...")
     
@@ -528,6 +532,33 @@ def display_squad_comparison(theoretical_points, theoretical_cost,
         print("👍 Nice effort.")
     else:
         print("💡 Not bad, could be better.")
+
+
+def _display_involvement_stats(involvement_stats, gameweek):
+    """Display player involvement statistics."""
+    if not involvement_stats['exclude_unavailable']:
+        print("📋 EXCLUDE_UNAVAILABLE = False: Including unavailable "
+              "players in optimisation")
+        return
+    
+    if gameweek > 1:
+        if involvement_stats['high_involvement'] > 0:
+            print(f"✅ {involvement_stats['high_involvement']} players with "
+                  "high involvement (reliable starters)")
+            
+        if involvement_stats['zero_involvement'] > 0:
+            print(f"⚠️  {involvement_stats['zero_involvement']} players with "
+                  "zero involvement will have scores set to 0")
+            
+        if involvement_stats['low_involvement'] > 0:
+            print(f"⚠️  {involvement_stats['low_involvement']} players with "
+                  "low involvement heavily penalized")
+    
+    if involvement_stats['unavailable'] > 0:
+        print(f"⚠️  {involvement_stats['unavailable']} players unavailable "
+              "due to injury/suspension")
+    else:
+        print("✅ All players are available for selection")
 
 
 def main():
