@@ -213,7 +213,7 @@ TEAM_MODIFIERS = {
 }
 
 FORCED_SELECTIONS = {
-    "FWD": ["Haaland"]  # Always include Haaland
+    "FWD": ["haaland"]  # Always include Haaland
 }
 BLACKLIST_PLAYERS = ["Martial"]  # Never select Martial
 ```
