@@ -89,14 +89,16 @@ class TransferEvaluator:
             ].copy()
 
             if len(potential_subs) == 0:
+                # Convert to per-gameweek for display
+                unavailable_ppgw = (unavailable_player["projected_points"] / 
+                                  self.config.FIRST_N_GAMEWEEKS)
                 substitute_scenarios.append({
                     "unavailable_player": unavailable_player["display_name"],
                     "position": pos,
-                    "unavailable_score": unavailable_player[
-                        "projected_points"],
+                    "unavailable_score": unavailable_ppgw,
                     "best_substitute": None,
                     "substitute_score": 0,
-                    "score_loss": unavailable_player["projected_points"],
+                    "score_loss": unavailable_ppgw,
                     "recommendation": "transfer",
                 })
                 continue
@@ -105,17 +107,20 @@ class TransferEvaluator:
             best_sub = potential_subs.loc[
                 potential_subs["projected_points"].idxmax()
             ]
-            score_loss = (
-                unavailable_player["projected_points"] - 
-                best_sub["projected_points"]
-            )
+            
+            # Convert to per-gameweek for comparison
+            unavailable_ppgw = (unavailable_player["projected_points"] / 
+                              self.config.FIRST_N_GAMEWEEKS)
+            substitute_ppgw = (best_sub["projected_points"] / 
+                             self.config.FIRST_N_GAMEWEEKS)
+            score_loss = unavailable_ppgw - substitute_ppgw
 
             substitute_scenarios.append({
                 "unavailable_player": unavailable_player["display_name"],
                 "position": pos,
-                "unavailable_score": unavailable_player["projected_points"],
+                "unavailable_score": unavailable_ppgw,
                 "best_substitute": best_sub["display_name"],
-                "substitute_score": best_sub["projected_points"],
+                "substitute_score": substitute_ppgw,
                 "score_loss": score_loss,
                 "recommendation": (
                     "substitute" if score_loss < 2.0 else "consider_transfer"
@@ -343,11 +348,10 @@ class TransferEvaluator:
         extra_transfers = max(0, actual_transfers - free_transfers)
         penalty_points = extra_transfers * 4
         
-        # Calculate points per gameweek for comparison
+        # Calculate points per gameweek and apply penalty directly to ppgw
         starting_points_total = starting["projected_points"].sum()
         starting_ppgw = starting_points_total / self.config.FIRST_N_GAMEWEEKS
-        net_ppgw = starting_ppgw - (penalty_points / 
-                                   self.config.FIRST_N_GAMEWEEKS)
+        net_ppgw = starting_ppgw - penalty_points  # Penalty applied directly
         
         # Get transfer details
         transfer_details = self._format_transfer_details(
@@ -399,7 +403,7 @@ class TransferEvaluator:
         return ""
     
     def _print_scenario_result(self, scenario: dict):
-        """Print the result of a transfer scenario with points per gameweek."""
+        """Print the result of a transfer scenario showing ppgw as 'projected points'."""
         actual_transfers = scenario['actual_transfers']
         extra_transfers = scenario['extra_transfers']
         penalty_points = scenario['penalty_points']
@@ -417,13 +421,15 @@ class TransferEvaluator:
         
         print(f"  {emoji} Scenario {max_transfers_allowed}: "
               f"{actual_transfers} transfers, {extra_transfers} extra, "
-              f"penalty: -{penalty_points}, ppgw: {starting_ppgw:.1f}, "
-              f"net: {net_ppgw:.1f}{transfer_details}")
+              f"penalty: -{penalty_points}, projected points: "
+              f"{starting_ppgw:.1f}, net: {net_ppgw:.1f}"
+              f"{transfer_details}")
     
     def _select_best_scenario(self, scenarios: list, free_transfers: int, 
                             df: pd.DataFrame) -> tuple:
         """Select the best scenario based on net points per gameweek."""
-        # Find the best scenario by net points per gameweek
+        # Find the best scenario by net points per gameweek (but still use ppgw 
+        # for internal comparison)
         best_scenario = max(scenarios, key=lambda x: x['net_ppgw'])
         
         # Get baseline scenario for comparison
@@ -463,17 +469,17 @@ class TransferEvaluator:
         )
     
     def _print_top_scenarios(self, scenarios: list, best_scenario: dict):
-        """Print top 3 scenarios for comparison using points per gameweek."""
+        """Print top 3 scenarios for comparison showing ppgw as points."""
         top_scenarios = sorted(scenarios, key=lambda x: x['net_ppgw'], 
                              reverse=True)[:3]
         for i, scenario in enumerate(top_scenarios, 1):
             status = " ⭐ BEST" if scenario == best_scenario else ""
             print(f"   #{i}: {scenario['actual_transfers']} transfers → "
-                  f"Net: {scenario['net_ppgw']:.1f} ppgw{status}")
+                  f"Net: {scenario['net_ppgw']:.1f} points{status}")
     
     def _apply_value_threshold(self, best_scenario: dict, 
                              baseline_scenario: dict) -> dict:
-        """Apply MIN_TRANSFER_VALUE threshold check using ppgw."""
+        """Apply MIN_TRANSFER_VALUE threshold check using ppgw directly."""
         if (best_scenario['actual_transfers'] > 
             baseline_scenario['actual_transfers']):
             baseline_ppgw = baseline_scenario['net_ppgw']
@@ -484,23 +490,23 @@ class TransferEvaluator:
                 baseline_scenario['actual_transfers']
             )
             
+            # Use MIN_TRANSFER_VALUE directly (already per-gameweek)
+            threshold_ppgw = self.config.MIN_TRANSFER_VALUE
+            
             print(f"\n📊 Transfer Value Check (per gameweek basis):")
             print(f"   Baseline ({baseline_scenario['actual_transfers']} "
-                  f"transfers): {baseline_ppgw:.1f} ppgw")
+                  f"transfers): {baseline_ppgw:.1f} points")
             print(f"   Best scenario ({best_scenario['actual_transfers']} "
-                  f"transfers): {best_ppgw:.1f} ppgw")
-            print(f"   Improvement: {improvement_ppgw:.1f} ppgw")
+                  f"transfers): {best_ppgw:.1f} points")
+            print(f"   Improvement: {improvement_ppgw:.1f} points per gameweek")
             print(f"   Extra transfers for improvement: "
                   f"{extra_transfers_for_improvement}")
             print(f"   Improvement per extra transfer: "
                   f"{improvement_ppgw/extra_transfers_for_improvement:.1f} "
-                  f"ppgw")
-            print(f"   Minimum threshold: "
-                  f"{self.config.MIN_TRANSFER_VALUE / self.config.FIRST_N_GAMEWEEKS:.1f} ppgw")
+                  f"points per gameweek")
+            print(f"   Minimum threshold: {threshold_ppgw:.1f} "
+                  f"points per gameweek")
             
-            # Convert threshold to per-gameweek basis
-            threshold_ppgw = (self.config.MIN_TRANSFER_VALUE / 
-                            self.config.FIRST_N_GAMEWEEKS)
             required_improvement_ppgw = (
                 threshold_ppgw * extra_transfers_for_improvement
             )
@@ -511,16 +517,16 @@ class TransferEvaluator:
                       "instead")
                 best_scenario = baseline_scenario
                 print(f"   ⭐ SELECTED: {best_scenario['actual_transfers']} "
-                      f"transfers → {best_scenario['net_ppgw']:.1f} ppgw")
+                      f"transfers → {best_scenario['net_ppgw']:.1f} points")
             else:
                 print(f"   ✅ SUFFICIENT VALUE: Extra transfers worthwhile")
                 print(f"   ⭐ SELECTED: {best_scenario['actual_transfers']} "
-                      f"transfers → {best_scenario['net_ppgw']:.1f} ppgw")
+                      f"transfers → {best_scenario['net_ppgw']:.1f} points")
         else:
             print(f"\n📊 Using optimal scenario with "
                   f"{best_scenario['actual_transfers']} transfers")
             print(f"   ⭐ SELECTED: {best_scenario['actual_transfers']} "
-                  f"transfers → {best_scenario['net_ppgw']:.1f} ppgw")
+                  f"transfers → {best_scenario['net_ppgw']:.1f} points")
         
         return best_scenario
     
@@ -544,7 +550,7 @@ class TransferEvaluator:
     def _print_final_transfer_summary(self, best_transfers: int, 
                                     free_transfers: int, best_penalty: int,
                                     best_scenario: dict, df: pd.DataFrame):
-        """Print final transfer summary with per-gameweek metrics."""
+        """Print final transfer summary showing ppgw as points."""
         if best_transfers > 0:
             print(f"\n=== Optimal Transfer Strategy ===")
             print(f"Total transfers: {best_transfers}")
@@ -552,9 +558,9 @@ class TransferEvaluator:
             if best_penalty > 0:
                 print(f"Extra transfers: {best_transfers - free_transfers}")
                 print(f"Transfer penalty: -{best_penalty} points")
-            print(f"Projected points per gameweek: "
+            print(f"Projected points: "
                   f"{best_scenario['starting_ppgw']:.1f}")
-            print(f"Net points per gameweek: "
+            print(f"Net points: "
                   f"{best_scenario['net_ppgw']:.1f}")
         else:
             print(f"\n=== Optimal Transfer Strategy ===")
@@ -589,9 +595,8 @@ class TransferEvaluator:
         transfer_ppgw = transfer_points / self.config.FIRST_N_GAMEWEEKS
         points_improvement_ppgw = transfer_ppgw - no_transfer_ppgw
 
-        # Check against minimum transfer value threshold (per gameweek)
-        threshold_ppgw = (self.config.MIN_TRANSFER_VALUE / 
-                         self.config.FIRST_N_GAMEWEEKS)
+        # Use MIN_TRANSFER_VALUE directly (already per-gameweek)
+        threshold_ppgw = self.config.MIN_TRANSFER_VALUE
         min_improvement_needed_ppgw = threshold_ppgw * transfers_made
         
         analysis = {
