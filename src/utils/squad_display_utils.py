@@ -12,7 +12,8 @@ class SquadDisplayUtils:
     
     def sort_and_format_starting_xi(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Sort starting XI by position and apply consistent formatting.
+        Sort starting XI by position and apply consistent formatting,
+        including DGW asterisk notation.
         
         Args:
             df (pd.DataFrame): Starting XI dataframe
@@ -23,6 +24,9 @@ class SquadDisplayUtils:
         if df.empty:
             return df
         
+        # Add DGW asterisk to player names
+        df = self._add_dgw_asterisk(df)
+        
         df["position"] = pd.Categorical(
             df["position"], categories=self.position_order, ordered=True
         )
@@ -30,7 +34,8 @@ class SquadDisplayUtils:
     
     def sort_and_format_bench(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Sort bench players: GK first, then by descending projected points.
+        Sort bench players: GK first, then by descending projected points,
+        including DGW asterisk notation.
         
         Args:
             df (pd.DataFrame): Bench dataframe
@@ -41,6 +46,9 @@ class SquadDisplayUtils:
         if df.empty:
             return df
         
+        # Add DGW asterisk to player names
+        df = self._add_dgw_asterisk(df)
+        
         gk_bench = df[df["position"] == "GK"].copy()
         non_gk_bench = df[df["position"] != "GK"].copy()
         non_gk_bench = non_gk_bench.sort_values(
@@ -48,10 +56,50 @@ class SquadDisplayUtils:
         )
         return pd.concat([gk_bench, non_gk_bench], ignore_index=True)
     
+    def _add_dgw_asterisk(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Add asterisk to player names who have double gameweeks.
+        Uses the reliable fixture multiplier and DGW flags.
+        
+        Args:
+            df (pd.DataFrame): Player dataframe
+            
+        Returns:
+            pd.DataFrame: Dataframe with DGW asterisks added
+        """
+        df = df.copy()
+        
+        # Initialize DGW mask as False for all players
+        dgw_mask = pd.Series([False] * len(df), index=df.index)
+        
+        # Method 1: Check has_dgw_next column (most reliable for current GW)
+        if "has_dgw_next" in df.columns:
+            dgw_mask = df["has_dgw_next"] == True
+        
+        # Method 2: Check for multiple opponents in next_opponent string
+        elif "next_opponent" in df.columns:
+            dgw_mask = df["next_opponent"].str.contains(" & ", na=False)
+        
+        # Method 3: Check fixture_multiplier > 1 (from fixture analysis)
+        elif "fixture_multiplier" in df.columns:
+            dgw_mask = df["fixture_multiplier"] > 1.0
+        
+        # Method 4: Check has_dgw column (from fixture analysis)
+        elif "has_dgw" in df.columns:
+            dgw_mask = df["has_dgw"] == True
+        
+        # Only add asterisk if we found actual DGW players
+        if dgw_mask.any():
+            df.loc[dgw_mask, "display_name"] = (
+                df.loc[dgw_mask, "display_name"].astype(str) + "*"
+            )
+        
+        return df
+    
     def apply_captain_and_vice(self, starting_df: pd.DataFrame) -> pd.DataFrame:
         """
         Apply captain and vice-captain designations to starting XI.
-        Enhanced to support Triple Captain chip.
+        Enhanced to support Triple Captain chip and DGW handling.
         
         Args:
             starting_df (pd.DataFrame): Starting XI dataframe
@@ -118,7 +166,8 @@ class SquadDisplayUtils:
     
     def print_squad_table(self, df: pd.DataFrame, rename_map: dict):
         """
-        Print squad table with renamed headers and filtered columns.
+        Print squad table with renamed headers and filtered columns,
+        including DGW notation explanation if asterisks are present.
         
         Args:
             df (pd.DataFrame): Squad dataframe to print
@@ -128,6 +177,14 @@ class SquadDisplayUtils:
         renamed = df.rename(columns=rename_map)
         display_cols = [rename_map[c] for c in available_cols]
         print(renamed[display_cols])
+        
+        # Check if any players have asterisks (DGW indicator)
+        if "name" in display_cols:
+            has_asterisk = renamed["name"].astype(str).str.contains(
+                r"\*", na=False
+            ).any()
+            if has_asterisk:
+                print("\n*Double gameweek")
     
     def select_starting_xi_fallback(
             self,

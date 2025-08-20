@@ -16,18 +16,18 @@ class FixtureManager:
                                       players: pd.DataFrame, 
                                       starting_gameweek: int) -> pd.DataFrame:
         """
-        Calculate average fixture difficulty for each player over the next
-        N gameweeks from a starting gameweek and save fixture data to CSV.
+        Calculate fixture difficulty for each player over the next N gameweeks,
+        with proper DGW/BGW detection.
 
         Args:
             first_n_gws (int): Number of gameweeks to consider for fixture 
                               difficulty.
-            players (pd.DataFrame): Player data containing team_id and name_key
+            players (pd.DataFrame): Player data containing team_id and 
+                                  name_key
             starting_gameweek (int): The gameweek to start calculating from.
 
         Returns:
-            pd.DataFrame: DataFrame with name_key, average difficulty, and 
-                         fixture bonus (6 - difficulty).
+            pd.DataFrame: DataFrame with name_key, fixture info, and DGW flags.
         """
         fixtures = pd.DataFrame(self.fpl_client.get_fixtures())
 
@@ -48,9 +48,9 @@ class FixtureManager:
             fixtures["event"], errors="coerce") <= end_gameweek)
         ]
 
-        # Calculate player difficulties
-        return self._calculate_player_difficulties(
-            fixtures, players, starting_gameweek, end_gameweek
+        # Calculate player difficulties with DGW/BGW detection
+        return self._calculate_player_difficulties_with_dgw_detection(
+            fixtures, players, teams_df, starting_gameweek, end_gameweek
         )
     
     def _save_fixture_data(
@@ -120,13 +120,20 @@ class FixtureManager:
         os.makedirs("data", exist_ok=True)
         fixtures_csv.to_csv("data/fixtures.csv", index=False)
     
-    def _calculate_player_difficulties(self, fixtures: pd.DataFrame, 
-                                     players: pd.DataFrame, 
-                                     starting_gameweek: int, 
-                                     end_gameweek: int) -> pd.DataFrame:
-        """Calculate difficulty scores for each player."""
+    def _calculate_player_difficulties_with_dgw_detection(
+            self, fixtures: pd.DataFrame, players: pd.DataFrame, 
+            teams_df: pd.DataFrame, starting_gameweek: int, 
+            end_gameweek: int) -> pd.DataFrame:
+        """
+        Calculate player difficulties using clean DGW/BGW detection logic.
+        """
+        # Detect DGW/BGW teams across the gameweek range
+        dgw_bgw_info = self._detect_dgw_bgw_teams(
+            fixtures, teams_df, starting_gameweek, end_gameweek
+        )
+        
+        # Calculate standard fixture difficulties
         player_diffs = []
-
         for _, fixture_row in fixtures.iterrows():
             for home_away, team_col, diff_col in [
                 ("home", "team_h", "team_h_difficulty"),
@@ -140,25 +147,137 @@ class FixtureManager:
                 for _, player_row in team_players.iterrows():
                     player_diffs.append({
                         "name_key": player_row["name_key"],
-                        "gw": fixture_row["event"],
+                        "team_id": team_id,
                         "diff": diff
                     })
 
-        df = pd.DataFrame(player_diffs)
-        if df.empty:
+        if not player_diffs:
             print(f"Warning: No fixtures found for gameweeks "
                   f"{starting_gameweek} to {end_gameweek}")
-            # Return empty dataframe with correct structure
-            return pd.DataFrame(columns=["name_key", "diff", "fixture_bonus"])
+            return pd.DataFrame(columns=[
+                "name_key", "diff", "fixture_bonus", "has_dgw", "has_bgw"
+            ])
 
-        avg_diff = df.groupby("name_key", as_index=False)["diff"].mean()
-        avg_diff["fixture_bonus"] = 6 - avg_diff["diff"]  # higher is better
-        return avg_diff
+        df = pd.DataFrame(player_diffs)
+        
+        # Calculate average difficulty per player
+        avg_diff = df.groupby("name_key", as_index=False).agg({
+            "diff": "mean",
+            "team_id": "first"  # Get team_id for each player
+        })
+        
+        # Add DGW/BGW information
+        avg_diff = avg_diff.merge(dgw_bgw_info, on="team_id", how="left")
+        avg_diff["has_dgw"] = avg_diff["has_dgw"].fillna(False)
+        avg_diff["has_bgw"] = avg_diff["has_bgw"].fillna(False)
+        avg_diff["fixture_multiplier"] = avg_diff["fixture_multiplier"].fillna(1.0)
+        
+        # Calculate fixture bonus accounting for DGW/BGW
+        avg_diff["fixture_bonus"] = (
+            (6 - avg_diff["diff"]) * avg_diff["fixture_multiplier"]
+        )
+        
+        return avg_diff[["name_key", "diff", "fixture_bonus", "has_dgw", 
+                        "has_bgw", "fixture_multiplier"]]
+    
+    def _detect_dgw_bgw_teams(self, fixtures: pd.DataFrame, teams_df: pd.DataFrame,
+                             starting_gameweek: int, end_gameweek: int) -> pd.DataFrame:
+        """
+        Detect DGW/BGW teams using the clean counting method.
+        
+        Returns:
+            pd.DataFrame: Team analysis with DGW/BGW flags and multipliers
+        """
+        team_analysis = []
+        
+        for gw in range(starting_gameweek, end_gameweek + 1):
+            gw_fixtures = fixtures[fixtures["event"] == gw]
+            
+            if gw_fixtures.empty:
+                continue
+            
+            # Get all teams in this gameweek
+            home_teams = gw_fixtures["team_h"].tolist()
+            away_teams = gw_fixtures["team_a"].tolist()
+            all_teams_in_gw = home_teams + away_teams
+            
+            # Count appearances for each team
+            team_counts = pd.Series(all_teams_in_gw).value_counts()
+            
+            # Analyze each team
+            for team_id in teams_df["id"]:
+                appearances = team_counts.get(team_id, 0)
+                
+                if appearances == 2:
+                    # Double gameweek (team appears twice = 2 fixtures)
+                    team_analysis.append({
+                        "team_id": team_id,
+                        "gameweek": gw,
+                        "appearances": appearances,
+                        "has_dgw": True,
+                        "has_bgw": False,
+                        "fixture_multiplier": 2.0
+                    })
+                elif appearances == 1:
+                    # Normal gameweek (team appears once = 1 fixture)
+                    team_analysis.append({
+                        "team_id": team_id,
+                        "gameweek": gw,
+                        "appearances": appearances,
+                        "has_dgw": False,
+                        "has_bgw": False,
+                        "fixture_multiplier": 1.0
+                    })
+                elif appearances == 0:
+                    # Blank gameweek (team doesn't appear = 0 fixtures)
+                    team_analysis.append({
+                        "team_id": team_id,
+                        "gameweek": gw,
+                        "appearances": appearances,
+                        "has_dgw": False,
+                        "has_bgw": True,
+                        "fixture_multiplier": 0.0
+                    })
+                else:
+                    # Unexpected count - log for debugging
+                    print(f"Warning: Team {team_id} has {appearances} "
+                          f"appearances in GW{gw} (expected 0, 1, or 2)")
+        
+        if not team_analysis:
+            # No teams found - return empty with correct structure
+            return pd.DataFrame(columns=[
+                "team_id", "has_dgw", "has_bgw", "fixture_multiplier"
+            ])
+        
+        # Aggregate across gameweeks for overall DGW/BGW status
+        analysis_df = pd.DataFrame(team_analysis)
+        team_summary = analysis_df.groupby("team_id").agg({
+            "has_dgw": "any",  # True if any DGW in the range
+            "has_bgw": "any",  # True if any BGW in the range
+            "fixture_multiplier": "sum"  # Sum multipliers across gameweeks
+        }).reset_index()
+        
+        # Debug output
+        dgw_teams = team_summary[team_summary["has_dgw"] == True]
+        bgw_teams = team_summary[team_summary["has_bgw"] == True]
+        
+        if len(dgw_teams) > 0:
+            team_names = teams_df[teams_df["id"].isin(dgw_teams["team_id"])]["name"].tolist()
+            print(f"DGW teams in GW{starting_gameweek}-{end_gameweek}: "
+                  f"{', '.join(team_names)}")
+        
+        if len(bgw_teams) > 0:
+            team_names = teams_df[teams_df["id"].isin(bgw_teams["team_id"])]["name"].tolist()
+            print(f"BGW teams in GW{starting_gameweek}-{end_gameweek}: "
+                  f"{', '.join(team_names)}")
+        
+        return team_summary
     
     def add_next_fixture(self, df: pd.DataFrame, 
                         target_gameweek: int) -> pd.DataFrame:
         """
-        Add fixture information for a specific gameweek for each player.
+        Add fixture information for a specific gameweek for each player,
+        handling multiple fixtures (DGW) and blank gameweeks (BGW).
 
         Args:
             df (pd.DataFrame): Player data to add fixture info to.
@@ -169,6 +288,8 @@ class FixtureManager:
                          difficulty columns added for the target gameweek.
         """
         fixtures = pd.DataFrame(self.fpl_client.get_fixtures())
+        teams_data = self.fpl_client.get_bootstrap_static()
+        teams_df = pd.DataFrame(teams_data["teams"])
         
         # Filter for target gameweek
         gw_fixtures = fixtures[fixtures["event"] == target_gameweek]
@@ -177,104 +298,138 @@ class FixtureManager:
             print(f"Warning: No fixtures found for gameweek {target_gameweek}")
             return self._add_empty_fixture_info(df)
 
+        # Detect DGW/BGW for this specific gameweek
+        dgw_bgw_info = self._detect_dgw_bgw_teams(
+            gw_fixtures, teams_df, target_gameweek, target_gameweek
+        )
+
         # Process fixtures for each player
-        next_fixtures = self._process_player_fixtures(df, gw_fixtures)
+        next_fixtures = self._process_gameweek_fixtures(
+            df, gw_fixtures, dgw_bgw_info
+        )
         
         # Add team names to fixtures
-        return self._add_team_names_to_fixtures(df, next_fixtures)
+        return self._add_team_names_to_fixtures(df, next_fixtures, teams_df)
     
     def _add_empty_fixture_info(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add empty fixture information when no fixtures found."""
         df["next_opponent"] = "No fixture"
         df["venue"] = "N/A"
         df["fixture_difficulty"] = None
+        df["has_dgw_next"] = False
+        df["has_bgw_next"] = True
         return df
     
-    def _process_player_fixtures(self, df: pd.DataFrame, 
-                               gw_fixtures: pd.DataFrame) -> list:
-        """Process fixtures for each player."""
+    def _process_gameweek_fixtures(self, df: pd.DataFrame, 
+                                  gw_fixtures: pd.DataFrame,
+                                  dgw_bgw_info: pd.DataFrame) -> list:
+        """Process fixtures for each player in the target gameweek."""
         next_fixtures = []
 
         for _, player_row in df.iterrows():
             team_id = player_row["team_id"]
             
-            # Find fixtures for this team
+            # Get DGW/BGW status for this team
+            team_info = dgw_bgw_info[dgw_bgw_info["team_id"] == team_id]
+            has_dgw = team_info["has_dgw"].iloc[0] if len(team_info) > 0 else False
+            has_bgw = team_info["has_bgw"].iloc[0] if len(team_info) > 0 else False
+            
+            # Find fixtures for this team in this gameweek
             team_fixtures = gw_fixtures[
                 (gw_fixtures["team_h"] == team_id) | 
                 (gw_fixtures["team_a"] == team_id)
             ]
             
-            if not team_fixtures.empty:
-                fixture = team_fixtures.iloc[0]  # Take first fixture
-                
-                if fixture["team_h"] == team_id:
-                    # Home game
-                    opponent_id = fixture["team_a"]
-                    venue = "Home"
-                    difficulty = fixture["team_h_difficulty"]
-                else:
-                    # Away game
-                    opponent_id = fixture["team_h"]
-                    venue = "Away"
-                    difficulty = fixture["team_a_difficulty"]
-                
+            if len(team_fixtures) == 0 or has_bgw:
+                # Blank gameweek
                 next_fixtures.append({
                     "name_key": player_row["name_key"],
-                    "next_opponent_id": opponent_id,
-                    "venue": venue,
-                    "fixture_difficulty": difficulty,
+                    "next_opponent_ids": [],
+                    "venues": [],
+                    "fixture_difficulties": [],
+                    "has_dgw_next": False,
+                    "has_bgw_next": True,
                 })
             else:
+                # Process fixtures (single or multiple)
+                opponent_ids = []
+                venues = []
+                difficulties = []
+                
+                for _, fixture in team_fixtures.iterrows():
+                    if fixture["team_h"] == team_id:
+                        # Home game
+                        opponent_ids.append(fixture["team_a"])
+                        venues.append("Home")
+                        difficulties.append(fixture["team_h_difficulty"])
+                    else:
+                        # Away game
+                        opponent_ids.append(fixture["team_h"])
+                        venues.append("Away")
+                        difficulties.append(fixture["team_a_difficulty"])
+                
                 next_fixtures.append({
                     "name_key": player_row["name_key"],
-                    "next_opponent_id": None,
-                    "venue": "No fixture",
-                    "fixture_difficulty": None,
+                    "next_opponent_ids": opponent_ids,
+                    "venues": venues,
+                    "fixture_difficulties": difficulties,
+                    "has_dgw_next": has_dgw,
+                    "has_bgw_next": False,
                 })
         
         return next_fixtures
     
     def _add_team_names_to_fixtures(self, df: pd.DataFrame, 
-                                  next_fixtures: list) -> pd.DataFrame:
+                                   next_fixtures: list,
+                                   teams_df: pd.DataFrame) -> pd.DataFrame:
         """Add team names to fixture information."""
         nf_df = pd.DataFrame(next_fixtures)
-        teams = pd.DataFrame(self.fpl_client.get_bootstrap_static()["teams"])
         
-        # Only merge for players who have fixtures
-        has_fixture_mask = nf_df["next_opponent_id"].notna()
-        
-        if has_fixture_mask.any():
-            # Merge only the rows with fixtures
-            nf_with_fixtures = nf_df[has_fixture_mask].copy()
-            nf_with_fixtures = nf_with_fixtures.merge(
-                teams[["id", "name"]], 
-                left_on="next_opponent_id", 
-                right_on="id", 
-                how="left"
-            )
-            nf_with_fixtures = nf_with_fixtures.rename(
-                columns={"name": "next_opponent"}
-            )
-            
-            # Combine back with rows without fixtures
-            nf_without_fixtures = nf_df[~has_fixture_mask].copy()
-            nf_without_fixtures["next_opponent"] = "No fixture"
-            
-            # Concatenate the results
-            nf_df = pd.concat(
-                [nf_with_fixtures, nf_without_fixtures], ignore_index=True
-            )
-        else:
-            # No fixtures at all for this gameweek
-            nf_df["next_opponent"] = "No fixture"
-        
-        # Ensure next_opponent column exists and fill any remaining NaN values
-        nf_df["next_opponent"] = nf_df["next_opponent"].fillna("No fixture")
+        # Process each player's fixtures
+        for idx, row in nf_df.iterrows():
+            if not row["next_opponent_ids"] or row.get("has_bgw_next", False):
+                # Blank gameweek
+                nf_df.at[idx, "next_opponent"] = "Blank GW"
+                nf_df.at[idx, "venue"] = "N/A"
+                nf_df.at[idx, "fixture_difficulty"] = None
+            elif len(row["next_opponent_ids"]) == 1:
+                # Single gameweek
+                opponent_id = row["next_opponent_ids"][0]
+                opponent_name = teams_df[teams_df["id"] == opponent_id][
+                    "name"
+                ].iloc[0]
+                nf_df.at[idx, "next_opponent"] = opponent_name
+                nf_df.at[idx, "venue"] = row["venues"][0]
+                nf_df.at[idx, "fixture_difficulty"] = row[
+                    "fixture_difficulties"
+                ][0]
+            else:
+                # Double gameweek - combine opponent names
+                opponent_names = []
+                for opponent_id in row["next_opponent_ids"]:
+                    opponent_name = teams_df[teams_df["id"] == opponent_id][
+                        "name"
+                    ].iloc[0]
+                    opponent_names.append(opponent_name)
+                
+                nf_df.at[idx, "next_opponent"] = " & ".join(opponent_names)
+                nf_df.at[idx, "venue"] = " & ".join(row["venues"])
+                nf_df.at[idx, "fixture_difficulty"] = sum(
+                    row["fixture_difficulties"]
+                ) / len(row["fixture_difficulties"])
 
+        # Merge with original dataframe
         df = df.merge(
-            nf_df[
-                ["name_key", "next_opponent", "venue", "fixture_difficulty"]],
+            nf_df[["name_key", "next_opponent", "venue", "fixture_difficulty", 
+                   "has_dgw_next", "has_bgw_next"]],
             on="name_key",
             how="left",
         )
+        
+        # Fill any missing values
+        df["next_opponent"] = df["next_opponent"].fillna("No fixture")
+        df["venue"] = df["venue"].fillna("N/A")
+        df["has_dgw_next"] = df["has_dgw_next"].fillna(False)
+        df["has_bgw_next"] = df["has_bgw_next"].fillna(False)
+        
         return df

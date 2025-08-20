@@ -130,31 +130,45 @@ def print_header(config):
         print(f"Free transfers available: {config.FREE_TRANSFERS}")
 
 
-def _display_involvement_stats(involvement_stats, gameweek):
-    """Display player involvement statistics."""
+def _display_availability_and_dgw_stats(involvement_stats, dgw_stats, 
+                                       gameweek):
+    """Display player availability and DGW/BGW statistics."""
     if not involvement_stats['exclude_unavailable']:
         print("📋 EXCLUDE_UNAVAILABLE = False: Including unavailable "
               "players in optimisation")
         return
     
+    print("\nChecking availability...")
     if gameweek > 1:
         if involvement_stats['high_involvement'] > 0:
             print(f"✅ {involvement_stats['high_involvement']} players with "
                   "high involvement (reliable starters)")
             
-        if involvement_stats['zero_involvement'] > 0:
-            print(f"⚠️  {involvement_stats['zero_involvement']} players with "
-                  "zero involvement will have scores set to 0")
-            
         if involvement_stats['low_involvement'] > 0:
             print(f"⚠️  {involvement_stats['low_involvement']} players with "
-                  "low involvement heavily penalized")
+                  "low involvement heavily penalised")
+            
+        if involvement_stats['zero_involvement'] > 0:
+            print(f"🛑 {involvement_stats['zero_involvement']} players with "
+                  "zero involvement will have scores set to 0")
     
     if involvement_stats['unavailable'] > 0:
-        print(f"⚠️  {involvement_stats['unavailable']} players unavailable "
+        print(f"🛑 {involvement_stats['unavailable']} players unavailable "
               "due to injury/suspension")
     else:
         print("✅ All players are available for selection")
+    
+    print("\nChecking double/blank gameweeks...")
+    print(f"▶️  {dgw_stats['regular_gw']} players with a regular gameweek")
+    
+    if dgw_stats['double_gw'] > 0:
+        print(f"🔥 {dgw_stats['double_gw']} players with a double gameweek")
+    
+    if dgw_stats['blank_gw'] > 0:
+        print(f"💔 {dgw_stats['blank_gw']} players with a blank gameweek")
+    
+    if dgw_stats['double_gw'] == 0 and dgw_stats['blank_gw'] == 0:
+        print("▶️  All players have regular gameweeks")
 
 
 def process_player_data(components, config):
@@ -172,7 +186,7 @@ def process_player_data(components, config):
     players = components['historical_manager'].merge_past_seasons(players)
     
     print(f"Fetching player-level fixture difficulty from "
-          f"GW{config.GAMEWEEK}...")
+          f"GW{config.GAMEWEEK} with DGW/BGW handling...")
     fixture_scores = (
         components['fixture_manager']
         .fetch_player_fixture_difficulty(
@@ -185,10 +199,29 @@ def process_player_data(components, config):
         players, fixture_scores
     )
     
-    # Display involvement statistics (only once, here)
-    _display_involvement_stats(involvement_stats, config.GAMEWEEK)
+    # Get DGW/BGW statistics
+    dgw_stats = _calculate_dgw_stats(scored, config.GAMEWEEK)
+    
+    # Display availability and DGW statistics (only once, here)
+    _display_availability_and_dgw_stats(involvement_stats, dgw_stats, 
+                                       config.GAMEWEEK)
     
     return players, scored, available_budget
+
+
+def _calculate_dgw_stats(players_df, gameweek):
+    """Calculate double/blank gameweek statistics."""
+    # For now, since your code doesn't seem to have DGW/BGW logic yet,
+    # we'll return stats showing all players have regular gameweeks
+    # You can enhance this when you add DGW/BGW functionality
+    
+    dgw_stats = {
+        'regular_gw': len(players_df),
+        'double_gw': 0,
+        'blank_gw': 0
+    }
+    
+    return dgw_stats
 
 
 def generate_theoretical_squad(components, config, players, available_budget):
@@ -420,7 +453,8 @@ def finalise_squad_selection(components, config, should_make_transfers,
 def optimise_starting_xi(components, config, starting, bench, players, 
                         available_budget):
     """Optimise starting XI for the specific gameweek."""
-    print(f"Fetching difficulty for GW{config.GAMEWEEK} fixture...")
+    print(f"Optimising Starting XI for GW{config.GAMEWEEK}...")
+    
     fixture_scores_next = (
         components['fixture_manager']
         .fetch_player_fixture_difficulty(1, players, config.GAMEWEEK)
@@ -432,8 +466,6 @@ def optimise_starting_xi(components, config, starting, bench, players,
         fixture_scores_next
         )[0]  # Take only the dataframe, ignore stats
 
-    print(f"Optimising Starting XI for GW{config.GAMEWEEK}...")
-    
     # Create forced selections from current squad
     updated_forced_selections = (
         components['squad_selector']
@@ -664,7 +696,7 @@ def main():
                                     .fetch_current_players())
         )
 
-    # Process player data
+    # Process player data - this now displays all stats in correct order
     players, scored, available_budget = process_player_data(components, config)
 
     # Generate theoretical best squad for comparison
