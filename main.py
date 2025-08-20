@@ -15,6 +15,7 @@ from src.data.historical_data import HistoricalDataManager
 from src.analysis.scoring_engine import ScoringEngine
 from src.analysis.points_calculator import PointsCalculator
 from src.analysis.results_analyser import ResultsAnalyser
+from src.analysis.differential_analyser import DifferentialAnalyser
 from src.optimisation.squad_selector import SquadSelector
 from src.optimisation.transfer_evaluator import TransferEvaluator
 from src.utils.file_utils import FileUtils
@@ -109,6 +110,7 @@ def initialise_components(config, token_manager):
         'scoring_engine': ScoringEngine(config),
         'points_calculator': PointsCalculator(config),
         'results_analyser': ResultsAnalyser(config),
+        'differential_analyser': DifferentialAnalyser(config),
         'squad_selector': SquadSelector(config),
         'transfer_evaluator': TransferEvaluator(config),
         'display_utils': SquadDisplayUtils(config),
@@ -316,6 +318,35 @@ def generate_theoretical_squad(components, config, players, available_budget):
     
     print(f"\nNerdball Squad Cost: {theoretical_cost:.1f}m")
     print(f"Nerdball Starting XI Projected Points: {theoretical_points:.1f}")
+    
+    # For differentials, use the full fixture analysis (same as main squad)
+    # This uses FIRST_N_GAMEWEEKS fixtures for a complete picture
+    differential_scored = components['scoring_engine'].build_scores(
+        players, 
+        components['fixture_manager'].fetch_player_fixture_difficulty(
+            config.FIRST_N_GAMEWEEKS, players, config.GAMEWEEK
+        )
+    )[0]
+    
+    # Add multi-fixture information for differentials
+    differential_scored_with_fixtures = (
+        components['differential_analyser']
+        .add_multi_fixture_info(differential_scored, config.GAMEWEEK,
+                               config.FIRST_N_GAMEWEEKS, 
+                               components['fixture_manager'])
+    )
+    
+    # Add differential suggestions
+    differentials = components['differential_analyser'].get_differential_suggestions(
+        differential_scored_with_fixtures,
+        config.GAMEWEEK,
+        config.FIRST_N_GAMEWEEKS
+    )
+    components['differential_analyser'].print_differential_suggestions(
+        differentials,
+        config.GAMEWEEK,
+        config.FIRST_N_GAMEWEEKS
+    )
     
     return theoretical_starting_display, theoretical_points, theoretical_cost
 
