@@ -11,7 +11,7 @@ class ScoringEngine:
         self.config = config
     
     def build_scores(self, players: pd.DataFrame, 
-                    fixture_scores: pd.DataFrame) -> pd.DataFrame:
+                    fixture_scores: pd.DataFrame) -> tuple:
         """
         Calculate FPL scores and base quality scores for each player based on 
         form, historical performance, and fixture difficulty, with reliability
@@ -22,8 +22,8 @@ class ScoringEngine:
             fixture_scores (pd.DataFrame): Fixture difficulty data.
 
         Returns:
-            pd.DataFrame: Player data with calculated fpl_score and 
-                          base_quality for each player.
+            tuple: (scored_dataframe, involvement_stats_dict) containing the 
+                   player data with calculated scores and involvement statistics.
         """
         df = players.merge(fixture_scores, on="name_key", how="left")
 
@@ -42,10 +42,10 @@ class ScoringEngine:
         # Calculate projected points
         df = self._calculate_projected_points(df)
 
-        # Apply availability filter based on config setting
-        df = self._apply_availability_filter(df)
+        # Apply availability filter and get involvement stats
+        df, involvement_stats = self._apply_availability_filter(df)
 
-        return df
+        return df, involvement_stats
     
     def _fill_missing_values(self, df: pd.DataFrame) -> pd.DataFrame:
         """Fill NaN values to prevent errors in calculations."""
@@ -128,15 +128,35 @@ class ScoringEngine:
             + df["avg_reliability"] * 0.3    # Historical weighting
         ) - 0.75  # Centre around 0
 
-        # Penalty for historically unreliable players (rotation risks)
+        # Enhanced penalty for historically unreliable players (rotation risks)
         df["historically_unreliable_penalty"] = 0.0  # Initialise column
+        
+        # Historical reliability penalty
         unreliable_mask = df["avg_reliability"] < 0.6  # <60% historical games
         df.loc[unreliable_mask, "historically_unreliable_penalty"] = -0.15
 
-        # Extra penalty for current season rotation risks
-        current_unreliable_mask = df["current_reliability"] < 0.7  # <70% games
-        df.loc[current_unreliable_mask,
-               "historically_unreliable_penalty"] -= 0.2
+        # Enhanced current season rotation risk penalty
+        if self.config.GAMEWEEK > 1:
+            gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
+            
+            # Calculate current season start percentage
+            current_start_pct = df["starts"].fillna(0) / gameweeks_completed
+            
+            # Very unreliable (rotation risk) - stronger penalty
+            very_unreliable_mask = current_start_pct < 0.5  # <50% starts
+            df.loc[very_unreliable_mask, 
+                   "historically_unreliable_penalty"] -= 0.3
+            
+            # Moderately unreliable
+            moderately_unreliable_mask = ((current_start_pct >= 0.5) & 
+                                        (current_start_pct < 0.7))
+            df.loc[moderately_unreliable_mask, 
+                   "historically_unreliable_penalty"] -= 0.15
+        else:
+            # First gameweek - use traditional penalty
+            current_unreliable_mask = df["current_reliability"] < 0.7
+            df.loc[current_unreliable_mask,
+                   "historically_unreliable_penalty"] -= 0.2
 
         # FPL score (for squad selection - includes reliability)
         df["fpl_score"] = (
@@ -177,40 +197,88 @@ class ScoringEngine:
 
         return df
     
-    def _apply_availability_filter(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _apply_availability_filter(self, df: pd.DataFrame) -> tuple:
         """
         Apply availability filter to players based on config setting.
+        Enhanced to penalize non-playing players after GW1.
         
         Args:
             df (pd.DataFrame): Player dataframe with scores
             
         Returns:
-            pd.DataFrame: Modified dataframe with availability considerations
+            tuple: (modified_dataframe, involvement_stats_dict)
         """
+        # Initialize involvement stats
+        involvement_stats = {
+            'high_involvement': 0,
+            'zero_involvement': 0,
+            'low_involvement': 0,
+            'unavailable': 0,
+            'exclude_unavailable': True
+        }
+        
         # Check if EXCLUDE_UNAVAILABLE setting exists, default to True
         exclude_unavailable = getattr(self.config, 'EXCLUDE_UNAVAILABLE', True)
+        involvement_stats['exclude_unavailable'] = exclude_unavailable
         
         if not exclude_unavailable:
-            print("📋 EXCLUDE_UNAVAILABLE = False: Including unavailable "
-                  "players in optimisation")
-            return df
+            return df, involvement_stats
         
-        # Identify unavailable players
+        # Identify unavailable players (injury/suspension)
         unavailable_mask = (
             (df["status"] != "a") & 
             (df["chance_of_playing_next_round"].fillna(100) < 75)
         )
         
-        unavailable_count = unavailable_mask.sum()
+        involvement_stats['unavailable'] = unavailable_mask.sum()
         
-        if unavailable_count > 0:
+        # After GW1, heavily penalize players who haven't been playing
+        if self.config.GAMEWEEK > 1:
+            gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
+            
+            # Players who haven't started any games AND have 0 form
+            zero_involvement_mask = (
+                (df["starts"].fillna(0) == 0) & 
+                (df["form"].fillna(0) == 0) &
+                (df["minutes"].fillna(0) < 45)  # Less than half a game total
+            )
+            
+            # Players with very low involvement (rotation risks)
+            low_involvement_mask = (
+                (df["starts"].fillna(0) / gameweeks_completed < 0.3) &  
+                (df["minutes"].fillna(0) / gameweeks_completed < 30) &   
+                ~zero_involvement_mask  # Don't double-count zero players
+            )
+            
+            # Players with high involvement (reliable starters)
+            high_involvement_mask = (
+                (df["starts"].fillna(0) / gameweeks_completed >= 0.7) &  
+                (df["minutes"].fillna(0) / gameweeks_completed >= 60)
+            )
+            
+            # Store stats
+            involvement_stats['high_involvement'] = high_involvement_mask.sum()
+            involvement_stats['zero_involvement'] = zero_involvement_mask.sum()
+            involvement_stats['low_involvement'] = low_involvement_mask.sum()
+            
+            # Apply penalties/zeroing
+            if zero_involvement_mask.sum() > 0:
+                # Set scores to 0 for completely uninvolved players
+                df.loc[zero_involvement_mask, "fpl_score"] = 0.0
+                df.loc[zero_involvement_mask, "projected_points"] = 0.0
+                
+            if low_involvement_mask.sum() > 0:
+                # Heavy penalty for low involvement players (75% reduction)
+                df.loc[low_involvement_mask, "fpl_score"] *= 0.25
+                df.loc[low_involvement_mask, "projected_points"] *= 0.25
+        
+        # Apply original unavailable filter
+        if unavailable_mask.sum() > 0:
             # Set scores to 0 for unavailable players
             df.loc[unavailable_mask, "fpl_score"] = 0.0
             df.loc[unavailable_mask, "projected_points"] = 0.0
-        else:
-            print("✅ All players are available for selection")
         
-        return df
+        return df, involvement_stats
     
     def _finalise_scores(self, df: pd.DataFrame) -> pd.DataFrame:
         """Final safety check - replace any remaining NaN/inf values."""

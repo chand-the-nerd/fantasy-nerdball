@@ -1,277 +1,377 @@
 # Fantasy Nerdball - FPL Squad Optimisation Tool
 
-A comprehensive Fantasy Premier League (FPL) squad optimisation tool that uses mathematical modelling to select optimal squads based on player form, historical performance, fixture difficulty, and reliability metrics.
+Fantasy Nerdball is an advanced Fantasy Premier League (FPL) squad optimisation tool that uses data science and mathematical optimisation to help you select the best possible team each gameweek.
 
-## Features
+## How It Works
 
-- **Intelligent Player Scoring**: Combines current form, historical performance, and fixture difficulty
-- **Transfer Penalty Mode**: Optional system to consider transfers beyond free limit with 4-point penalties
-- **Transfer Value Analysis**: Evaluates whether transfers provide sufficient projected points improvement
-- **Theoretical Best Squad**: Shows optimal squad ignoring transfer constraints for comparison
-- **Captain Multiplier**: Automatically applies captain (2x) and vice-captain logic to projections
-- **Form-Based Starting XI**: Only selects players with form > 0 for starting lineup
-- **Reliability Metrics**: Accounts for player rotation and injury risks
-- **Forced Selections**: Ability to force specific players into your squad
-- **Starting XI Focus**: Results tracking focuses on players who actually contributed points
-- **Substitute vs Transfer Analysis**: Recommends whether to use substitutes or make transfers
-- **Availability Control**: Option to include/exclude unavailable players from optimization
-- **Player History Tracking**: Updates and tracks player performance across gameweeks
-- **Enhanced Transfer Display**: Shows next 3 fixtures for players being transferred
+### Player Selection Criteria
 
-## Installation
+The tool evaluates every player using a sophisticated scoring system that combines multiple data sources with **user-determined custom weighting**:
 
-1. Clone or download this repository
-2. Install required dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+**Core Components:**
+- **Current Form**: How well the player is performing this season - their average points per game
+- **Historical Performance**: How consistently they've performed over the past 2-3 seasons  
+- **Fixture Difficulty**: How easy or hard their upcoming fixtures are
 
-## Usage
+*The relative importance of these three components is fully customizable in your config file (default: 40% form, 40% historical, 20% fixtures).*
 
-1. **Configure your settings** in `config.py` (see Configuration section below)
-2. **Run the optimisation**:
-   ```bash
-   python main.py
-   ```
+**Smart Adjustments:**
+- **Performance Analysis**: Uses expected output data to identify players who are likely to improve or decline based on whether they're over/under-performing their underlying statistics. This considers xGI (Expected Goal Involvements) for attacking output and xGC (Expected Goals Conceded) for defensive performance, weighted by position
+- **Reliability Bonus**: Rewards players who start games consistently (reduces rotation risk)
+- **Team Modifiers**: User-determined adjustments for teams that are over/under-performing expectations - helps provide additional context that the model is unlikely to know from data alone
+- **Promotion Penalty**: Accounts for newly promoted teams typically struggling
+- **Involvement Filtering**: After GW1, automatically identifies and penalizes players who haven't been getting game time, with different treatment for zero involvement vs rotation risks
 
-The tool will:
-1. Prompt for player history updates from previous gameweek
-2. Create results analysis for previous gameweek (Starting XI focus)
-3. Fetch current player data from the FPL API
-4. Show theoretical best squad for comparison
-5. Analyse historical performance data
-6. Calculate fixture difficulty for upcoming gameweeks
-7. Score all players based on your configured weights
-8. Evaluate unavailable players and substitution options
-9. Test multiple transfer scenarios (including penalty analysis)
-10. Optimise squad selection using linear programming
-11. Optimize Starting XI with form constraints and captain selection
-12. Display comprehensive squad comparison vs theoretical optimum
-13. Save all results to CSV files
+### Squad Selection Process
 
-## New Transfer Penalty System
+The tool uses **Integer Linear Programming** (a mathematical optimisation technique) to find the perfect 15-player squad that:
 
-When `ACCEPT_TRANSFER_PENALTY = True`, the system:
-- Tests all transfer scenarios (0 to free_transfers + 3)
-- Applies 4-point penalty for each transfer beyond free limit
-- Evaluates net projected points (gross points - penalties)
-- Respects `MIN_TRANSFER_VALUE` threshold before recommending transfers
-- Shows detailed analysis with player names and next fixtures
+1. **Maximises total FPL score** while respecting all FPL rules
+2. **Stays within budget** (£100m or your current squad value)
+3. **Respects position limits** (2 GK, 5 DEF, 5 MID, 3 FWD)
+4. **Limits players per team** (maximum 3 from any single team)
+5. **Considers transfer constraints** (how many free transfers you have)
 
-Example output:
+The **FPL score** used for squad selection includes reliability adjustments to minimize rotation risk.
+
+### Starting XI Selection
+
+Once the 15-player squad is chosen, the tool optimises the starting XI by:
+
+1. **Selecting exactly 11 players** who can start this gameweek
+2. **Meeting formation requirements** (1 GK, 3-5 DEF, 3-5 MID, 1-3 FWD)
+3. **Excluding players with zero form** (haven't performed recently)
+4. **Maximising projected points** for this specific gameweek
+5. **Auto-selecting captain and vice-captain** (highest projected scorers)
+
+The **projected points** used for starting XI selection focuses purely on expected output when the player actually plays.
+
+### FPL Chip Support
+
+The tool fully supports all FPL chips with automatic adjustments:
+
+**Wildcard**: 
+- Removes transfer limits (sets to 15 free transfers)
+- Optimises across all players without constraints
+
+**Triple Captain**:
+- Captain receives 3x points instead of 2x
+- Display shows "(x3)" for captain in output
+- Points calculations account for triple multiplier
+
+**Bench Boost**:
+- All 15 players count towards total points
+- Display shows "Full Squad Points" instead of "Starting XI Points"
+- Optimisation considers full squad performance
+
+**Free Hit (Previous Gameweek)**:
+- Automatically loads squad from 2 gameweeks ago when `FREE_HIT_PREV_GW = True`
+- Handles missing squad files gracefully
+
+### Player Involvement Analysis
+
+After the first gameweek, the tool automatically categorizes players based on their involvement:
+
+- **✅ High Involvement (Reliable Starters)**: ≥70% start rate, ≥60 minutes per gameweek - no penalties
+- **⚠️ Zero Involvement**: 0 starts, 0 form, <45 total minutes - scores set to 0
+- **⚠️ Low Involvement**: <30% start rate, <30 minutes per gameweek - 75% score penalty
+- **⚠️ Unavailable**: Injured/suspended players - scores set to 0
+
+This prevents unrealistic selections of players who clearly aren't in their manager's plans.
+
+### Example Player Calculation
+
+Let's see how **Bruno Fernandes (MID)** might be evaluated:
+
+**Step 1: Core Components**
+- Current Form: 6.2 points per game → Z-score: +1.5
+- Historical Performance: 5.8 points per game → Z-score: +1.2  
+- Fixture Difficulty: 3.2 average difficulty → Z-score: +0.8
+
+**Step 2: Weighted Core Score** (40% + 40% + 20%)
+- Core Score = (1.5 × 0.4) + (1.2 × 0.4) + (0.8 × 0.2) = 1.24
+
+**Step 3: Smart Adjustments**
+- Performance Analysis: 1.15 (slightly outperforming expected output)
+- Reliability: +0.3 (starts 90% of games)
+- Team Modifier: 1.0 (Man United performing as expected)
+
+**Step 4: Final Scores**
+- **FPL Score** (for squad selection): 1.24 + 0.3 = 1.54 × 1.15 = 1.77
+- **Projected Points** (for starting XI): 4.5 baseline + 1.24 = 5.74 × 1.15 = 6.6 points
+
+### Transfer Strategy
+
+The tool has three modes for handling transfers:
+
+**Standard Mode**: 
+- Compares your current squad (with no transfers) vs. the optimal squad (with transfers)
+- Only recommends transfers if the improvement exceeds a minimum threshold (configurable)
+- Helps you avoid "sideways moves" that waste transfers
+
+**Transfer Penalty Mode**:
+- Tests multiple transfer scenarios (e.g., 1 transfer, 2 transfers, 3 transfers)
+- Factors in the -4 point penalty for each extra transfer
+- Recommends the strategy with the highest net points after penalties
+
+**Wildcard Mode**:
+- No transfer limits - optimises freely across all players
+
+### The Nerdball XI
+
+This is the **best team that fits the model's parameters** for the gameweek - what the perfect squad would look like if you had unlimited transfers and no budget constraints. It serves as a benchmark to see how close your actual team gets to the mathematical optimum based on the tool's scoring system.
+
+## Understanding the Output Tables
+
+### Main Columns Explained
+
+| Column | What It Means |
+|--------|---------------|
+| **name** | Player's name (with (C) for captain, (V) for vice-captain) |
+| **pos** | Position (GK/DEF/MID/FWD) |
+| **team** | Player's club |
+| **cost** | Current price in millions |
+| **form** | Current season average points per game |
+| **his_ppg** | Historical average points per game (weighted across past seasons) |
+| **fix_diff** | Average fixture difficulty over next N gameweeks (default: 5 games, lower = easier) |
+| **start_pct** | Reliability - percentage of games they've started |
+| **hist_xOP** | Historical expected output performance ratio (>1.0 = tends to overperform expected output) |
+| **cur_xOP** | Current season expected output performance ratio |
+| **xMod** | Final expected output consistency modifier applied to projections |
+| **minspg** | Minutes per game this season |
+| **proj_pts** | Projected points for this gameweek (shows captain multiplier) |
+| **next_fix** | Next opponent |
+
+### Expected Output Performance Columns Explained
+
+- **hist_xOP & cur_xOP**: Compare actual goals/assists vs. expected goals/assists. Values >1.0 mean they're scoring more than expected, <1.0 means less than expected
+- **xMod**: The final modifier applied - accounts for whether current performance is sustainable or due for regression
+
+### Squad Comparison Output
+
+The tool provides enhanced comparison information:
+
 ```
-🔄 Evaluating all transfer scenarios up to 4 transfers...
-  🏠 Scenario 0: 0 transfers, 0 extra, penalty: -0, gross: 60.5, net: 60.5
-  ✅ Scenario 1: 1 transfers, 0 extra, penalty: -0, gross: 61.4, net: 61.4
-     (🔄 OUT: Bowen → IN: Wood)
-  💰 Scenario 2: 2 transfers, 1 extra, penalty: -4, gross: 62.5, net: 58.5
-     (🔄 OUT: Bowen, Baleba → IN: Wood, Semenyo)
+🎯 SQUAD COMPARISON (including captain multiplier)
+📊 Nerdball XI: 79.4 pts
+🔥 Triple Captain: Palmer (+13.7) 🔥
+🏈 Your Starting XI Points (Triple Captain): 71.1 pts
+📈 Gap to theoretical: 8.3 pts (10.4%)
 ```
 
-## Output Files
+This shows:
+- **Nerdball XI**: The theoretical best possible score
+- **Captain Impact**: How many extra points your captain choice provides
+- **Your Score**: Your actual projected score with chip effects
+- **Performance Gap**: How close you are to the theoretical optimum
 
-Results are saved in the `squads/gw{n}/` directory:
-- `full_squad.csv`: Complete squad with all metrics
-- `full_squad_simple.csv`: Simplified squad overview
-- `starting_xi_results.csv`: Starting XI projected vs actual points comparison
-- `summary.csv`: Starting XI performance summary and accuracy metrics
+## Getting Started
 
-## Configuration (`config.py`)
+### 1. Copy the Config Template
 
-### Basic Settings
+Create a new file called `config.py` in the main directory and copy this template:
+
 ```python
-GAMEWEEK = 2                    # Current gameweek you're planning for
-BUDGET = 100.0                 # Total budget in millions
-FREE_TRANSFERS = 1             # Number of free transfers available
-ACCEPT_TRANSFER_PENALTY = True # Allow transfers beyond free limit (4 pts penalty each)
-WILDCARD = False               # Set to True if using wildcard
+"""
+Configuration settings for Fantasy Nerdball FPL optimisation tool.
+Edit this file to customise your optimisation preferences.
+"""
+
+class Config:
+    """Configuration class containing all settings for the FPL optimisation."""
+    
+    # === BASIC SETTINGS ===
+    GAMEWEEK = 1  # Current gameweek number
+    BUDGET = 100.0  # Will be overridden by value of squad from prev gameweek
+    FREE_TRANSFERS = 1  # How many free transfers you have
+    ACCEPT_TRANSFER_PENALTY = False  # Set to True to consider extra transfers
+    EXCLUDE_UNAVAILABLE = True  # Set to False to include injured players
+
+    # === TOKENS ===
+    WILDCARD = False  # Set to True when either Wildcard or Free Hit is used
+    FREE_HIT_PREV_GW = False  # Set to True if you used Free Hit prev gameweek
+    BENCH_BOOST = False
+    TRIPLE_CAPTAIN = False
+
+    # === TRANSFER EFFICIENCY SETTINGS ===
+    MIN_TRANSFER_VALUE = 5.0  # Minimum point improvement needed per transfer
+
+    # === POINTS PROJECTION SETTINGS ===
+    BASELINE_POINTS_PER_GAME = {
+        "GK": 3.0,
+        "DEF": 3.5,
+        "MID": 4.5,
+        "FWD": 4.5,
+    }
+
+    # === SCORING WEIGHTS ===
+    # These should total 1.0
+    FORM_WEIGHT = 0.4      # Importance of current season average
+    HISTORIC_WEIGHT = 0.4   # Importance of historic seasons' average
+    DIFFICULTY_WEIGHT = 0.2 # Importance of upcoming fixture difficulty
+
+    # === SQUAD COMPOSITION ===
+    SQUAD_SIZE = {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3}
+    MAX_PER_TEAM = 3
+
+    # === TEAM ADJUSTMENTS ===
+    # Teams that will be considered as newly promoted
+    PROMOTED_TEAMS = ["Burnley", "Sunderland", "Leeds"]
+
+    # Team performance modifiers (adjust for over/under-performing teams)
+    # Teams that have overperformed should be under 1.0 and vice versa
+    TEAM_MODIFIERS = {
+        "Arsenal": 1.0,
+        "Aston Villa": 1.0,
+        "Bournemouth": 1.0,
+        "Brentford": 1.0,
+        "Brighton": 1.0,
+        "Burnley": 1.0,
+        "Chelsea": 1.0,
+        "Crystal Palace": 1.0,
+        "Everton": 1.0,
+        "Fulham": 1.0,
+        "Leeds": 1.0,
+        "Liverpool": 1.0,
+        "Man City": 1.0,
+        "Man Utd": 1.0,
+        "Newcastle": 1.0,
+        "Nott'm Forest": 1.0,
+        "Sunderland": 1.0,
+        "Spurs": 1.0,
+        "West Ham": 1.0,
+        "Wolves": 1.0,
+    }
+
+    # === PLAYER SELECTIONS ===
+    # Force specific players to be selected (use lowercase names)
+    FORCED_SELECTIONS = {
+        "GK": [], 
+        "DEF": [], 
+        "MID": [], 
+        "FWD": []
+    }
+
+    # Players that should not be considered (use lowercase names)
+    BLACKLIST_PLAYERS = []
 ```
 
-### Availability Settings
-```python
-EXCLUDE_UNAVAILABLE = True     # Set to False to include unavailable players in optimization
-```
-- **True**: Only considers available players (realistic squads)
-- **False**: Includes injured/suspended players (theoretical analysis)
+### 2. Configure Your Settings
 
-### Transfer Settings
-```python
-MIN_TRANSFER_VALUE = 5.0       # Minimum projected points improvement needed to make transfers
-```
-- **Simple threshold**: Any transfer scenario must improve projected points by at least this amount
-- **Example**: With 5.0, transfers must improve your Starting XI by 5+ points to be recommended
+**Essential Settings to Update:**
 
-### Points Projection Settings
-```python
-BASELINE_POINTS_PER_GAME = {
-    "GK": 4.0,   # Average points for a decent goalkeeper
-    "DEF": 4.5,  # Average points for a decent defender
-    "MID": 5.0,  # Average points for a decent midfielder
-    "FWD": 5.5,  # Average points for a decent forward
-}
-FPL_SCORE_TO_POINTS_MULTIPLIER = 1.5  # How much 1 FPL score unit translates to points
-```
+- **GAMEWEEK**: Set this to the current gameweek number
+- **FREE_TRANSFERS**: How many free transfers you currently have
+- **ACCEPT_TRANSFER_PENALTY**: 
+  - `False` = Only use free transfers
+  - `True` = Consider extra transfers with -4 point penalties
 
-### Historical Data Settings
-```python
-PAST_SEASONS = ["2024-25", "2023-24"]     # Historic seasons to consider
-HISTORIC_SEASON_WEIGHTS = [0.7, 0.3]      # Relative weights (should match seasons)
-FIRST_N_GAMEWEEKS = 5                     # How many upcoming fixtures to consider
-```
+**FPL Chip Settings (Only One Can Be True):**
+- **WILDCARD**: Set to `True` if you're playing your wildcard or free hit this week
+- **TRIPLE_CAPTAIN**: Set to `True` if using Triple Captain chip
+- **BENCH_BOOST**: Set to `True` if using Bench Boost chip
+- **FREE_HIT_PREV_GW**: Set to `True` if you used Free Hit last gameweek
 
-### Scoring Weights (Must Total 1.0)
-```python
-FORM_WEIGHT = 0.3          # Importance of current season form
-HISTORIC_WEIGHT = 0.4      # Importance of historical performance
-DIFFICULTY_WEIGHT = 0.3    # Importance of upcoming fixture difficulty
-```
+**Scoring Weights (Must Total 1.0):**
+- **FORM_WEIGHT**: How much to weight current season performance (default: 0.4)
+- **HISTORIC_WEIGHT**: How much to weight past seasons (default: 0.4)  
+- **DIFFICULTY_WEIGHT**: How much to weight fixture difficulty (default: 0.2)
 
-### Squad Composition
-```python
-SQUAD_SIZE = {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3}  # Required squad composition
-MAX_PER_TEAM = 3                                        # Maximum players from one team
-```
+**Optional Settings:**
 
-### Team Adjustments
-```python
-PROMOTED_TEAMS = ["Burnley", "Sunderland", "Leeds"]    # Newly promoted teams (get penalty)
+- **MIN_TRANSFER_VALUE**: How many points improvement you need per transfer (default: 5.0)
+- **TEAM_MODIFIERS**: Adjust teams up/down based on your assessment (1.0 = neutral, >1.0 = boost, <1.0 = penalty)
+- **FORCED_SELECTIONS**: Add player names if you want to force certain players into your squad
+- **BLACKLIST_PLAYERS**: Add player names you never want selected
 
+**Example Configuration:**
+```python
+GAMEWEEK = 15
+FREE_TRANSFERS = 2
+ACCEPT_TRANSFER_PENALTY = True  # Will consider making 3+ transfers if worth it
+
+# Using Triple Captain this week
+WILDCARD = False
+TRIPLE_CAPTAIN = True
+BENCH_BOOST = False
+FREE_HIT_PREV_GW = False
+
+# Custom weights - more emphasis on current form
+FORM_WEIGHT = 0.5
+HISTORIC_WEIGHT = 0.3  
+DIFFICULTY_WEIGHT = 0.2
+
+# Team adjustments based on your analysis
 TEAM_MODIFIERS = {
-    "Man City": 1.05,      # Boost players from overperforming teams
-    "West Ham": 0.95,      # Reduce players from underperforming teams
+    "Arsenal": 0.95,  # Slightly overperforming
+    "Brighton": 1.1,  # Underperforming their quality
     # ... etc
 }
-```
 
-### Player Selections
-```python
 FORCED_SELECTIONS = {
-    "GK": ["dúbravka"],    # Force specific players (use lowercase names)
-    "DEF": [], 
-    "MID": ["baleba","m.salah"], 
-    "FWD": []
+    "FWD": ["haaland"]  # Always include Haaland
 }
-
-BLACKLIST_PLAYERS = ["isak"]  # Players to exclude from consideration
+BLACKLIST_PLAYERS = ["martial"]  # Never select Martial
 ```
 
-## Algorithm Overview
+### 3. Run the Tool
 
-### Phase 1: Data Collection & Analysis
-1. **Player History Update**: Optional update of previous gameweek performance
-2. **Results Analysis**: Creates Starting XI focused performance analysis
-3. **Data Fetching**: Current player data and historical performance from FPL API
-4. **Theoretical Best**: Shows optimal squad ignoring all constraints
+Simply run:
+```bash
+python main.py
+```
 
-### Phase 2: Player Scoring
-1. **Scoring**: Calculates composite scores using form, history, and fixtures
-2. **Availability Filter**: Optionally excludes unavailable players (configurable)
-3. **Reliability Adjustments**: Accounts for rotation risks and playing time
+The tool will automatically fetch the latest data and provide you with optimised squad recommendations!
 
-### Phase 3: Transfer Analysis
-1. **Substitute Analysis**: Evaluates bench coverage for unavailable players
-2. **Multi-Scenario Testing**: Tests 0 to free_transfers+3 scenarios
-3. **Penalty Calculation**: Applies 4-point penalties for extra transfers
-4. **Value Threshold**: Checks improvements against MIN_TRANSFER_VALUE
-5. **Optimal Selection**: Chooses best scenario respecting all constraints
+## Understanding the Output
 
-### Phase 4: Starting XI Optimization
-1. **Squad-to-Starting XI**: Optimizes final Starting XI from selected 15 players
-2. **Form Constraint**: Only players with form > 0 can start
-3. **Captain Selection**: Auto-selects captain (highest projected points) with 2x multiplier
-4. **Position Constraints**: Ensures valid formation (1 GK, 3+ DEF, 3+ MID, 1+ FWD)
+### Player Involvement Statistics
 
-### Phase 5: Results & Comparison
-1. **Squad Display**: Shows full squad, Starting XI, and bench with all metrics
-2. **Captain Multiplier**: Displays captain points as "6.9 (x2)" format
-3. **Theoretical Comparison**: Compares your squad vs theoretical optimum
-4. **Gap Analysis**: Shows points gap and improvement suggestions
+After GW1, you'll see involvement analysis:
 
-## Key Metrics Explained
+```
+✅ 282 players with high involvement (reliable starters)
+⚠️  516 players with zero involvement will have scores set to 0
+⚠️  77 players with low involvement heavily penalized
+⚠️  146 players unavailable due to injury/suspension
+```
 
-### Reliability
-- **Current Season**: `starts / gameweeks_completed`
-- **Historical**: Weighted average across past seasons
-- **Impact**: Regular starters get boost, rotation risks get penalty
+This helps you understand how the tool is filtering players based on their actual playing time.
 
-### Projected Points (with Captain)
-- **Base Formula**: `baseline_points + (base_quality * multiplier)`
-- **Captain Bonus**: Highest projected player gets 2x multiplier
-- **Display**: Shows as "6.9 (x2)" for captain, includes doubled points in totals
+### Enhanced Captain Information
 
-### Form Constraint
-- **Starting XI Rule**: Only players with form > 0 can be selected to start
-- **Bench Exception**: Players with form ≤ 0 can be on bench
-- **Fallback**: If optimization fails, uses simple projected points ranking
+The squad comparison now shows detailed captain impact:
 
-## Transfer Strategy Modes
+```
+🎯 SQUAD COMPARISON (including captain multiplier)
+📊 Nerdball XI: 79.4 pts
+🔥 Triple Captain: Palmer (+13.7) 🔥
+🏈 Your Starting XI Points (Triple Captain): 71.1 pts
+📈 Gap to theoretical: 8.3 pts (10.4%)
+```
 
-### Standard Mode (`ACCEPT_TRANSFER_PENALTY = False`)
-- Strict adherence to free transfer limits
-- Traditional transfer value analysis
-- Conservative approach focused on transfer efficiency
+This shows exactly how many bonus points your captain choice is providing.
 
-### Penalty Mode (`ACCEPT_TRANSFER_PENALTY = True`)
-- Tests unlimited transfer scenarios
-- 4-point penalty per extra transfer
-- Optimal mathematical approach
-- Still respects MIN_TRANSFER_VALUE threshold
+### Chip Integration
 
-## Starting XI vs Full Squad Analysis
+When chips are active, you'll see appropriate adjustments:
 
-The tool now distinguishes between:
-- **Squad Selection**: Choose best 15 players (transfer decisions)
-- **Starting XI**: Choose best 11 from your 15 (weekly decisions)
-- **Captain Choice**: Auto-select highest projected points (2x multiplier)
+- **Wildcard**: "🃏 WILDCARD ACTIVE - No transfer limits!"
+- **Triple Captain**: Captain shows "(x3)" and provides triple points
+- **Bench Boost**: Shows "Full Squad Points" and includes all 15 players
+- **Free Hit Previous**: Loads squad from 2 gameweeks ago automatically
 
-This mirrors real FPL decision-making where you:
-1. Build squad with transfers
-2. Pick Starting XI each week
-3. Choose captain for double points
+## Tips for Best Results
 
-## Results Analysis Features
+1. **Update weekly**: Run after each gameweek for the most accurate projections
+2. **Use chip tokens correctly**: Only set one chip to `True` at a time
+3. **Customize the weights**: Adjust FORM_WEIGHT, HISTORIC_WEIGHT, and DIFFICULTY_WEIGHT based on your FPL philosophy
+4. **Set team modifiers thoughtfully**: Use your football knowledge to adjust for teams the data might not capture
+5. **Consider your risk tolerance**: Conservative managers might prefer `ACCEPT_TRANSFER_PENALTY = False`
+6. **Use forced selections sparingly**: Let the algorithm do its work, but force key players if needed
+7. **Check the transfer value analysis**: Don't make transfers unless they're clearly worthwhile
+8. **Compare to Nerdball XI**: See how close you can get to the theoretical optimum
+9. **Pay attention to involvement stats**: The tool automatically filters out non-playing players
+10. **Monitor captain impact**: Use the enhanced captain information to assess your captain choices
 
-### Starting XI Focus
-- **Performance tracking**: Only analyzes players who actually played
-- **Captain-adjusted scoring**: Accounts for doubled captain points
-- **Meaningful metrics**: Focuses on decisions that affected your score
-- **Accuracy measurement**: How well projections matched actual Starting XI performance
-
-### Historical Tracking
-- **Player performance**: Track individual player results across gameweeks
-- **Projection accuracy**: Measure how well the model predicts outcomes
-- **Decision analysis**: Evaluate transfer and captain decisions
-
-## Troubleshooting
-
-- **No fixtures showing**: Check that GAMEWEEK is set correctly in config.py
-- **Poor reliability scores**: Early in season, players need time to establish patterns
-- **Unexpected transfers**: Adjust MIN_TRANSFER_VALUE or set ACCEPT_TRANSFER_PENALTY = False
-- **Missing players**: Check BLACKLIST_PLAYERS and EXCLUDE_UNAVAILABLE settings
-- **Form constraint issues**: Some players with form ≤ 0 cannot start (by design)
-- **Captain not doubling**: Check that proj_pts_display column shows "(x2)" format
-
-## Advanced Usage
-
-### Research Mode
-Set `EXCLUDE_UNAVAILABLE = False` to:
-- Include all players regardless of injury status
-- See theoretical maximum squad potential
-- Plan for when injured players return
-- Understand cost of player unavailability
-
-### Conservative Mode
-Set `ACCEPT_TRANSFER_PENALTY = False` and increase `MIN_TRANSFER_VALUE` to:
-- Only make transfers when high confidence of improvement
-- Preserve transfer flexibility for future gameweeks
-- Reduce risk of unnecessary changes
-
-### Aggressive Mode
-Set `ACCEPT_TRANSFER_PENALTY = True` and lower `MIN_TRANSFER_VALUE` to:
-- Explore all mathematically optimal solutions
-- Accept penalties when improvement justifies cost
-- Maximize theoretical points regardless of transfer usage
-
-## Support
-
-For issues or questions, review the configuration options in `config.py` first. The tool is highly customisable to match your FPL strategy and risk tolerance. The new penalty system allows both conservative and aggressive approaches to transfer strategy.
+The tool combines the best of data science, mathematical optimisation, and FPL strategy to give you a competitive edge!

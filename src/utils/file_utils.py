@@ -8,6 +8,44 @@ class FileUtils:
     """Utility class for file operations."""
     
     @staticmethod
+    def load_previous_squad_from_gameweek(current_gameweek: int, 
+                                        prev_gameweek: int) -> pd.DataFrame:
+        """
+        Load squad from a specific previous gameweek.
+
+        Args:
+            current_gameweek (int): Current gameweek number.
+            prev_gameweek (int): Gameweek to load squad from.
+
+        Returns:
+            pd.DataFrame or None: Previous squad data or None if file 
+                                 doesn't exist.
+        """
+        if prev_gameweek <= 0:
+            print(f"Cannot load squad from GW{prev_gameweek} "
+                  "(invalid gameweek)")
+            return None
+
+        squad_file = f"squads/gw{prev_gameweek}/full_squad.csv"
+
+        if not os.path.exists(squad_file):
+            print(f"Warning: Squad file not found at {squad_file}")
+            if current_gameweek - prev_gameweek > 1:
+                print("(This is expected when Free Hit was used)")
+            else:
+                print("Proceeding without transfer constraints "
+                      "(assuming new team)")
+            return None
+
+        try:
+            prev_squad = pd.read_csv(squad_file)
+            print(f"\nLoaded squad from {squad_file}")
+            return prev_squad
+        except Exception as e:
+            print(f"Error loading squad: {e}")
+            return None
+    
+    @staticmethod
     def load_previous_squad(gameweek: int) -> pd.DataFrame:
         """
         Load the previous gameweek's squad from CSV file.
@@ -24,21 +62,7 @@ class FileUtils:
             return None
 
         prev_gw = gameweek - 1
-        squad_file = f"squads/gw{prev_gw}/full_squad.csv"
-
-        if not os.path.exists(squad_file):
-            print(f"Warning: Previous squad file not found at {squad_file}")
-            print("Proceeding without transfer constraints "
-                  "(assuming new team)")
-            return None
-
-        try:
-            prev_squad = pd.read_csv(squad_file)
-            print(f"\nLoaded previous squad from {squad_file}")
-            return prev_squad
-        except Exception as e:
-            print(f"Error loading previous squad: {e}")
-            return None
+        return FileUtils.load_previous_squad_from_gameweek(gameweek, prev_gw)
     
     @staticmethod
     def save_squad_data(gameweek: int, starting_display: pd.DataFrame, 

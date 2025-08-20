@@ -19,6 +19,7 @@ from src.optimisation.squad_selector import SquadSelector
 from src.optimisation.transfer_evaluator import TransferEvaluator
 from src.utils.file_utils import FileUtils
 from src.utils.squad_display_utils import SquadDisplayUtils
+from src.utils.token_manager import TokenManager
 
 RENAME_MAP = {
     "display_name": "name",
@@ -98,7 +99,7 @@ def prompt_player_history_update(config):
             print("Please enter 'y' for yes, 'n' for no, or 's' for stats.")
 
 
-def initialise_components(config):
+def initialise_components(config, token_manager):
     """Initialise all required components."""
     return {
         'fpl_client': FPLClient(),
@@ -110,7 +111,8 @@ def initialise_components(config):
         'results_analyser': ResultsAnalyser(config),
         'squad_selector': SquadSelector(config),
         'transfer_evaluator': TransferEvaluator(config),
-        'display_utils': SquadDisplayUtils(config)
+        'display_utils': SquadDisplayUtils(config),
+        'token_manager': token_manager
     }
 
 
@@ -126,6 +128,33 @@ def print_header(config):
               f"{config.FREE_TRANSFERS} free transfers (4 pts penalty each)")
     else:
         print(f"Free transfers available: {config.FREE_TRANSFERS}")
+
+
+def _display_involvement_stats(involvement_stats, gameweek):
+    """Display player involvement statistics."""
+    if not involvement_stats['exclude_unavailable']:
+        print("📋 EXCLUDE_UNAVAILABLE = False: Including unavailable "
+              "players in optimisation")
+        return
+    
+    if gameweek > 1:
+        if involvement_stats['high_involvement'] > 0:
+            print(f"✅ {involvement_stats['high_involvement']} players with "
+                  "high involvement (reliable starters)")
+            
+        if involvement_stats['zero_involvement'] > 0:
+            print(f"⚠️  {involvement_stats['zero_involvement']} players with "
+                  "zero involvement will have scores set to 0")
+            
+        if involvement_stats['low_involvement'] > 0:
+            print(f"⚠️  {involvement_stats['low_involvement']} players with "
+                  "low involvement heavily penalized")
+    
+    if involvement_stats['unavailable'] > 0:
+        print(f"⚠️  {involvement_stats['unavailable']} players unavailable "
+              "due to injury/suspension")
+    else:
+        print("✅ All players are available for selection")
 
 
 def process_player_data(components, config):
@@ -152,7 +181,12 @@ def process_player_data(components, config):
     )
     
     print("Scoring players with xG performance modifiers...")
-    scored = components['scoring_engine'].build_scores(players, fixture_scores)
+    scored, involvement_stats = components['scoring_engine'].build_scores(
+        players, fixture_scores
+    )
+    
+    # Display involvement statistics (only once, here)
+    _display_involvement_stats(involvement_stats, config.GAMEWEEK)
     
     return players, scored, available_budget
 
@@ -171,7 +205,7 @@ def generate_theoretical_squad(components, config, players, available_budget):
     scoring_engine_comparison = ScoringEngine(config)
     scored_comparison = scoring_engine_comparison.build_scores(
         players, fixture_scores_comparison
-    )
+    )[0]  # Take only the dataframe, ignore stats
     
     budget_for_comparison = (
         available_budget if available_budget is not None else config.BUDGET
@@ -396,7 +430,7 @@ def optimise_starting_xi(components, config, starting, bench, players,
     scored_next = scoring_engine_next.build_scores(
         players,
         fixture_scores_next
-        )
+        )[0]  # Take only the dataframe, ignore stats
 
     print(f"Optimising Starting XI for GW{config.GAMEWEEK}...")
     
@@ -446,8 +480,23 @@ def optimise_starting_xi(components, config, starting, bench, players,
     return starting_optimised, bench_optimised
 
 
+def calculate_your_points(starting_display: pd.DataFrame, 
+                        bench_display: pd.DataFrame, 
+                        token_manager: TokenManager) -> float:
+    """Calculate total points based on active chip."""
+    if token_manager.should_include_bench_points():
+        # Bench Boost: All 15 players count
+        return (starting_display["projected_points"].sum() + 
+               bench_display["projected_points"].sum())
+    else:
+        # Normal: Only starting XI counts
+        return starting_display["projected_points"].sum()
+
+
 def display_final_results(components, config, starting, bench):
     """Display final squad results with proper formatting."""
+    token_manager = components['token_manager']
+    
     # Add fixture information
     try:
         starting = components['fixture_manager'].add_next_fixture(
@@ -485,9 +534,22 @@ def display_final_results(components, config, starting, bench):
     components['display_utils'].print_squad_table(bench_display, RENAME_MAP)
 
     total_cost = starting["now_cost_m"].sum() + bench["now_cost_m"].sum()
-    total_projected_points = starting_display["projected_points"].sum()
+    
+    # Calculate projected points based on chip
+    if token_manager.should_include_bench_points():
+        # Bench Boost: All 15 players count
+        total_projected_points = (
+            starting_display["projected_points"].sum() + 
+            bench_display["projected_points"].sum()
+        )
+    else:
+        # Normal: Only starting XI counts
+        total_projected_points = starting_display["projected_points"].sum()
+    
+    points_label = token_manager.get_points_label()
+    
     print(f"\nTotal Squad Cost: {total_cost:.1f}m")
-    print(f"Projected Starting XI Points: {total_projected_points:.1f}")
+    print(f"{points_label}: {total_projected_points:.1f}")
 
     # Save squad data
     FileUtils.save_squad_data(config.GAMEWEEK, starting_display, bench_display)
@@ -496,26 +558,33 @@ def display_final_results(components, config, starting, bench):
 
 
 def display_squad_comparison(theoretical_points, theoretical_cost, 
-                           your_points, your_cost, penalty_points=0):
+                           your_points, your_cost, penalty_points=0, 
+                           token_manager=None, starting_display=None):
     """Display comparison between theoretical and actual squad."""
     if theoretical_points <= 0:
         return
     
     net_your_points = your_points - penalty_points
     
+    # Get appropriate points label
+    points_label = (token_manager.get_points_label() 
+                   if token_manager else "Starting XI Points")
+    
     print(f"\n🎯 SQUAD COMPARISON (including captain multiplier)")
+    print(f"📊 Nerdball XI: {theoretical_points:.1f} pts")
+    
+    # Show captain information
+    if starting_display is not None and not starting_display.empty:
+        captain_info = _get_captain_info(starting_display, token_manager)
+        if captain_info:
+            print(captain_info)
     
     if penalty_points > 0:
-        print(f"📊 Nerdball Pick of the Week: {theoretical_points:.1f} pts "
-              f"({theoretical_cost:.1f}m)")
-        print(f"🏈 Your Squad (gross): {your_points:.1f} pts "
-              f"({your_cost:.1f}m)")
+        print(f"🏈 Your Squad (gross): {your_points:.1f} pts")
         print(f"💰 Transfer Penalty: -{penalty_points:.1f} pts")
-        print(f"🎯 Your Squad (net): {net_your_points:.1f} pts")
+        print(f"🎯 Your {points_label}: {net_your_points:.1f} pts")
     else:
-        print(f"📊 Theoretical Best: {theoretical_points:.1f} pts "
-              f"({theoretical_cost:.1f}m)")
-        print(f"🏈 Your Squad: {your_points:.1f} pts ({your_cost:.1f}m)")
+        print(f"🏈 Your {points_label}: {your_points:.1f} pts")
     
     gap = theoretical_points - net_your_points
     gap_pct = (gap / theoretical_points * 100) if theoretical_points > 0 else 0
@@ -530,15 +599,50 @@ def display_squad_comparison(theoretical_points, theoretical_cost,
         print("💡 Not bad, could be better.")
 
 
+def _get_captain_info(starting_display, token_manager):
+    """Extract captain information for display."""
+    # Find captain (player with (C) in name)
+    captain_mask = starting_display["display_name"].str.contains(
+        r"\(C\)", na=False
+    )
+    
+    if not captain_mask.any():
+        return None
+    
+    captain = starting_display[captain_mask].iloc[0]
+    captain_name = captain["display_name"].replace(" (C)", "")
+    
+    # Get base points (before captain multiplier)
+    if "proj_pts" in captain:
+        base_points = captain["proj_pts"]
+    else:
+        # Fallback: reverse engineer from projected_points
+        multiplier = 3 if (token_manager and 
+                         token_manager.config.TRIPLE_CAPTAIN) else 2
+        base_points = captain["projected_points"] / multiplier
+    
+    # Calculate captain bonus
+    multiplier = 3 if (token_manager and 
+                     token_manager.config.TRIPLE_CAPTAIN) else 2
+    captain_bonus = base_points * (multiplier - 1)
+    
+    # Format display
+    if token_manager and token_manager.config.TRIPLE_CAPTAIN:
+        return f"🔥 Triple Captain: {captain_name} (+{captain_bonus:.1f}) 🔥"
+    else:
+        return f"💪 Captain: {captain_name} (+{captain_bonus:.1f})"
+
+
 def main():
     """Main function to run the FPL optimisation process."""
     config = Config()
+    token_manager = TokenManager(config)  # Handle token logic separately
     
     print_header(config)
     prompt_player_history_update(config)
 
     # Initialise all components
-    components = initialise_components(config)
+    components = initialise_components(config, token_manager)
 
     # Create results for previous gameweek if this is GW2+
     if config.GAMEWEEK >= 2:
@@ -546,8 +650,11 @@ def main():
             config.GAMEWEEK
         )
 
-    # Load previous squad if available
-    prev_squad = FileUtils.load_previous_squad(config.GAMEWEEK)
+    # Load previous squad - use correct gameweek based on tokens
+    prev_squad_gameweek = token_manager.get_previous_squad_gameweek()
+    prev_squad = FileUtils.load_previous_squad_from_gameweek(
+        config.GAMEWEEK, prev_squad_gameweek
+    )
     prev_squad_ids = None
     if prev_squad is not None:
         prev_squad_ids = (
@@ -612,13 +719,16 @@ def main():
 
     # Display comparison with theoretical squad
     if theoretical_points > 0:
-        your_points = starting_display["projected_points"].sum()
+        your_points = calculate_your_points(
+            starting_display, bench_display, token_manager
+        )
         your_cost = (
             starting["now_cost_m"].sum() + bench["now_cost_m"].sum()
         )
         display_squad_comparison(
             theoretical_points, theoretical_cost, 
-            your_points, your_cost, penalty_points
+            your_points, your_cost, penalty_points, token_manager,
+            starting_display
         )
 
 
