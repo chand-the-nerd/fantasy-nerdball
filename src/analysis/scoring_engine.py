@@ -195,6 +195,22 @@ class ScoringEngine:
         # Ensure minimum of 1 point (no player should project negative)
         df["projected_points"] = df["projected_points"].clip(lower=1.0)
 
+        # Apply fixture multiplier for DGW/BGW
+        if "fixture_multiplier" in df.columns:
+            # Fill any NaN fixture multipliers with 1.0 (normal gameweek)
+            df["fixture_multiplier"] = df["fixture_multiplier"].fillna(1.0)
+            
+            df["projected_points"] = df["projected_points"] * df["fixture_multiplier"]
+            
+            # Clean up any NaN/inf values that might have been created
+            df["projected_points"] = df["projected_points"].fillna(0.0)
+            df["projected_points"] = df["projected_points"].replace([float("inf"), float("-inf")], 0.0)
+            
+            # Ensure BGW players have exactly 0 points, others have minimum 1
+            bgw_mask = df["fixture_multiplier"] == 0.0
+            df.loc[~bgw_mask, "projected_points"] = df.loc[~bgw_mask, "projected_points"].clip(lower=1.0)
+            df.loc[bgw_mask, "projected_points"] = 0.0
+
         return df
     
     def _apply_availability_filter(self, df: pd.DataFrame) -> tuple:

@@ -12,7 +12,8 @@ class PointsCalculator:
     def calculate_projected_points(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Calculate projected points for each player - now just a pass-through 
-        since projected points are calculated in ScoringEngine.
+        since projected points are calculated in ScoringEngine with proper
+        DGW/BGW handling.
 
         Args:
             df (pd.DataFrame): Player data with projected_points already 
@@ -28,7 +29,8 @@ class PointsCalculator:
     
     def add_points_analysis_to_display(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Add projected points columns and score components for better display.
+        Add projected points columns and score components for better display,
+        properly handling DGW scenarios.
 
         Args:
             df (pd.DataFrame): Squad data with projected_points already 
@@ -51,23 +53,22 @@ class PointsCalculator:
         return df
     
     def _prepare_display_columns(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Prepare display columns with proper formatting."""
+        """Prepare display columns with proper formatting including DGW 
+        handling."""
         # Round form to 1 decimal place
         df["form"] = df["form"].round(1)
         
         # Historic PPG from past seasons
         df["historic_ppg"] = df["avg_ppg_past2"].round(1)
 
-        # Use the fixture difficulty average from 
-        # fetch_player_fixture_difficulty. This shows average difficulty over 
-        # FIRST_N_GAMEWEEKS (same as algorithm uses)
-        df["fixture_diff"] = (6 - df["fixture_bonus"]).round(1)
+        # Use the fixture difficulty from fetch_player_fixture_difficulty
+        df["fixture_diff"] = (6 - df["diff"]).round(1)
 
         # Reliability as percentage (starts/games)
         df["reliability"] = (
             df["current_reliability"] * 100).round(0).astype(int)
         
-        # Projected points rounded to 1 decimal
+        # Show total projected points per gameweek (not per fixture)
         df["proj_pts"] = df["projected_points"].round(1)
 
         return df
