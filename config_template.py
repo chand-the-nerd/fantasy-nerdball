@@ -15,7 +15,12 @@ class Config:
     ACCEPT_TRANSFER_PENALTY = False
     # Set to False to include unavailable players in optimisation
     EXCLUDE_UNAVAILABLE = True
-    WILDCARD = False
+
+    # === TOKENS ===
+    WILDCARD = False # Set to True when either Wildcard or Free Hit is used
+    FREE_HIT_PREV_GW = False # Set to True if you used Free Hit prev gameweek
+    BENCH_BOOST = False
+    TRIPLE_CAPTAIN = False
 
     # === TRANSFER EFFICIENCY SETTINGS ===
     # Minimum FPL score improvement per transfer required

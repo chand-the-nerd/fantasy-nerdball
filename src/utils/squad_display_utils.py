@@ -48,11 +48,10 @@ class SquadDisplayUtils:
         )
         return pd.concat([gk_bench, non_gk_bench], ignore_index=True)
     
-    def apply_captain_and_vice(
-            self,
-            starting_df: pd.DataFrame) -> pd.DataFrame:
+    def apply_captain_and_vice(self, starting_df: pd.DataFrame) -> pd.DataFrame:
         """
         Apply captain and vice-captain designations to starting XI.
+        Enhanced to support Triple Captain chip.
         
         Args:
             starting_df (pd.DataFrame): Starting XI dataframe
@@ -72,14 +71,19 @@ class SquadDisplayUtils:
             captain_idx = top_two_idx[0]
             df.loc[captain_idx, "display_name"] += " (C)"
             
-            # Create display column for projected points with (c)) multiplier
+            # Check for Triple Captain chip
+            captain_multiplier = 3 if self.config.TRIPLE_CAPTAIN else 2
+            captain_display = "x3" if self.config.TRIPLE_CAPTAIN else "x2"
+            
+            # Create display column for projected points with captain 
+            # multiplier
             captain_original_points = df.loc[captain_idx, "proj_pts"]
             df.loc[captain_idx, "proj_pts_display"] = (
-                f"{captain_original_points:.1f} (x2)"
+                f"{captain_original_points:.1f} ({captain_display})"
             )
             # Update actual projected_points for total calculation
             df.loc[captain_idx, "projected_points"] = (
-                captain_original_points * 2
+                captain_original_points * captain_multiplier
             )
             
         if len(top_two_idx) > 1:
