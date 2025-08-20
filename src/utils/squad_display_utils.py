@@ -112,8 +112,8 @@ class SquadDisplayUtils:
         
         df = starting_df.copy()
         
-        # Find top two players by projected points
-        top_two_idx = df["proj_pts"].nlargest(2).index
+        # Find top two players by projected points (total, not per-fixture)
+        top_two_idx = df["projected_points"].nlargest(2).index
         
         if len(top_two_idx) > 0:
             captain_idx = top_two_idx[0]
@@ -125,7 +125,7 @@ class SquadDisplayUtils:
             
             # Create display column for projected points with captain 
             # multiplier
-            captain_original_points = df.loc[captain_idx, "proj_pts"]
+            captain_original_points = df.loc[captain_idx, "projected_points"]
             df.loc[captain_idx, "proj_pts_display"] = (
                 f"{captain_original_points:.1f} ({captain_display})"
             )
@@ -139,12 +139,12 @@ class SquadDisplayUtils:
 
         # Create display column for non-captain players
         if "proj_pts_display" not in df.columns:
-            df["proj_pts_display"] = df["proj_pts"].round(1).astype(str)
+            df["proj_pts_display"] = df["projected_points"].round(1).astype(str)
         else:
             # Fill in non-captain players
             mask = df["proj_pts_display"].isna()
             df.loc[mask, "proj_pts_display"] = (
-                df.loc[mask, "proj_pts"].round(1).astype(str)
+                df.loc[mask, "projected_points"].round(1).astype(str)
             )
         
         return df

@@ -68,20 +68,7 @@ class PointsCalculator:
         df["reliability"] = (
             df["current_reliability"] * 100).round(0).astype(int)
         
-        # For proj_pts display, show per-fixture points for easier comparison
-        # This makes it clear how much each fixture is worth
-        if "projected_points_per_fixture" in df.columns:
-            df["proj_pts"] = df["projected_points_per_fixture"].round(1)
-        else:
-            # Fallback: if we don't have per-fixture, calculate it
-            if "fixture_multiplier" in df.columns:
-                # Reverse engineer per-fixture points
-                df["proj_pts"] = (
-                    df["projected_points"] / 
-                    df["fixture_multiplier"].clip(lower=0.1)  # Avoid division by 0
-                ).round(1)
-            else:
-                # Last resort: use total projected points
-                df["proj_pts"] = df["projected_points"].round(1)
+        # Show total projected points per gameweek (not per fixture)
+        df["proj_pts"] = df["projected_points"].round(1)
 
         return df
