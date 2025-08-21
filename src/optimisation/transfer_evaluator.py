@@ -38,13 +38,52 @@ class TransferEvaluator:
         
         return unavailable_ids
     
+    def _calculate_hypothetical_projected_points(
+            self, player_row: pd.Series) -> float:
+        """
+        Calculate what a player's projected points would be if they were 
+        available. This recreates the calculation from ScoringEngine but skips
+        availability filters.
+        
+        Args:
+            player_row (pd.Series): Player data row
+            
+        Returns:
+            float: Hypothetical projected points if player was available
+        """
+        # Get the player's position for baseline points
+        position = player_row.get("position", "MID")
+        baseline_points = self.config.BASELINE_POINTS_PER_GAME.get(
+            position, 4.0)
+        
+        # Get the base quality score (this should still be calculated normally)
+        base_quality = player_row.get("base_quality", 0.0)
+        
+        # Convert base quality to points adjustment
+        points_adjustment = (
+            base_quality * self.config.FPL_SCORE_TO_POINTS_MULTIPLIER
+        )
+        
+        # Calculate hypothetical projected points
+        hypothetical_points = baseline_points + points_adjustment
+        
+        # Ensure minimum of 1 point
+        hypothetical_points = max(1.0, hypothetical_points)
+        
+        # Apply fixture multiplier if present
+        fixture_multiplier = player_row.get("fixture_multiplier", 1.0)
+        if pd.notna(fixture_multiplier) and fixture_multiplier > 0:
+            hypothetical_points *= fixture_multiplier
+        
+        return hypothetical_points
+    
     def evaluate_substitute_vs_transfer(
         self, df: pd.DataFrame, prev_squad_ids: list, 
         unavailable_player_ids: list, free_transfers: int
     ) -> dict:
         """
         Evaluate whether to substitute unavailable players or transfer them 
-        out.
+        out using previous gameweek's squad data.
 
         Args:
             df (pd.DataFrame): Current player database with scores
@@ -62,13 +101,25 @@ class TransferEvaluator:
                 "reason": "No unavailable players or no previous squad",
             }
 
-        # Get previous squad dataframe
+        # Load previous gameweek squad CSV
+        prev_gw = self.config.GAMEWEEK - 1
+        prev_squad_file = f"squads/gw{prev_gw}/full_squad_simple.csv"
+        
+        try:
+            import os
+            import pandas as pd
+            if not os.path.exists(prev_squad_file):
+                return self._fallback_substitute_analysis()
+            
+            prev_squad_csv = pd.read_csv(prev_squad_file)
+            
+        except Exception as e:
+            return self._fallback_substitute_analysis()
+
+        # Get current player data
         prev_squad_df = df[df["id"].isin(prev_squad_ids)].copy()
         unavailable_df = prev_squad_df[
             prev_squad_df["id"].isin(unavailable_player_ids)
-        ]
-        available_df = prev_squad_df[
-            ~prev_squad_df["id"].isin(unavailable_player_ids)
         ]
 
         print(f"\n=== Substitute vs Transfer Analysis ===")
@@ -78,58 +129,103 @@ class TransferEvaluator:
                   f"({player['position']}, {player['team']})")
 
         substitute_scenarios = []
-
+        
         for _, unavailable_player in unavailable_df.iterrows():
-            pos = unavailable_player["position"]
-
-            # Find potential substitutes from bench
-            potential_subs = available_df[
-                (available_df["id"] != unavailable_player["id"])
-                & (available_df["status"] == "a")
-            ].copy()
-
-            if len(potential_subs) == 0:
-                # Convert to per-gameweek for display
-                unavailable_ppgw = (unavailable_player["projected_points"] / 
-                                  self.config.FIRST_N_GAMEWEEKS)
+            hypothetical_total_points = (
+                self._calculate_hypothetical_projected_points(
+                unavailable_player)
+            )
+            unavailable_ppgw = (
+                hypothetical_total_points / self.config.FIRST_N_GAMEWEEKS
+            )
+            
+            # Find best substitute from bench
+            best_substitute = self._find_best_bench_substitute(
+                unavailable_player, prev_squad_csv, prev_squad_df
+            )
+            
+            if best_substitute is None:
                 substitute_scenarios.append({
                     "unavailable_player": unavailable_player["display_name"],
-                    "position": pos,
+                    "position": unavailable_player["position"],
                     "unavailable_score": unavailable_ppgw,
-                    "best_substitute": None,
+                    "best_substitute": "No suitable substitute",
                     "substitute_score": 0,
                     "score_loss": unavailable_ppgw,
                     "recommendation": "transfer",
                 })
-                continue
-
-            # Find best substitute (highest projected points available player)
-            best_sub = potential_subs.loc[
-                potential_subs["projected_points"].idxmax()
-            ]
-            
-            # Convert to per-gameweek for comparison
-            unavailable_ppgw = (unavailable_player["projected_points"] / 
-                              self.config.FIRST_N_GAMEWEEKS)
-            substitute_ppgw = (best_sub["projected_points"] / 
-                             self.config.FIRST_N_GAMEWEEKS)
-            score_loss = unavailable_ppgw - substitute_ppgw
-
-            substitute_scenarios.append({
-                "unavailable_player": unavailable_player["display_name"],
-                "position": pos,
-                "unavailable_score": unavailable_ppgw,
-                "best_substitute": best_sub["display_name"],
-                "substitute_score": substitute_ppgw,
-                "score_loss": score_loss,
-                "recommendation": (
-                    "substitute" if score_loss < 2.0 else "consider_transfer"
-                ),
-            })
+            else:
+                substitute_ppgw = (best_substitute["projected_points"] / 
+                                 self.config.FIRST_N_GAMEWEEKS)
+                
+                unavailable_rounded = round(unavailable_ppgw, 1)
+                substitute_rounded = round(substitute_ppgw, 1)
+                score_loss = unavailable_rounded - substitute_rounded
+                
+                substitute_scenarios.append({
+                    "unavailable_player": unavailable_player["display_name"],
+                    "position": unavailable_player["position"],
+                    "unavailable_score": unavailable_rounded,
+                    "best_substitute": (f"{best_substitute['display_name']} "
+                                      f"({best_substitute['position']})"),
+                    "substitute_score": substitute_rounded,
+                    "score_loss": score_loss,
+                    "recommendation": (
+                        "substitute" if score_loss < 2.0
+                        else "consider_transfer"
+                    ),
+                })
 
         return self._evaluate_substitution_strategy(
             substitute_scenarios, free_transfers
         )
+    
+    def _find_best_bench_substitute(self, unavailable_player: pd.Series,
+                                  prev_squad_csv: pd.DataFrame,
+                                  prev_squad_df: pd.DataFrame) -> pd.Series:
+        """Find the best substitute from bench players."""
+        
+        # Get bench players from CSV
+        bench_csv = prev_squad_csv[prev_squad_csv['squad_role'] == 'Bench']
+        
+        # Find bench players in current data who are available
+        available_bench_players = []
+        
+        for _, bench_player_csv in bench_csv.iterrows():
+            # Clean player name (remove captain/vice markers)
+            player_name = bench_player_csv[
+                'player'].replace(' (C)', '').replace(' (V)', '')
+            
+            # Find matching player in current data
+            matching_players = prev_squad_df[
+                prev_squad_df['display_name'].str.lower().str.contains(
+                    player_name.lower(), na=False, regex=False
+                )
+            ]
+            
+            for _, matching_player in matching_players.iterrows():
+                if matching_player["status"] == "a":  # Available to play
+                    available_bench_players.append(matching_player)
+                    break  # Only add once
+        
+        if not available_bench_players:
+            return None
+        
+        # Convert to DataFrame and find highest projected points
+        bench_df = pd.DataFrame(available_bench_players)
+        bench_df = bench_df.drop_duplicates(subset=['id'])
+        
+        # Return player with highest projected points
+        return bench_df.loc[bench_df["projected_points"].idxmax()]
+    
+    def _fallback_substitute_analysis(self) -> dict:
+        """Fallback analysis when CSV data is not available."""
+        return {
+            "recommendation": "transfer",
+            "reason": "Cannot determine previous squad composition, "
+                     "recommend transfers",
+            "scenarios": []
+        }
     
     def _evaluate_substitution_strategy(self, substitute_scenarios: list, 
                                       free_transfers: int) -> dict:
@@ -143,14 +239,17 @@ class TransferEvaluator:
         Returns:
             dict: Strategy recommendation
         """
-        # Calculate total impact of substitutions
+        # Calculate total impact of substitutions (already in ppgw)
         total_score_loss = sum(scenario["score_loss"] 
                              for scenario in substitute_scenarios)
         forced_transfers = len(
             [s for s in substitute_scenarios if s["best_substitute"] is None]
         )
 
-        # Decision logic based on projected points
+        # Use MIN_TRANSFER_VALUE directly (already per-gameweek)
+        threshold_ppgw = self.config.MIN_TRANSFER_VALUE
+
+        # Decision logic based on projected points per gameweek
         if forced_transfers > free_transfers:
             decision = {
                 "recommendation": "wildcard_needed",
@@ -159,12 +258,11 @@ class TransferEvaluator:
                 "total_score_loss": total_score_loss,
                 "scenarios": substitute_scenarios,
             }
-        elif total_score_loss > self.config.MIN_TRANSFER_VALUE:
+        elif total_score_loss > threshold_ppgw:
             decision = {
                 "recommendation": "make_transfers",
                 "reason": (f"Score loss ({total_score_loss:.1f}) exceeds "
-                          f"transfer threshold "
-                          f"({self.config.MIN_TRANSFER_VALUE})"),
+                          f"transfer threshold ({threshold_ppgw:.1f})"),
                 "total_score_loss": total_score_loss,
                 "scenarios": substitute_scenarios,
             }
@@ -180,29 +278,35 @@ class TransferEvaluator:
         self._print_substitution_analysis(
             substitute_scenarios,
             total_score_loss, 
-            decision
+            decision,
+            threshold_ppgw
         )
         return decision
     
     def _print_substitution_analysis(self, substitute_scenarios: list, 
-                                   total_score_loss: float, decision: dict):
-        """Print substitution analysis to console."""
+                                   total_score_loss: float, decision: dict,
+                                   threshold_ppgw: float):
+        """Print substitution analysis to console with ppgw values."""
         print(f"\nSubstitution scenarios:")
         for scenario in substitute_scenarios:
             if scenario["best_substitute"]:
-                print(f"  {scenario['unavailable_player']} → "
-                      f"{scenario['best_substitute']} "
-                      f"(score loss: {scenario['score_loss']:.1f} pts)")
+                print(f"  {scenario['unavailable_player']} "
+                      f"(projected points {scenario['unavailable_score']:.1f})"
+                       f" → {scenario['best_substitute']} "
+                      f"(projected points {scenario['substitute_score']:.1f})")
             else:
                 print(f"  {scenario['unavailable_player']} → "
                       f"NO SUBSTITUTE AVAILABLE (must transfer)")
 
-        print(f"\nTotal score loss from substitutions: "
-              f"{total_score_loss:.1f} pts")
-        print("(note that negative score loss is good)")
-        print(f"Transfer threshold: {self.config.MIN_TRANSFER_VALUE} pts")
-        print(f"Recommendation: {decision['recommendation'].upper()}")
-        print(f"Reason: {decision['reason']}")
+        # Display total score loss - show "NONE" if negative (beneficial)
+        if total_score_loss < 0:
+            print(f"Total score loss from substitutions: NONE")
+        else:
+            print(f"\nTotal score loss from substitutions: "
+                  f"{total_score_loss:.1f}")
+            
+        print(f"Transfer threshold: {threshold_ppgw:.1f}")
+
     
     def _calculate_minimum_transfers_needed(self, forced_selections: dict, 
                                           prev_squad_ids: list, 
@@ -731,8 +835,6 @@ class TransferEvaluator:
             ~full_no_transfer_squad["id"].isin(starting["id"])
         ].copy()
 
-        # Order bench properly: GK first, then by descending projected points
-        gk_bench = bench[bench["position"] == "GK"].copy()
         # Order bench properly: GK first, then by descending projected points
         gk_bench = bench[bench["position"] == "GK"].copy()
         non_gk_bench = bench[bench["position"] != "GK"].copy()
