@@ -4,6 +4,10 @@ Fantasy Nerdball is an advanced Fantasy Premier League (FPL) squad optimisation 
 
 ## How It Works
 
+**Concise vs Verbose Outputs**:
+- In `config.py` (see more below), set `GRANULAR_OUTPUT = False` for a summary document for your FPL strategy.
+- Set `GRANULAR_OUTPUT = True` to show an detailed report to support your FPL strategy.
+
 ### Player Selection Criteria
 
 The tool evaluates every player using a sophisticated scoring system that combines multiple data sources with **user-determined custom weighting**:
@@ -181,11 +185,14 @@ class Config:
     """Configuration class containing all settings for the FPL optimisation."""
     
     # === BASIC SETTINGS ===
-    GAMEWEEK = 1  # Current gameweek number
+    GAMEWEEK = 1
     BUDGET = 100.0  # Will be overridden by value of squad from prev gameweek
-    FREE_TRANSFERS = 1  # How many free transfers you have
-    ACCEPT_TRANSFER_PENALTY = False  # Set to True to consider extra transfers
-    EXCLUDE_UNAVAILABLE = True  # Set to False to include injured players
+    FREE_TRANSFERS = 0
+    ACCEPT_TRANSFER_PENALTY = True
+    # Set to False to include unavailable players in optimisation
+    EXCLUDE_UNAVAILABLE = True
+    # Set to True for detailed technical output, False for clean summary
+    GRANULAR_OUTPUT = False
 
     # === TOKENS ===
     WILDCARD = False  # Set to True when either Wildcard or Free Hit is used
