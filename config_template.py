@@ -46,6 +46,13 @@ class Config:
     # How many upcoming fixtures' difficulty to consider
     FIRST_N_GAMEWEEKS = 5
 
+    # === FIXTURE DIFFICULTY DECAY SETTINGS ===
+    # Controls how much future fixtures are discounted relative to immediate ones
+    # 0.6 means each subsequent gameweek is weighted 60% of the previous
+    # Lower values = more emphasis on immediate fixtures
+    # Higher values = more balanced weighting across all fixtures
+    FIXTURE_DECAY_FACTOR = 0.8
+
     # === SCORING WEIGHTS ===
     # These should total 1.0
     FORM_WEIGHT = 0.4      # Importance of current season average

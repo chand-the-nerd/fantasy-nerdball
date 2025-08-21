@@ -1,4 +1,5 @@
-"""Module for managing fixture data and difficulty calculations."""
+"""Module for managing fixture data and difficulty calculations with 
+decaying weights."""
 
 import os
 import pandas as pd
@@ -12,12 +13,44 @@ class FixtureManager:
         self.config = config
         self.fpl_client = FPLClient()
     
+    def _calculate_decay_weights(self, num_gameweeks: int) -> list:
+        """
+        Calculate decaying weights for fixtures.
+        
+        Args:
+            num_gameweeks (int): Number of gameweeks to weight
+            
+        Returns:
+            list: Weights that decay exponentially, summing to 1.0
+        """
+        if num_gameweeks <= 0:
+            return []
+        
+        if num_gameweeks == 1:
+            return [1.0]
+        
+        # Use exponential decay: weight = decay_factor^(position-1)
+        # where position starts at 1 for immediate gameweek
+        decay_factor = getattr(self.config, 'FIXTURE_DECAY_FACTOR', 0.6)
+        
+        raw_weights = []
+        for i in range(num_gameweeks):
+            weight = decay_factor ** i
+            raw_weights.append(weight)
+        
+        # Normalise to sum to 1.0
+        total_weight = sum(raw_weights)
+        normalised_weights = [w / total_weight for w in raw_weights]
+        
+        return normalised_weights
+    
     def fetch_player_fixture_difficulty(self, first_n_gws: int, 
                                       players: pd.DataFrame, 
                                       starting_gameweek: int) -> pd.DataFrame:
         """
-        Calculate fixture difficulty for each player over the next N gameweeks,
-        with proper DGW/BGW detection.
+        Calculate fixture difficulty for each player over the next N 
+        gameweeks, with proper DGW/BGW detection and decaying weights for 
+        future fixtures.
 
         Args:
             first_n_gws (int): Number of gameweeks to consider for fixture 
@@ -27,7 +60,8 @@ class FixtureManager:
             starting_gameweek (int): The gameweek to start calculating from.
 
         Returns:
-            pd.DataFrame: DataFrame with name_key, fixture info, and DGW flags.
+            pd.DataFrame: DataFrame with name_key, fixture info, and DGW 
+                         flags.
         """
         fixtures = pd.DataFrame(self.fpl_client.get_fixtures())
 
@@ -48,9 +82,11 @@ class FixtureManager:
             fixtures["event"], errors="coerce") <= end_gameweek)
         ]
 
-        # Calculate player difficulties with DGW/BGW detection
-        return self._calculate_player_difficulties_with_dgw_detection(
-            fixtures, players, teams_df, starting_gameweek, end_gameweek
+        # Calculate player difficulties with DGW/BGW detection and decay 
+        # weights
+        return self._calculate_player_difficulties_with_dgw_detection_and_decay(
+            fixtures, players, teams_df, starting_gameweek, end_gameweek, 
+            first_n_gws
         )
     
     def _save_fixture_data(
@@ -120,36 +156,48 @@ class FixtureManager:
         os.makedirs("data", exist_ok=True)
         fixtures_csv.to_csv("data/fixtures.csv", index=False)
     
-    def _calculate_player_difficulties_with_dgw_detection(
+    def _calculate_player_difficulties_with_dgw_detection_and_decay(
             self, fixtures: pd.DataFrame, players: pd.DataFrame, 
             teams_df: pd.DataFrame, starting_gameweek: int, 
-            end_gameweek: int) -> pd.DataFrame:
+            end_gameweek: int, num_gameweeks: int) -> pd.DataFrame:
         """
-        Calculate player difficulties using clean DGW/BGW detection logic.
+        Calculate player difficulties using clean DGW/BGW detection logic 
+        and decaying weights for future fixtures.
         """
+        # Calculate decay weights
+        decay_weights = self._calculate_decay_weights(num_gameweeks)
+        
         # Detect DGW/BGW teams across the gameweek range
         dgw_bgw_info = self._detect_dgw_bgw_teams(
             fixtures, teams_df, starting_gameweek, end_gameweek
         )
         
-        # Calculate standard fixture difficulties
+        # Calculate weighted fixture difficulties
         player_diffs = []
-        for _, fixture_row in fixtures.iterrows():
-            for home_away, team_col, diff_col in [
-                ("home", "team_h", "team_h_difficulty"),
-                ("away", "team_a", "team_a_difficulty"),
-            ]:
-                team_id = fixture_row[team_col]
-                diff = fixture_row[diff_col]
-                
-                # Get players for this team
-                team_players = players[players["team_id"] == team_id]
-                for _, player_row in team_players.iterrows():
-                    player_diffs.append({
-                        "name_key": player_row["name_key"],
-                        "team_id": team_id,
-                        "diff": diff
-                    })
+        
+        # Group fixtures by gameweek for weight application
+        for gw_offset, weight in enumerate(decay_weights):
+            current_gw = starting_gameweek + gw_offset
+            gw_fixtures = fixtures[fixtures["event"] == current_gw]
+            
+            for _, fixture_row in gw_fixtures.iterrows():
+                for home_away, team_col, diff_col in [
+                    ("home", "team_h", "team_h_difficulty"),
+                    ("away", "team_a", "team_a_difficulty"),
+                ]:
+                    team_id = fixture_row[team_col]
+                    diff = fixture_row[diff_col]
+                    
+                    # Get players for this team
+                    team_players = players[players["team_id"] == team_id]
+                    for _, player_row in team_players.iterrows():
+                        player_diffs.append({
+                            "name_key": player_row["name_key"],
+                            "team_id": team_id,
+                            "gameweek": current_gw,
+                            "diff": diff,
+                            "weight": weight
+                        })
 
         if not player_diffs:
             print(f"Warning: No fixtures found for gameweeks "
@@ -160,25 +208,30 @@ class FixtureManager:
 
         df = pd.DataFrame(player_diffs)
         
-        # Calculate average difficulty per player
-        avg_diff = df.groupby("name_key", as_index=False).agg({
-            "diff": "mean",
-            "team_id": "first"  # Get team_id for each player
-        })
+        # Calculate weighted average difficulty per player
+        weighted_avg = df.groupby("name_key", group_keys=False).apply(
+            lambda group: pd.Series({
+                "diff": (group["diff"] * group["weight"]).sum() / 
+                        group["weight"].sum(),
+                "team_id": group["team_id"].iloc[0]  # All should be same team
+            }), include_groups=False
+        ).reset_index()
         
         # Add DGW/BGW information
-        avg_diff = avg_diff.merge(dgw_bgw_info, on="team_id", how="left")
-        avg_diff["has_dgw"] = avg_diff["has_dgw"].fillna(False)
-        avg_diff["has_bgw"] = avg_diff["has_bgw"].fillna(False)
-        avg_diff["fixture_multiplier"] = avg_diff["fixture_multiplier"].fillna(1.0)
+        weighted_avg = weighted_avg.merge(dgw_bgw_info, on="team_id", 
+                                        how="left")
+        weighted_avg["has_dgw"] = weighted_avg["has_dgw"].fillna(False)
+        weighted_avg["has_bgw"] = weighted_avg["has_bgw"].fillna(False)
+        weighted_avg["fixture_multiplier"] = weighted_avg[
+            "fixture_multiplier"].fillna(1.0)
         
         # Calculate fixture bonus accounting for DGW/BGW
-        avg_diff["fixture_bonus"] = (
-            (6 - avg_diff["diff"]) * avg_diff["fixture_multiplier"]
+        weighted_avg["fixture_bonus"] = (
+            (6 - weighted_avg["diff"]) * weighted_avg["fixture_multiplier"]
         )
         
-        return avg_diff[["name_key", "diff", "fixture_bonus", "has_dgw", 
-                        "has_bgw", "fixture_multiplier"]]
+        return weighted_avg[["name_key", "diff", "fixture_bonus", "has_dgw", 
+                            "has_bgw", "fixture_multiplier"]]
     
     def _detect_dgw_bgw_teams(self, fixtures: pd.DataFrame, teams_df: pd.DataFrame,
                              starting_gameweek: int, end_gameweek: int) -> pd.DataFrame:
@@ -262,12 +315,14 @@ class FixtureManager:
         bgw_teams = team_summary[team_summary["has_bgw"] == True]
         
         if len(dgw_teams) > 0:
-            team_names = teams_df[teams_df["id"].isin(dgw_teams["team_id"])]["name"].tolist()
+            team_names = teams_df[teams_df["id"].isin(
+                dgw_teams["team_id"])]["name"].tolist()
             print(f"DGW teams in GW{starting_gameweek}-{end_gameweek}: "
                   f"{', '.join(team_names)}")
         
         if len(bgw_teams) > 0:
-            team_names = teams_df[teams_df["id"].isin(bgw_teams["team_id"])]["name"].tolist()
+            team_names = teams_df[teams_df["id"].isin(
+                bgw_teams["team_id"])]["name"].tolist()
             print(f"BGW teams in GW{starting_gameweek}-{end_gameweek}: "
                   f"{', '.join(team_names)}")
         
@@ -295,7 +350,8 @@ class FixtureManager:
         gw_fixtures = fixtures[fixtures["event"] == target_gameweek]
         
         if gw_fixtures.empty:
-            print(f"Warning: No fixtures found for gameweek {target_gameweek}")
+            print(f"Warning: No fixtures found for gameweek "
+                  f"{target_gameweek}")
             return self._add_empty_fixture_info(df)
 
         # Detect DGW/BGW for this specific gameweek
@@ -420,8 +476,8 @@ class FixtureManager:
 
         # Merge with original dataframe
         df = df.merge(
-            nf_df[["name_key", "next_opponent", "venue", "fixture_difficulty", 
-                   "has_dgw_next", "has_bgw_next"]],
+            nf_df[["name_key", "next_opponent", "venue", 
+                   "fixture_difficulty", "has_dgw_next", "has_bgw_next"]],
             on="name_key",
             how="left",
         )
