@@ -70,14 +70,16 @@ class SquadSelector:
         status = prob.solve(pulp.PULP_CBC_CMD(msg=0))
 
         if status != pulp.LpStatusOptimal:
-            print(f"Optimisation failed with status: {pulp.LpStatus[status]}")
+            if self.config.GRANULAR_OUTPUT:
+                print(f"Optimisation failed with status: {pulp.LpStatus[status]}")
             return pd.DataFrame(), pd.DataFrame(), None
 
         # Extract and process results
         squad = self._extract_solution(df, x, y, n)
         
-        # Display transfer information if requested
-        if prev_squad_ids is not None and show_transfer_summary:
+        # Display transfer information if requested and in granular mode
+        if (prev_squad_ids is not None and show_transfer_summary 
+            and self.config.GRANULAR_OUTPUT):
             self._display_transfer_summary(squad, prev_squad_ids, df, 
                                          free_transfers)
 
@@ -222,7 +224,8 @@ class SquadSelector:
             prob += prev_players_kept >= min_players_to_keep
 
         elif self.config.WILDCARD and prev_squad_ids is not None:
-            print("🃏 WILDCARD ACTIVE: No transfer constraints applied")
+            if self.config.GRANULAR_OUTPUT:
+                print("🃏 WILDCARD ACTIVE: No transfer constraints applied")
     
     def _add_bench_constraints(self, prob: pulp.LpProblem, x: list, y: list,
                              df: pd.DataFrame, n: int):

@@ -122,11 +122,12 @@ class TransferEvaluator:
             prev_squad_df["id"].isin(unavailable_player_ids)
         ]
 
-        print(f"\n=== Substitute vs Transfer Analysis ===")
-        print(f"Unavailable players: {len(unavailable_df)}")
-        for _, player in unavailable_df.iterrows():
-            print(f"  - {player['display_name']} "
-                  f"({player['position']}, {player['team']})")
+        if self.config.GRANULAR_OUTPUT:
+            print(f"\n=== Substitute vs Transfer Analysis ===")
+            print(f"Unavailable players: {len(unavailable_df)}")
+            for _, player in unavailable_df.iterrows():
+                print(f"  - {player['display_name']} "
+                      f"({player['position']}, {player['team']})")
 
         substitute_scenarios = []
         
@@ -275,12 +276,13 @@ class TransferEvaluator:
                 "scenarios": substitute_scenarios,
             }
 
-        self._print_substitution_analysis(
-            substitute_scenarios,
-            total_score_loss, 
-            decision,
-            threshold_ppgw
-        )
+        if self.config.GRANULAR_OUTPUT:
+            self._print_substitution_analysis(
+                substitute_scenarios,
+                total_score_loss, 
+                decision,
+                threshold_ppgw
+            )
         return decision
     
     def _print_substitution_analysis(self, substitute_scenarios: list, 
@@ -374,9 +376,10 @@ class TransferEvaluator:
             )
             return starting, bench, forced_display, 0, 0
         
-        print(f"\n=== TRANSFER ANALYSIS ===")
-        print(f"\n🔄 Evaluating all transfer scenarios up to "
-              f"{free_transfers + 3} transfers...")
+        if self.config.GRANULAR_OUTPUT:
+            print(f"\n=== TRANSFER ANALYSIS ===")
+            print(f"\nEvaluating all transfer scenarios up to "
+                  f"{free_transfers + 3} transfers...")
         
         scenarios = self._evaluate_transfer_scenarios(
             df, forced_selections, prev_squad_ids, free_transfers, 
@@ -384,7 +387,8 @@ class TransferEvaluator:
         )
         
         if not scenarios:
-            print("❌ No valid scenarios found")
+            if self.config.GRANULAR_OUTPUT:
+                print("No valid scenarios found")
             return pd.DataFrame(), pd.DataFrame(), None, 0, 0
         
         return self._select_best_scenario(scenarios, free_transfers, df)
@@ -409,8 +413,8 @@ class TransferEvaluator:
         max_transfers_to_test = free_transfers + 3
         start_transfers = min_transfers_needed
         
-        if min_transfers_needed > 0:
-            print(f"📋 Forced selections require minimum "
+        if min_transfers_needed > 0 and self.config.GRANULAR_OUTPUT:
+            print(f"Forced selections require minimum "
                   f"{min_transfers_needed} transfer(s)")
         
         for max_transfers_allowed in range(start_transfers, 
@@ -422,7 +426,8 @@ class TransferEvaluator:
             
             if scenario:
                 scenarios.append(scenario)
-                self._print_scenario_result(scenario)
+                if self.config.GRANULAR_OUTPUT:
+                    self._print_scenario_result(scenario)
         
         return scenarios
     
@@ -501,13 +506,14 @@ class TransferEvaluator:
             in_names.append(player["display_name"])
         
         if out_names and in_names:
-            return (f" (🔄 OUT: {', '.join(out_names)} → "
+            return (f" (OUT: {', '.join(out_names)} → "
                    f"IN: {', '.join(in_names)})")
         
         return ""
     
     def _print_scenario_result(self, scenario: dict):
-        """Print the result of a transfer scenario showing ppgw as 'projected points'."""
+        """Print the result of a transfer scenario showing ppgw as 
+        'projected points'."""
         actual_transfers = scenario['actual_transfers']
         extra_transfers = scenario['extra_transfers']
         penalty_points = scenario['penalty_points']
@@ -517,13 +523,13 @@ class TransferEvaluator:
         max_transfers_allowed = scenario['max_transfers_allowed']
         
         if actual_transfers == 0:
-            emoji = "🏠"
+            prefix = "  Scenario"
         elif extra_transfers == 0:
-            emoji = "✅"
+            prefix = "  Scenario"
         else:
-            emoji = "💰"
+            prefix = "  Scenario"
         
-        print(f"  {emoji} Scenario {max_transfers_allowed}: "
+        print(f"{prefix} {max_transfers_allowed}: "
               f"{actual_transfers} transfers, {extra_transfers} extra, "
               f"penalty: -{penalty_points}, projected points: "
               f"{starting_ppgw:.1f}, net: {net_ppgw:.1f}"
@@ -540,19 +546,24 @@ class TransferEvaluator:
         baseline_scenario = self._get_baseline_scenario(scenarios)
         
         if baseline_scenario is None:
-            print("❌ No baseline scenario found")
+            if self.config.GRANULAR_OUTPUT:
+                print("No baseline scenario found")
             return pd.DataFrame(), pd.DataFrame(), None, 0, 0
         
-        print(f"\n🎯 Best scenario analysis:")
-        print(f"   Tested {len(scenarios)} different transfer limits")
-        
-        # Show top 3 scenarios for comparison
-        self._print_top_scenarios(scenarios, best_scenario)
+        if self.config.GRANULAR_OUTPUT:
+            print(f"\nBest scenario analysis:")
+            print(f"   Tested {len(scenarios)} different transfer limits")
+            
+            # Show top 3 scenarios for comparison
+            self._print_top_scenarios(scenarios, best_scenario)
         
         # Apply MIN_TRANSFER_VALUE threshold check (per gameweek basis)
         best_scenario = self._apply_value_threshold(
             best_scenario, baseline_scenario
         )
+        
+        # Store the best scenario for later access
+        self._last_best_scenario = best_scenario
         
         # Extract and display final solution
         return self._extract_final_solution(
@@ -577,13 +588,15 @@ class TransferEvaluator:
         top_scenarios = sorted(scenarios, key=lambda x: x['net_ppgw'], 
                              reverse=True)[:3]
         for i, scenario in enumerate(top_scenarios, 1):
-            status = " ⭐ BEST" if scenario == best_scenario else ""
+            status = " BEST" if scenario == best_scenario else ""
             print(f"   #{i}: {scenario['actual_transfers']} transfers → "
                   f"Net: {scenario['net_ppgw']:.1f} points{status}")
     
     def _apply_value_threshold(self, best_scenario: dict, 
                              baseline_scenario: dict) -> dict:
         """Apply MIN_TRANSFER_VALUE threshold check using ppgw directly."""
+        improvement_ppgw = 0  # Default value
+        
         if (best_scenario['actual_transfers'] > 
             baseline_scenario['actual_transfers']):
             baseline_ppgw = baseline_scenario['net_ppgw']
@@ -597,40 +610,50 @@ class TransferEvaluator:
             # Use MIN_TRANSFER_VALUE directly (already per-gameweek)
             threshold_ppgw = self.config.MIN_TRANSFER_VALUE
             
-            print(f"\n📊 Transfer Value Check (per gameweek basis):")
-            print(f"   Baseline ({baseline_scenario['actual_transfers']} "
-                  f"transfers): {baseline_ppgw:.1f} points")
-            print(f"   Best scenario ({best_scenario['actual_transfers']} "
-                  f"transfers): {best_ppgw:.1f} points")
-            print(f"   Improvement: {improvement_ppgw:.1f} points per gameweek")
-            print(f"   Extra transfers for improvement: "
-                  f"{extra_transfers_for_improvement}")
-            print(f"   Improvement per extra transfer: "
-                  f"{improvement_ppgw/extra_transfers_for_improvement:.1f} "
-                  f"points per gameweek")
-            print(f"   Minimum threshold: {threshold_ppgw:.1f} "
-                  f"points per gameweek")
+            if self.config.GRANULAR_OUTPUT:
+                print(f"\nTransfer Value Check (per gameweek basis):")
+                print(f"   Baseline ({baseline_scenario['actual_transfers']} "
+                      f"transfers): {baseline_ppgw:.1f} points")
+                print(f"   Best scenario ({best_scenario['actual_transfers']} "
+                      f"transfers): {best_ppgw:.1f} points")
+                print(
+                    f"   Improvement: {improvement_ppgw:.1f} points per gameweek")
+                print(f"   Extra transfers for improvement: "
+                      f"{extra_transfers_for_improvement}")
+                print(f"   Improvement per extra transfer: "
+                      f"{improvement_ppgw/extra_transfers_for_improvement:.1f} "
+                      f"points per gameweek")
+                print(f"   Minimum threshold: {threshold_ppgw:.1f} "
+                      f"points per gameweek")
             
             required_improvement_ppgw = (
                 threshold_ppgw * extra_transfers_for_improvement
             )
             
             if improvement_ppgw < required_improvement_ppgw:
-                print(f"   ❌ INSUFFICIENT VALUE GAINED: Using baseline "
-                      f"({baseline_scenario['actual_transfers']} transfers) "
-                      "instead")
+                if self.config.GRANULAR_OUTPUT:
+                    print(f"   INSUFFICIENT VALUE GAINED: Using baseline "
+                          f"({baseline_scenario['actual_transfers']} transfers) "
+                          "instead")
                 best_scenario = baseline_scenario
-                print(f"   ⭐ SELECTED: {best_scenario['actual_transfers']} "
-                      f"transfers → {best_scenario['net_ppgw']:.1f} points")
+                if self.config.GRANULAR_OUTPUT:
+                    print(f"   SELECTED: {best_scenario['actual_transfers']} "
+                          f"transfers → {best_scenario['net_ppgw']:.1f} points")
             else:
-                print(f"   ✅ SUFFICIENT VALUE: Extra transfers worthwhile")
-                print(f"   ⭐ SELECTED: {best_scenario['actual_transfers']} "
-                      f"transfers → {best_scenario['net_ppgw']:.1f} points")
+                if self.config.GRANULAR_OUTPUT:
+                    print(f"   SUFFICIENT VALUE: Extra transfers worthwhile")
+                    print(f"   SELECTED: {best_scenario['actual_transfers']} "
+                          f"transfers → {best_scenario['net_ppgw']:.1f} points")
         else:
-            print(f"\n📊 Using optimal scenario with "
-                  f"{best_scenario['actual_transfers']} transfers")
-            print(f"   ⭐ SELECTED: {best_scenario['actual_transfers']} "
-                  f"transfers → {best_scenario['net_ppgw']:.1f} points")
+            if self.config.GRANULAR_OUTPUT:
+                print(f"\nUsing optimal scenario with "
+                      f"{best_scenario['actual_transfers']} transfers")
+                print(f"   SELECTED: {best_scenario['actual_transfers']} "
+                      f"transfers → {best_scenario['net_ppgw']:.1f} points")
+        
+        # Store the improvement data in the scenario for later use
+        best_scenario['points_improvement_ppgw'] = improvement_ppgw
+        best_scenario['gameweeks_analysed'] = self.config.FIRST_N_GAMEWEEKS
         
         return best_scenario
     
@@ -644,9 +667,10 @@ class TransferEvaluator:
         best_forced_display = best_scenario['forced_display']
         
         # Show final transfer summary
-        self._print_final_transfer_summary(
-            best_transfers, free_transfers, best_penalty, best_scenario, df
-        )
+        if self.config.GRANULAR_OUTPUT:
+            self._print_final_transfer_summary(
+                best_transfers, free_transfers, best_penalty, best_scenario, df
+            )
         
         return (starting, bench, best_forced_display, 
                 best_transfers, best_penalty)
@@ -729,8 +753,8 @@ class TransferEvaluator:
             return False, {
                 **analysis,
                 "reason": (f"Improvement ({points_improvement_ppgw:.1f} ppgw) "
-                          f"below threshold ({min_improvement_needed_ppgw:.1f} "
-                          f"ppgw)")
+                          f"below threshold ({min_improvement_needed_ppgw:.1f}"
+                          f" ppgw)")
             }
 
         return True, {
@@ -762,8 +786,9 @@ class TransferEvaluator:
         ]
 
         if len(available_prev_players) < 15:
-            print(f"Warning: Only {len(available_prev_players)} "
-                  f"previous players available")
+            if self.config.GRANULAR_OUTPUT:
+                print(f"Warning: Only {len(available_prev_players)} "
+                      f"previous players available")
             return pd.DataFrame()
 
         prev_squad_df = df[df["id"].isin(available_prev_players)].copy()
@@ -866,25 +891,41 @@ class TransferEvaluator:
         """
         # If wildcard is active, skip transfer value analysis
         if wildcard_active:
-            print(f"\n🃏 WILDCARD ACTIVE: Making {transfers_made} changes "
-                  f"without constraints")
+            if self.config.GRANULAR_OUTPUT:
+                print(f"\nWILDCARD ACTIVE: Making {transfers_made} changes "
+                      f"without constraints")
             return True, {"reason": "Wildcard active - no transfer limits"}
         
-        # If transfer penalties are accepted, always make the transfers
         if self.config.ACCEPT_TRANSFER_PENALTY:
             extra_transfers = max(0, transfers_made - free_transfers)
             penalty_points = extra_transfers * 4
-            print(f"\n✅ TRANSFER PENALTY MODE: Making {transfers_made} "
-                  "transfers")
-            if penalty_points > 0:
-                print(f"   Transfer penalty: -{penalty_points} points "
-                      f"(already factored into optimisation)")
+            
+            if self.config.GRANULAR_OUTPUT:
+                print(f"\nTRANSFER PENALTY MODE: Making {transfers_made} "
+                      "transfers")
+                if penalty_points > 0:
+                    print(f"   Transfer penalty: -{penalty_points} points "
+                          f"(already factored into optimisation)")
+            
+            # Check if we have stored improvement data from penalty analysis
+            if hasattr(self, '_last_best_scenario'):
+                scenario = self._last_best_scenario
+                return True, {
+                    "reason": ("Transfer penalty mode - "
+                               "transfers already optimised"),
+                    "points_improvement_ppgw": scenario.get(
+                    'points_improvement_ppgw', 0),
+                    "gameweeks_analysed": scenario.get(
+                    'gameweeks_analysed', self.config.FIRST_N_GAMEWEEKS)
+                }
+            
             return True, {"reason": "Transfer penalty mode - transfers "
                           "already optimised"}
         
         # If we have previous squad, evaluate whether transfers are worth it
         elif prev_squad_ids is not None and transfers_made > 0:
-            print(f"\nEvaluating transfer value...")
+            if self.config.GRANULAR_OUTPUT:
+                print(f"\nEvaluating transfer value...")
 
             # Get best squad with no transfers for comparison
             no_transfer_starting = self.get_no_transfer_squad(
@@ -898,7 +939,8 @@ class TransferEvaluator:
                     transfers_made
                 )
 
-                self._print_transfer_value_analysis(transfer_analysis)
+                if self.config.GRANULAR_OUTPUT:
+                    self._print_transfer_value_analysis(transfer_analysis)
                 return should_make_transfers, transfer_analysis
         
         return True, {}

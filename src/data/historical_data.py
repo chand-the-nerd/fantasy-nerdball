@@ -99,8 +99,9 @@ class HistoricalDataManager:
                     df[df_col], errors="coerce").fillna(0)
             else:
                 df[col_name] = 0.0
-                print(f"Warning: {df_col} not found in {season_folder}, "
-                      "using 0")
+                if self.config.GRANULAR_OUTPUT:
+                    print(f"Warning: {df_col} not found in {season_folder}, "
+                          "using 0")
         
         return df
     
@@ -567,11 +568,12 @@ class HistoricalDataManager:
         current_reliability = self._calculate_current_reliability(current)
         current = current.assign(current_reliability=current_reliability)
         
-        print("Calculated reliability based on starts over "
-              f"{max(1, self.config.GAMEWEEK - 1)} completed gameweek(s)")
-        print("Applied consistent per-game weighted xG analysis with "
-              f"conservative volatility penalties across "
-              f"{len(self.config.PAST_SEASONS)} seasons")
+        if self.config.GRANULAR_OUTPUT:
+            print("Calculated reliability based on starts over "
+                  f"{max(1, self.config.GAMEWEEK - 1)} completed gameweek(s)")
+            print("Applied consistent per-game weighted xG analysis with "
+                  f"conservative volatility penalties across "
+                  f"{len(self.config.PAST_SEASONS)} seasons")
 
         # Enhanced merge columns including historical baseline tracking
         merge_cols = [

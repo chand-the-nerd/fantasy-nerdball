@@ -15,6 +15,8 @@ class Config:
     ACCEPT_TRANSFER_PENALTY = False
     # Set to False to include unavailable players in optimisation
     EXCLUDE_UNAVAILABLE = True
+    # Set to True for detailed technical output, False for clean summary
+    GRANULAR_OUTPUT = False
 
     # === TOKENS ===
     WILDCARD = False # Set to True when either Wildcard or Free Hit is used
@@ -47,7 +49,7 @@ class Config:
     FIRST_N_GAMEWEEKS = 5
 
     # === FIXTURE DIFFICULTY DECAY SETTINGS ===
-    # Controls how much future fixtures are discounted relative to immediate ones
+    # Controls importance of upcoming fixture against distant ones
     # 0.6 means each subsequent gameweek is weighted 60% of the previous
     # Lower values = more emphasis on immediate fixtures
     # Higher values = more balanced weighting across all fixtures

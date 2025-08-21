@@ -39,7 +39,6 @@ class FileUtils:
 
         try:
             prev_squad = pd.read_csv(squad_file)
-            print(f"\nLoaded squad from {squad_file}")
             return prev_squad
         except Exception as e:
             print(f"Error loading squad: {e}")
