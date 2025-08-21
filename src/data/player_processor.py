@@ -67,7 +67,9 @@ class PlayerProcessor:
         # Save to CSV
         os.makedirs("data", exist_ok=True)
         players.to_csv("data/players.csv", index=False)
-        print("Player data saved to data/players.csv")
+        
+        if self.config.GRANULAR_OUTPUT:
+            print("Player data saved to data/players.csv")
 
         return players
     
@@ -104,11 +106,12 @@ class PlayerProcessor:
         df["xg_trend"] = df.apply(
             lambda row: self._format_xg_trend(row), axis=1)
         
-        # Print summary
+        # Print summary only in granular mode
         players_with_data = len(
             df[df["current_xg_context"] != "insufficient_data"])
-        print(f"   ✅ {players_with_data} players have current season xG "
-              "analysis")
+        if self.config.GRANULAR_OUTPUT:
+            print(f"   ✅ {players_with_data} players have current season xG "
+                  "analysis")
         
         # Clean up temporary columns
         df = self._cleanup_temporary_columns(df)
@@ -133,7 +136,8 @@ class PlayerProcessor:
                     df[df_col], errors="coerce").fillna(0)
             else:
                 df[col_name] = 0.0
-                print(f"Warning: {df_col} not found in current season data")
+                if self.config.GRANULAR_OUTPUT:
+                    print(f"Warning: {df_col} not found in current season data")
         
         return df
     
@@ -382,16 +386,18 @@ class PlayerProcessor:
                    previous squad
         """
         if gameweek <= 1:
-            print(f"Using default budget: £{self.config.BUDGET:.1f}m "
-                  f"(no previous squad)")
+            if self.config.GRANULAR_OUTPUT:
+                print(f"Using default budget: £{self.config.BUDGET:.1f}m "
+                      f"(no previous squad)")
             return self.config.BUDGET
 
         prev_gw = gameweek - 1
         prev_squad_file = f"squads/gw{prev_gw}/full_squad.csv"
 
         if not os.path.exists(prev_squad_file):
-            print(f"Using default budget: £{self.config.BUDGET:.1f}m "
-                  f"(no previous squad file)")
+            if self.config.GRANULAR_OUTPUT:
+                print(f"Using default budget: £{self.config.BUDGET:.1f}m "
+                      f"(no previous squad file)")
             return self.config.BUDGET
 
         try:
@@ -401,8 +407,9 @@ class PlayerProcessor:
             )
 
             if not prev_squad_ids:
-                print(f"Using default budget: £{self.config.BUDGET:.1f}m "
-                      f"(could not match previous squad)")
+                if self.config.GRANULAR_OUTPUT:
+                    print(f"Using default budget: £{self.config.BUDGET:.1f}m "
+                          f"(could not match previous squad)")
                 return self.config.BUDGET
 
             # Calculate total value using current prices
@@ -411,12 +418,14 @@ class PlayerProcessor:
             ]
             total_value = prev_squad_current_df["now_cost_m"].sum()
 
-            print(f"Previous squad value: £{total_value:.1f}m")
+            if self.config.GRANULAR_OUTPUT:
+                print(f"Previous squad value: £{total_value:.1f}m")
             return total_value
 
         except Exception as e:
-            print(f"Error calculating budget from previous squad: {e}")
-            print(f"Using default budget: £{self.config.BUDGET:.1f}m")
+            if self.config.GRANULAR_OUTPUT:
+                print(f"Error calculating budget from previous squad: {e}")
+                print(f"Using default budget: £{self.config.BUDGET:.1f}m")
             return self.config.BUDGET
     
     def match_players_to_current(self, prev_squad: pd.DataFrame, 
@@ -459,8 +468,9 @@ class PlayerProcessor:
         if len(exact_matches) == 1:
             return exact_matches.iloc[0]["id"]
         elif len(exact_matches) > 1:
-            print(f"Warning: Multiple matches for {prev_name}, taking first "
-                  "match")
+            if self.config.GRANULAR_OUTPUT:
+                print(f"Warning: Multiple matches for {prev_name}, taking first "
+                      "match")
             return exact_matches.iloc[0]["id"]
         
         # Try fuzzy matching on name
@@ -475,6 +485,7 @@ class PlayerProcessor:
         if len(fuzzy_matches) > 0:
             return fuzzy_matches.iloc[0]["id"]
         
-        print(f"Warning: Could not find current match for "
-              f"{prev_name} ({prev_pos}, {prev_team})")
+        if self.config.GRANULAR_OUTPUT:
+            print(f"Warning: Could not find current match for "
+                  f"{prev_name} ({prev_pos}, {prev_team})")
         return None

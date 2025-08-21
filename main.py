@@ -108,6 +108,9 @@ def prompt_player_history_update(config):
     if config.GAMEWEEK <= 1:
         return
         
+    if not config.GRANULAR_OUTPUT:
+        return  # Skip prompt in clean mode
+        
     print(f"\n=== Player History Update ===")
     print(f"Would you like to update player history data for "
           f"GW{config.GAMEWEEK - 1}?")
@@ -183,6 +186,9 @@ def initialise_components(config, token_manager):
 
 def print_header(config):
     """Print application header with current settings."""
+    if not config.GRANULAR_OUTPUT:
+        return  # Skip header in clean mode
+        
     print(f"\n=== WELCOME TO FANTASY NERDBALL ===")
     print(f"\nPlanning for Gameweek {config.GAMEWEEK}")
     
@@ -196,49 +202,53 @@ def print_header(config):
 
 
 def _display_availability_and_dgw_stats(involvement_stats, dgw_stats, 
-                                       gameweek):
+                                       gameweek, config):
     """Display player availability and DGW/BGW statistics."""
     if not involvement_stats['exclude_unavailable']:
-        print("EXCLUDE_UNAVAILABLE = False: Including unavailable "
-              "players in optimisation")
+        if config.GRANULAR_OUTPUT:
+            print("EXCLUDE_UNAVAILABLE = False: Including unavailable "
+                  "players in optimisation")
         return
     
-    print("\nChecking availability...")
-    if gameweek > 1:
-        if involvement_stats['high_involvement'] > 0:
-            print(f"{involvement_stats['high_involvement']} players with "
-                  "high involvement (reliable starters)")
-            
-        if involvement_stats['low_involvement'] > 0:
-            print(f"{involvement_stats['low_involvement']} players with "
-                  "low involvement heavily penalised")
-            
-        if involvement_stats['zero_involvement'] > 0:
-            print(f"{involvement_stats['zero_involvement']} players with "
-                  "zero involvement will have scores set to 0")
-    
-    if involvement_stats['unavailable'] > 0:
-        print(f"{involvement_stats['unavailable']} players unavailable "
-              "due to injury/suspension")
-    else:
-        print("All players are available for selection")
-    
-    print("\nChecking double/blank gameweeks...")
-    print(f"{dgw_stats['regular_gw']} players with a regular gameweek")
-    
-    if dgw_stats['double_gw'] > 0:
-        print(f"{dgw_stats['double_gw']} players with a double gameweek")
-    
-    if dgw_stats['blank_gw'] > 0:
-        print(f"{dgw_stats['blank_gw']} players with a blank gameweek")
-    
-    if dgw_stats['double_gw'] == 0 and dgw_stats['blank_gw'] == 0:
-        print("All players have regular gameweeks")
+    if config.GRANULAR_OUTPUT:
+        print("\nChecking availability...")
+        if gameweek > 1:
+            if involvement_stats['high_involvement'] > 0:
+                print(f"{involvement_stats['high_involvement']} players with "
+                      "high involvement (reliable starters)")
+                
+            if involvement_stats['low_involvement'] > 0:
+                print(f"{involvement_stats['low_involvement']} players with "
+                      "low involvement heavily penalised")
+                
+            if involvement_stats['zero_involvement'] > 0:
+                print(f"{involvement_stats['zero_involvement']} players with "
+                      "zero involvement will have scores set to 0")
+        
+        if involvement_stats['unavailable'] > 0:
+            print(f"{involvement_stats['unavailable']} players unavailable "
+                  "due to injury/suspension")
+        else:
+            print("All players are available for selection")
+        
+        print("\nChecking double/blank gameweeks...")
+        print(f"{dgw_stats['regular_gw']} players with a regular gameweek")
+        
+        if dgw_stats['double_gw'] > 0:
+            print(f"{dgw_stats['double_gw']} players with a double gameweek")
+        
+        if dgw_stats['blank_gw'] > 0:
+            print(f"{dgw_stats['blank_gw']} players with a blank gameweek")
+        
+        if dgw_stats['double_gw'] == 0 and dgw_stats['blank_gw'] == 0:
+            print("All players have regular gameweeks")
 
 
 def process_player_data(components, config):
     """Process player data with historical and fixture analysis."""
-    print("Fetching current players with xG analysis...")
+    if config.GRANULAR_OUTPUT:
+        print("Fetching current players with xG analysis...")
+    
     players = components['player_processor'].fetch_current_players()
 
     # Calculate available budget based on previous squad value
@@ -247,11 +257,15 @@ def process_player_data(components, config):
         .calculate_budget_from_previous_squad(config.GAMEWEEK, players)
     )
 
-    print("Analysing historical xG performance...")
+    if config.GRANULAR_OUTPUT:
+        print("Analysing historical xG performance...")
+    
     players = components['historical_manager'].merge_past_seasons(players)
     
-    print(f"Fetching player-level fixture difficulty from "
-          f"GW{config.GAMEWEEK} with DGW/BGW handling...")
+    if config.GRANULAR_OUTPUT:
+        print(f"Fetching player-level fixture difficulty from "
+              f"GW{config.GAMEWEEK} with DGW/BGW handling...")
+    
     fixture_scores = (
         components['fixture_manager']
         .fetch_player_fixture_difficulty(
@@ -259,7 +273,9 @@ def process_player_data(components, config):
         )
     )
     
-    print("Scoring players with xG performance modifiers...")
+    if config.GRANULAR_OUTPUT:
+        print("Scoring players with xG performance modifiers...")
+    
     scored, involvement_stats = components['scoring_engine'].build_scores(
         players, fixture_scores
     )
@@ -267,9 +283,9 @@ def process_player_data(components, config):
     # Get DGW/BGW statistics
     dgw_stats = _calculate_dgw_stats(scored, config.GAMEWEEK)
     
-    # Display availability and DGW statistics (only once, here)
+    # Display availability and DGW statistics
     _display_availability_and_dgw_stats(involvement_stats, dgw_stats, 
-                                       config.GAMEWEEK)
+                                       config.GAMEWEEK, config)
     
     return players, scored, available_budget
 
@@ -293,8 +309,8 @@ def generate_theoretical_squad(components, config, players,
                               available_budget):
     """Generate theoretical best squad for comparison."""
     # Always generate theoretical squad regardless of output mode
-    print(f"\n=== NERDBALL PICKS GW{config.GAMEWEEK} ===")
     if config.GRANULAR_OUTPUT:
+        print(f"\n=== NERDBALL PICKS GW{config.GAMEWEEK} ===")
         print("Limitless pick for the week (within budget)")
     
     # Get single gameweek fixture scores for comparison
@@ -454,7 +470,8 @@ def analyse_unavailable_players(components, config, scored, prev_squad_ids):
             print(f"\nRECOMMENDATION: Use substitutes, save transfers")
             print(f"   Substitution score loss acceptable")
     else:
-        print(f"\nAll previous squad players are available")
+        if config.GRANULAR_OUTPUT:
+            print(f"\nAll previous squad players are available")
 
 
 def optimise_squad(
@@ -464,7 +481,8 @@ def optimise_squad(
         available_budget
         ):
     """Optimise squad selection with transfer considerations."""
-    print("\nThinking...")
+    if config.GRANULAR_OUTPUT:
+        print("\nThinking...")
 
     penalty_mode = (
         config.ACCEPT_TRANSFER_PENALTY and 
@@ -537,14 +555,16 @@ def finalise_squad_selection(components, config, should_make_transfers,
                            penalty_points):
     """Finalise the squad selection based on transfer analysis."""
     if should_make_transfers:
-        if penalty_points > 0:
-            print(f"\nMaking {transfers_made} transfer(s) with "
-                  f"{penalty_points} penalty points")
-        else:
-            print(f"\nMaking {transfers_made} transfer(s)")
+        if config.GRANULAR_OUTPUT:
+            if penalty_points > 0:
+                print(f"\nMaking {transfers_made} transfer(s) with "
+                      f"{penalty_points} penalty points")
+            else:
+                print(f"\nMaking {transfers_made} transfer(s)")
         return starting_with_transfers, bench_with_transfers
     else:
-        print(f"\nTransfers not worth it - keeping current squad")
+        if config.GRANULAR_OUTPUT:
+            print(f"\nTransfers not worth it - keeping current squad")
         if prev_squad_ids is not None:
             return components[
                 'transfer_evaluator'
@@ -558,7 +578,8 @@ def finalise_squad_selection(components, config, should_make_transfers,
 def optimise_starting_xi(components, config, starting, bench, players, 
                         available_budget):
     """Optimise starting XI for the specific gameweek."""
-    print(f"Optimising Starting XI for GW{config.GAMEWEEK}...")
+    if config.GRANULAR_OUTPUT:
+        print(f"Optimising Starting XI for GW{config.GAMEWEEK}...")
     
     fixture_scores_next = (
         components['fixture_manager']
@@ -588,8 +609,9 @@ def optimise_starting_xi(components, config, starting, bench, players,
 
     # Fallback if optimisation failed
     if starting_optimised.empty:
-        print("Starting XI optimisation infeasible with form constraint. "
-              "Using fallback selection...")
+        if config.GRANULAR_OUTPUT:
+            print("Starting XI optimisation infeasible with form constraint. "
+                  "Using fallback selection...")
         
         full_squad = pd.concat([starting, bench], ignore_index=True)
         squad_players = scored_next[
@@ -611,7 +633,8 @@ def optimise_starting_xi(components, config, starting, bench, players,
                 bench_optimised
             )
         else:
-            print("Unable to create starting XI. Using original selection.")
+            if config.GRANULAR_OUTPUT:
+                print("Unable to create starting XI. Using original selection.")
             return starting, bench
 
     return starting_optimised, bench_optimised
@@ -630,6 +653,94 @@ def calculate_your_points(starting_display: pd.DataFrame,
         return starting_display["projected_points"].sum()
 
 
+def get_prev_gw_summary(components, config):
+    """Get previous gameweek summary for display."""
+    if config.GAMEWEEK <= 1:
+        return None
+        
+    prev_gw = config.GAMEWEEK - 1
+    summary_file = f"squads/gw{prev_gw}/summary.csv"
+    
+    try:
+        import os
+        if os.path.exists(summary_file):
+            summary_df = pd.read_csv(summary_file)
+            
+            # Extract key metrics
+            total_metric = summary_df[
+                summary_df['metric'] == 'Starting XI Total Points'
+            ]
+            mae_metric = summary_df[
+                summary_df['metric'] == 'Mean Absolute Error (XI)'
+            ]
+            accuracy_metric = summary_df[
+                summary_df['metric'] == 'Accuracy within 2pts (XI)'
+            ]
+            best_metric = summary_df[
+                summary_df['metric'] == 'Best Starting XI Performer'
+            ]
+            worst_metric = summary_df[
+                summary_df['metric'] == 'Worst Starting XI Performer'
+            ]
+            
+            # Extract position breakdowns
+            position_metrics = {}
+            for pos in ['GK', 'DEF', 'MID', 'FWD']:
+                pos_metric = summary_df[
+                    summary_df['metric'] == f'{pos} Starting XI'
+                ]
+                if len(pos_metric) > 0:
+                    position_metrics[pos] = {
+                        'actual': int(pos_metric.iloc[0]['actual']),
+                        'projected': float(pos_metric.iloc[0]['projected']),
+                        'difference': float(pos_metric.iloc[0]['difference'])
+                    }
+            
+            if len(total_metric) > 0:
+                accuracy_value = "N/A"
+                if len(accuracy_metric) > 0:
+                    accuracy_raw = accuracy_metric.iloc[0]['actual']
+                    if isinstance(accuracy_raw, str) and '%' in accuracy_raw:
+                        accuracy_value = accuracy_raw
+                    else:
+                        try:
+                            accuracy_value = f"{float(accuracy_raw):.1f}%"
+                        except (ValueError, TypeError):
+                            accuracy_value = "N/A"
+                
+                # Extract best/worst performer names
+                best_performer = "N/A"
+                worst_performer = "N/A"
+                best_diff = 0
+                worst_diff = 0
+                
+                if len(best_metric) > 0:
+                    best_performer = best_metric.iloc[0]['notes'].split(' (')[0]
+                    best_diff = float(best_metric.iloc[0]['difference'])
+                
+                if len(worst_metric) > 0:
+                    worst_performer = worst_metric.iloc[0]['notes'].split(' (')[0]
+                    worst_diff = float(worst_metric.iloc[0]['difference'])
+                
+                return {
+                    'gameweek': prev_gw,
+                    'actual_points': int(total_metric.iloc[0]['actual']),
+                    'projected_points': float(total_metric.iloc[0]['projected']),
+                    'difference': float(total_metric.iloc[0]['difference']),
+                    'mae': float(mae_metric.iloc[0]['actual']) if len(mae_metric) > 0 else 0,
+                    'accuracy': accuracy_value,
+                    'best_performer': best_performer,
+                    'best_diff': best_diff,
+                    'worst_performer': worst_performer,
+                    'worst_diff': worst_diff,
+                    'positions': position_metrics
+                }
+    except Exception:
+        pass
+    
+    return None
+
+
 def main():
     """Main function to run the FPL optimisation process."""
     config = Config()
@@ -643,6 +754,21 @@ def main():
 
     # Create results for previous gameweek if this is GW2+
     if config.GAMEWEEK >= 2:
+        if not config.GRANULAR_OUTPUT:
+            print("\n📈 Reviewing previous gameweek...")
+            try:
+                result = subprocess.run([
+                    sys.executable, 'update_player_history.py', 'update'
+                ], capture_output=True, text=True)
+                
+                # Only show output if there's an error
+                if result.returncode != 0 and result.stderr:
+                    print(f"Warning: Error updating player history: "
+                          f"{result.stderr}")
+                    
+            except Exception as e:
+                print(f"Warning: Could not update player history: {e}")
+
         components['results_analyser'].create_previous_gameweek_results(
             config.GAMEWEEK
         )
@@ -662,9 +788,16 @@ def main():
         )
 
     # Process player data - this now displays all stats in correct order
+    if not config.GRANULAR_OUTPUT:
+        print("🤕 Seeing who's available this week...")
     players, scored, available_budget = process_player_data(components, config)
 
+    if not config.GRANULAR_OUTPUT:
+        print("⏩ Looking for double gameweeks...")
+
     # Generate theoretical best squad for comparison
+    if not config.GRANULAR_OUTPUT:
+        print("🏆 Picking my favourite players for this week...")
     theoretical_starting_display, theoretical_points, theoretical_cost = (
         generate_theoretical_squad(
             components,
@@ -679,6 +812,8 @@ def main():
         analyse_unavailable_players(components, config, scored, prev_squad_ids)
 
     # Optimise squad
+    if not config.GRANULAR_OUTPUT:
+        print("↔️  Browsing the transfer market...")
     (starting_with_transfers,
     bench_with_transfers,
     transfers_made,
@@ -731,6 +866,8 @@ def main():
     )
 
     # Optimise starting XI for specific gameweek
+    if not config.GRANULAR_OUTPUT:
+        print("🧠 Making final adjustments...")
     starting, bench = optimise_starting_xi(
         components, config, starting, bench, players, available_budget
     )
@@ -740,6 +877,8 @@ def main():
         prev_squad_ids, starting_with_transfers, bench_with_transfers, players
     )
 
+    # Get previous gameweek summary
+    prev_gw_summary = get_prev_gw_summary(components, config)
 
     # Display final results with enhanced logic - PASS TRANSFER DATA
     starting_display, bench_display = display_final_results_enhanced(
@@ -751,7 +890,8 @@ def main():
         transfers_made,        # NEW: Pass number of transfers
         penalty_points,        # NEW: Pass penalty points
         transfer_analysis,     # NEW: Pass transfer analysis
-        transfer_details       # NEW: Pass specific transfer details
+        transfer_details,      # NEW: Pass specific transfer details
+        prev_gw_summary        # NEW: Pass previous gameweek summary
     )
 
     # Display comparison with theoretical squad

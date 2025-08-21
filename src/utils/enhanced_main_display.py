@@ -106,7 +106,8 @@ def display_final_results_enhanced(components, config, starting, bench,
                                  transfers_made=0,
                                  penalty_points=0,
                                  transfer_analysis=None,
-                                 transfer_details=None):
+                                 transfer_details=None,
+                                 prev_gw_summary=None):
     """
     Enhanced display function that chooses between granular and clean output.
     
@@ -123,6 +124,7 @@ def display_final_results_enhanced(components, config, starting, bench,
         penalty_points: Transfer penalty points
         transfer_analysis: Transfer analysis results
         transfer_details: Dict with 'players_out', 'players_in', etc.
+        prev_gw_summary: Previous gameweek summary data
     """
     if config.GRANULAR_OUTPUT:
         # Use existing detailed output
@@ -133,7 +135,8 @@ def display_final_results_enhanced(components, config, starting, bench,
                                    theoretical_starting, theoretical_bench,
                                    theoretical_points, should_make_transfers,
                                    transfers_made, penalty_points,
-                                   transfer_analysis, transfer_details)
+                                   transfer_analysis, transfer_details,
+                                   prev_gw_summary)
 
 
 def _display_granular_output(components, config, starting, bench):
@@ -234,7 +237,8 @@ def _display_clean_output(components, config, starting, bench,
                         theoretical_starting, theoretical_bench, 
                         theoretical_points, should_make_transfers=None,
                         transfers_made=0, penalty_points=0,
-                        transfer_analysis=None, transfer_details=None):
+                        transfer_analysis=None, transfer_details=None,
+                        prev_gw_summary=None):
     """Display clean dashboard output with dynamic actions."""
     token_manager = components['token_manager']
     
@@ -306,7 +310,8 @@ def _display_clean_output(components, config, starting, bench,
         your_points,
         captain_name,
         captain_points,
-        action_data
+        action_data,
+        prev_gw_summary
     )
 
     return starting_display, bench_display

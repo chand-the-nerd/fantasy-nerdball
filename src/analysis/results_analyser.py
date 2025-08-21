@@ -45,7 +45,8 @@ class ResultsAnalyser:
                                   created for gameweek-1)
         """
         if current_gameweek <= 1:
-            print("Cannot create results for GW0 or earlier")
+            if self.config.GRANULAR_OUTPUT:
+                print("Cannot create results for GW0 or earlier")
             return
 
         prev_gw = current_gameweek - 1
@@ -54,21 +55,25 @@ class ResultsAnalyser:
         # Check if previous gameweek squad file exists
         prev_squad_file = f"{prev_squad_dir}/full_squad.csv"
         if not os.path.exists(prev_squad_file):
-            print(f"No previous squad found at {prev_squad_file}")
+            if self.config.GRANULAR_OUTPUT:
+                print(f"No previous squad found at {prev_squad_file}")
             return
 
-        print(f"\n=== GW{prev_gw} SUMMARY ===")
+        if self.config.GRANULAR_OUTPUT:
+            print(f"\n=== GW{prev_gw} SUMMARY ===")
 
         try:
             self._process_previous_squad_results(
                 prev_squad_file, prev_gw, prev_squad_dir
             )
-            print(f"\n✅ Results creation completed for GW{prev_gw}")
+            if self.config.GRANULAR_OUTPUT:
+                print(f"\n✅ Results creation completed for GW{prev_gw}")
 
         except Exception as e:
-            print(f"❌ Error creating results for GW{prev_gw}: {e}")
-            import traceback
-            traceback.print_exc()
+            if self.config.GRANULAR_OUTPUT:
+                print(f"⚠ Error creating results for GW{prev_gw}: {e}")
+                import traceback
+                traceback.print_exc()
     
     def _process_previous_squad_results(self, prev_squad_file: str, 
                                       prev_gw: int, prev_squad_dir: str):
@@ -80,7 +85,9 @@ class ResultsAnalyser:
         # Add actual points to dataframe
         prev_squad["actual_points"] = actual_points
         total_actual = sum(actual_points)
-        print(f"Total squad points: {total_actual}")
+        
+        if self.config.GRANULAR_OUTPUT:
+            print(f"Total squad points: {total_actual}")
 
         # Calculate differences (actual - projected)
         prev_squad = self._calculate_point_differences(
@@ -102,7 +109,8 @@ class ResultsAnalyser:
             player_name = player.get("display_name", "Unknown")
 
             if pd.isna(player_id):
-                print(f"  Warning: No ID found for {player_name}")
+                if self.config.GRANULAR_OUTPUT:
+                    print(f"  Warning: No ID found for {player_name}")
                 actual_points.append(0)
                 continue
 
@@ -111,9 +119,11 @@ class ResultsAnalyser:
                     int(player_id), prev_gw
                 )
                 actual_points.append(actual)
-                print(f"  {player_name}: {actual} points")
+                if self.config.GRANULAR_OUTPUT:
+                    print(f"  {player_name}: {actual} points")
             except Exception as e:
-                print(f"  Error fetching points for {player_name}: {e}")
+                if self.config.GRANULAR_OUTPUT:
+                    print(f"  Error fetching points for {player_name}: {e}")
                 actual_points.append(0)
         
         return actual_points
@@ -131,12 +141,15 @@ class ResultsAnalyser:
 
             total_projected = prev_squad["projected_points"].sum()
             difference = total_actual - total_projected
-            print(f"Projected (from last week): {total_projected:.1f}, "
-                  f"Total Points: {total_actual}, "
-                  f"Difference: {difference:+.1f}")
+            
+            if self.config.GRANULAR_OUTPUT:
+                print(f"Projected (from last week): {total_projected:.1f}, "
+                      f"Total Points: {total_actual}, "
+                      f"Difference: {difference:+.1f}")
         else:
-            print("Warning: No projected_points column found in previous "
-                  "squad")
+            if self.config.GRANULAR_OUTPUT:
+                print("Warning: No projected_points column found in previous "
+                      "squad")
             prev_squad["projected_points"] = 0  # Add dummy column
             prev_squad["points_difference"] = prev_squad["actual_points"]
             prev_squad["absolute_difference"] = abs(
@@ -174,7 +187,9 @@ class ResultsAnalyser:
 
         results_file = f"{prev_squad_dir}/full_squad_results.csv"
         results_df.to_csv(results_file, index=False)
-        print(f"✅ Results saved to {results_file}")
+        
+        if self.config.GRANULAR_OUTPUT:
+            print(f"✅ Results saved to {results_file}")
     
     def create_summary_analysis(self, squad_df: pd.DataFrame, gameweek: int, 
                               output_dir: str):
@@ -195,8 +210,9 @@ class ResultsAnalyser:
             ]
 
             if len(starting_xi) == 0:
-                print("Warning: No Starting XI players found, using all "
-                      "players")
+                if self.config.GRANULAR_OUTPUT:
+                    print("Warning: No Starting XI players found, using all "
+                          "players")
                 starting_xi = squad_df
 
             # Calculate starting XI totals and metrics
@@ -208,15 +224,17 @@ class ResultsAnalyser:
             summary_df = pd.DataFrame(summary_data)
             summary_file = f"{output_dir}/summary.csv"
             summary_df.to_csv(summary_file, index=False)
-            print(f"✅ Starting XI summary saved to {summary_file}")
-
-            # Print summary to console
-            self._print_console_summary(summary_data, starting_xi, gameweek)
+            
+            if self.config.GRANULAR_OUTPUT:
+                print(f"✅ Starting XI summary saved to {summary_file}")
+                # Print summary to console
+                self._print_console_summary(summary_data, starting_xi, gameweek)
 
         except Exception as e:
-            print(f"❌ Error creating summary analysis: {e}")
-            import traceback
-            traceback.print_exc()
+            if self.config.GRANULAR_OUTPUT:
+                print(f"⚠ Error creating summary analysis: {e}")
+                import traceback
+                traceback.print_exc()
     
     def _calculate_summary_metrics(self, starting_xi: pd.DataFrame, 
                                  gameweek: int) -> list:

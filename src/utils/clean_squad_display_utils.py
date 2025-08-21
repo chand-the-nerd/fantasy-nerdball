@@ -72,7 +72,6 @@ class CleanSquadDisplayUtils:
             prefix = "┌─ "
             suffix = " ┐"
             
-
             space_for_dashes = (
                 self.IBOX_WIDTH
                 - len(prefix)
@@ -127,7 +126,7 @@ class CleanSquadDisplayUtils:
         else:
             inner_line = self._ibox_inner(str(content))
 
-        # Center the inner box within the outer frame
+        # Centre the inner box within the outer frame
         padding_needed = self.INNER_WIDTH - len(inner_line)
         left_pad = padding_needed // 2
         right_pad = padding_needed - left_pad
@@ -162,7 +161,7 @@ class CleanSquadDisplayUtils:
     def print_clean_dashboard(self, nerdball_starting, nerdball_bench, 
                               nerdball_points, your_starting, your_bench, 
                               your_points, captain_name, captain_points,
-                              action_data):
+                              action_data, prev_gw_summary=None):
         lines = []
         
         # Header
@@ -173,9 +172,69 @@ class CleanSquadDisplayUtils:
         lines.append(self.format_separator())
         lines.append(self.format_empty_line())
         
+        # Previous gameweek summary (if available)
+        if prev_gw_summary:
+            lines.append(self.format_box_line(f"GW{prev_gw_summary['gameweek']} SUMMARY", 'top'))
+            
+            # Format the difference with + or - sign
+            diff = prev_gw_summary['difference']
+            diff_str = f"{diff:+.1f}" if diff != 0 else "0.0"
+            
+            lines.append(self.format_box_line(
+                f"{prev_gw_summary['actual_points']} pts    "
+                f"Projected: {prev_gw_summary['projected_points']:.1f}, "
+                f"diff: {diff_str}"
+            ))
+            
+            # Add accuracy if available
+            if 'accuracy' in prev_gw_summary:
+                accuracy_str = prev_gw_summary['accuracy']
+                if isinstance(accuracy_str, str) and '%' in accuracy_str:
+                    lines.append(self.format_box_line(f"Accuracy: {accuracy_str}"))
+                else:
+                    lines.append(self.format_box_line(f"Accuracy: {accuracy_str:.1f}%"))
+            
+            # Add best/worst performers
+            if 'best_performer' in prev_gw_summary and prev_gw_summary['best_performer'] != "N/A":
+                best_diff = prev_gw_summary.get('best_diff', 0)
+                best_str = f"{prev_gw_summary['best_performer']} ({best_diff:+.1f})"
+                lines.append(self.format_box_line(f"Best: {best_str}"))
+            
+            if 'worst_performer' in prev_gw_summary and prev_gw_summary['worst_performer'] != "N/A":
+                worst_diff = prev_gw_summary.get('worst_diff', 0)
+                worst_str = f"{prev_gw_summary['worst_performer']} ({worst_diff:+.1f})"
+                lines.append(self.format_box_line(f"Worst: {worst_str}"))
+            
+            # Add position breakdown in compact format
+            if 'positions' in prev_gw_summary and prev_gw_summary['positions']:
+                positions = prev_gw_summary['positions']
+                pos_parts = []
+                for pos in ['GK', 'DEF', 'MID', 'FWD']:
+                    if pos in positions:
+                        pos_data = positions[pos]
+                        diff = pos_data['difference']
+                        diff_str = f"{diff:+.0f}" if diff != 0 else "0"
+                        pos_parts.append(f"{pos}:{pos_data['actual']}({diff_str})")
+                
+                if pos_parts:
+                    # Split into two lines if too long
+                    pos_line = " ".join(pos_parts)
+                    if len(pos_line) > self.IBOX_CONTENT:
+                        # Split into two lines
+                        mid_point = len(pos_parts) // 2
+                        line1 = " ".join(pos_parts[:mid_point])
+                        line2 = " ".join(pos_parts[mid_point:])
+                        lines.append(self.format_box_line(line1))
+                        lines.append(self.format_box_line(line2))
+                    else:
+                        lines.append(self.format_box_line(pos_line))
+            
+            lines.append(self.format_box_line("", 'bottom'))
+            lines.append(self.format_empty_line())
+        
         # Nerdball XI section
         lines.append(self.format_box_line("NERDBALL XI", 'top'))
-        content = f"{nerdball_points:.1f} pts    Theoretical maximum squad"
+        content = f"{nerdball_points:.1f} pts    My top picks for the week"
         lines.append(self.format_box_line(content))
         lines.append(self.format_box_line("", 'bottom'))
         lines.append(self.format_empty_line())
