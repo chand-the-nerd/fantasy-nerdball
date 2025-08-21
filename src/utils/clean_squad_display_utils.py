@@ -405,7 +405,7 @@ class CleanSquadDisplayUtils:
         # Check if unavailable - only based on status, not points
         unavailable = ""
         if ('status' in player and player['status'] != 'a'):
-            unavailable = " [UNAVAIL]"
+            unavailable = " [Unavailable]"
         
         points_str = f"{points:>4.1f}"
         line = (f"{pos_abbrev} {name_field} {points_str}    "
