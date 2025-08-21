@@ -21,8 +21,6 @@ def main():
     print(f"Current gameweek: {config.GAMEWEEK}")
     print(f"Timestamp: {datetime.now()}")
     
-    # Add some debug info
-    logging.info(f"Starting update - Current GW: {config.GAMEWEEK}")
     
     if len(sys.argv) > 1:
         command = sys.argv[1].lower()

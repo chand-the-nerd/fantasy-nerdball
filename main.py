@@ -21,6 +21,69 @@ from src.optimisation.transfer_evaluator import TransferEvaluator
 from src.utils.file_utils import FileUtils
 from src.utils.squad_display_utils import SquadDisplayUtils
 from src.utils.token_manager import TokenManager
+from src.utils.enhanced_main_display import (
+    display_final_results_enhanced, 
+    enhance_squad_comparison_display
+)
+
+
+def extract_transfer_details(prev_squad_ids, starting_with_transfers, 
+                            bench_with_transfers, players_df):
+    """
+    Extract specific transfer details (who goes out, who comes in).
+    
+    Args:
+        prev_squad_ids: List of previous squad player IDs
+        starting_with_transfers: New starting XI dataframe
+        bench_with_transfers: New bench dataframe  
+        players_df: Full players dataframe with names
+        
+    Returns:
+        Dict with 'players_out', 'players_in' lists
+    """
+    if prev_squad_ids is None:
+        return None
+    
+    # Get current squad IDs
+    current_squad_ids = set(
+        pd.concat([starting_with_transfers, bench_with_transfers])["id"]
+    )
+    prev_squad_ids_set = set(prev_squad_ids)
+    
+    # Find transferred players
+    players_out_ids = prev_squad_ids_set - current_squad_ids
+    players_in_ids = current_squad_ids - prev_squad_ids_set
+    
+    if not players_out_ids and not players_in_ids:
+        return None
+    
+    # Get player names
+    players_out_names = []
+    players_in_names = []
+    
+    # Create a mapping of id to display_name from players dataframe
+    id_to_name = players_df.set_index('id')['display_name'].to_dict()
+    
+    # Also check the new squad dataframes for names
+    new_squad_df = pd.concat([starting_with_transfers, bench_with_transfers])
+    new_id_to_name = new_squad_df.set_index('id')['display_name'].to_dict()
+    id_to_name.update(new_id_to_name)
+    
+    for player_id in players_out_ids:
+        name = id_to_name.get(player_id, f"Player {player_id}")
+        players_out_names.append(name)
+    
+    for player_id in players_in_ids:
+        name = id_to_name.get(player_id, f"Player {player_id}")
+        players_in_names.append(name)
+    
+    return {
+        'players_out': players_out_names,
+        'players_in': players_in_names,
+        'players_out_ids': list(players_out_ids),
+        'players_in_ids': list(players_in_ids)
+    }
+
 
 RENAME_MAP = {
     "display_name": "name",
@@ -63,16 +126,16 @@ def prompt_player_history_update(config):
                 ], capture_output=True, text=True)
                 
                 if result.returncode == 0:
-                    print("✅ Player history updated successfully!")
+                    print("Player history updated successfully!")
                     if result.stdout:
                         print(result.stdout)
                 else:
-                    print("❌ Error updating player history:")
+                    print("Error updating player history:")
                     if result.stderr:
                         print(result.stderr)
                     
             except Exception as e:
-                print(f"❌ Failed to run player history update: {e}")
+                print(f"Failed to run player history update: {e}")
                 print("Continuing with main analysis...")
             break
             
@@ -124,9 +187,9 @@ def print_header(config):
     print(f"\nPlanning for Gameweek {config.GAMEWEEK}")
     
     if config.WILDCARD:
-        print("🃏 WILDCARD ACTIVE - No transfer limits!")
+        print("WILDCARD ACTIVE - No transfer limits!")
     elif config.ACCEPT_TRANSFER_PENALTY:
-        print(f"💰 TRANSFER PENALTY MODE - Can exceed "
+        print(f"TRANSFER PENALTY MODE - Can exceed "
               f"{config.FREE_TRANSFERS} free transfers (4 pts penalty each)")
     else:
         print(f"Free transfers available: {config.FREE_TRANSFERS}")
@@ -136,41 +199,41 @@ def _display_availability_and_dgw_stats(involvement_stats, dgw_stats,
                                        gameweek):
     """Display player availability and DGW/BGW statistics."""
     if not involvement_stats['exclude_unavailable']:
-        print("📋 EXCLUDE_UNAVAILABLE = False: Including unavailable "
+        print("EXCLUDE_UNAVAILABLE = False: Including unavailable "
               "players in optimisation")
         return
     
     print("\nChecking availability...")
     if gameweek > 1:
         if involvement_stats['high_involvement'] > 0:
-            print(f"✅ {involvement_stats['high_involvement']} players with "
+            print(f"{involvement_stats['high_involvement']} players with "
                   "high involvement (reliable starters)")
             
         if involvement_stats['low_involvement'] > 0:
-            print(f"⚠️  {involvement_stats['low_involvement']} players with "
+            print(f"{involvement_stats['low_involvement']} players with "
                   "low involvement heavily penalised")
             
         if involvement_stats['zero_involvement'] > 0:
-            print(f"🛑 {involvement_stats['zero_involvement']} players with "
+            print(f"{involvement_stats['zero_involvement']} players with "
                   "zero involvement will have scores set to 0")
     
     if involvement_stats['unavailable'] > 0:
-        print(f"🛑 {involvement_stats['unavailable']} players unavailable "
+        print(f"{involvement_stats['unavailable']} players unavailable "
               "due to injury/suspension")
     else:
-        print("✅ All players are available for selection")
+        print("All players are available for selection")
     
     print("\nChecking double/blank gameweeks...")
-    print(f"▶️  {dgw_stats['regular_gw']} players with a regular gameweek")
+    print(f"{dgw_stats['regular_gw']} players with a regular gameweek")
     
     if dgw_stats['double_gw'] > 0:
-        print(f"🔥 {dgw_stats['double_gw']} players with a double gameweek")
+        print(f"{dgw_stats['double_gw']} players with a double gameweek")
     
     if dgw_stats['blank_gw'] > 0:
-        print(f"💔 {dgw_stats['blank_gw']} players with a blank gameweek")
+        print(f"{dgw_stats['blank_gw']} players with a blank gameweek")
     
     if dgw_stats['double_gw'] == 0 and dgw_stats['blank_gw'] == 0:
-        print("▶️  All players have regular gameweeks")
+        print("All players have regular gameweeks")
 
 
 def process_player_data(components, config):
@@ -226,10 +289,13 @@ def _calculate_dgw_stats(players_df, gameweek):
     return dgw_stats
 
 
-def generate_theoretical_squad(components, config, players, available_budget):
+def generate_theoretical_squad(components, config, players, 
+                              available_budget):
     """Generate theoretical best squad for comparison."""
-    print(f"\n=== 🏆 NERDBALL PICKS GW{config.GAMEWEEK} ===")
-    print("Limitless pick for the week (within budget)")
+    # Always generate theoretical squad regardless of output mode
+    print(f"\n=== NERDBALL PICKS GW{config.GAMEWEEK} ===")
+    if config.GRANULAR_OUTPUT:
+        print("Limitless pick for the week (within budget)")
     
     # Get single gameweek fixture scores for comparison
     fixture_scores_comparison = (
@@ -245,7 +311,9 @@ def generate_theoretical_squad(components, config, players, available_budget):
     budget_for_comparison = (
         available_budget if available_budget is not None else config.BUDGET
     )
-    print(f"Available budget for comparison: {budget_for_comparison:.1f}m")
+    
+    if config.GRANULAR_OUTPUT:
+        print(f"Available budget for comparison: {budget_for_comparison:.1f}m")
     
     # No forced selections or transfer constraints for theoretical squad
     theoretical_starting, theoretical_bench, _ = (
@@ -260,7 +328,8 @@ def generate_theoretical_squad(components, config, players, available_budget):
     )
     
     if theoretical_starting.empty:
-        print("❌ Could not generate theoretical best squad")
+        if config.GRANULAR_OUTPUT:
+            print("Could not generate theoretical best squad")
         return None, 0, 0
     
     # Process theoretical squad for display
@@ -299,54 +368,62 @@ def generate_theoretical_squad(components, config, players, available_budget):
         .apply_captain_and_vice(theoretical_starting_display)
     )
     
-    # Display theoretical squad
-    print(f"\n=== NERDBALL XI for GW{config.GAMEWEEK} ===")
-    components['display_utils'].print_squad_table(
-        theoretical_starting_display, RENAME_MAP
-    )
-    
-    print(f"\n=== SUBS (in order) for GW{config.GAMEWEEK} ===")
-    components['display_utils'].print_squad_table(
-        theoretical_bench_display, RENAME_MAP
-    )
-    
     theoretical_cost = (
         theoretical_starting["now_cost_m"].sum() + 
         theoretical_bench["now_cost_m"].sum()
     )
     theoretical_points = theoretical_starting_display["projected_points"].sum()
     
-    print(f"\nNerdball Squad Cost: {theoretical_cost:.1f}m")
-    print(f"Nerdball Starting XI Projected Points: {theoretical_points:.1f}")
-    
-    # For differentials, use the full fixture analysis (same as main squad)
-    # This uses FIRST_N_GAMEWEEKS fixtures for a complete picture
-    differential_scored = components['scoring_engine'].build_scores(
-        players, 
-        components['fixture_manager'].fetch_player_fixture_difficulty(
-            config.FIRST_N_GAMEWEEKS, players, config.GAMEWEEK
+    # Store for clean display
+    components['theoretical_starting'] = theoretical_starting_display
+    components['theoretical_bench'] = theoretical_bench_display
+    components['theoretical_points'] = theoretical_points
+
+    # Only print detailed output in granular mode
+    if config.GRANULAR_OUTPUT:
+        # Display theoretical squad
+        print(f"\n=== NERDBALL XI for GW{config.GAMEWEEK} ===")
+        components['display_utils'].print_squad_table(
+            theoretical_starting_display, RENAME_MAP
         )
-    )[0]
-    
-    # Add multi-fixture information for differentials
-    differential_scored_with_fixtures = (
-        components['differential_analyser']
-        .add_multi_fixture_info(differential_scored, config.GAMEWEEK,
-                               config.FIRST_N_GAMEWEEKS, 
-                               components['fixture_manager'])
-    )
-    
-    # Add differential suggestions
-    differentials = components['differential_analyser'].get_differential_suggestions(
-        differential_scored_with_fixtures,
-        config.GAMEWEEK,
-        config.FIRST_N_GAMEWEEKS
-    )
-    components['differential_analyser'].print_differential_suggestions(
-        differentials,
-        config.GAMEWEEK,
-        config.FIRST_N_GAMEWEEKS
-    )
+        
+        print(f"\n=== SUBS (in order) for GW{config.GAMEWEEK} ===")
+        components['display_utils'].print_squad_table(
+            theoretical_bench_display, RENAME_MAP
+        )
+        
+        print(f"\nNerdball Squad Cost: {theoretical_cost:.1f}m")
+        print(f"Nerdball Starting XI Projected Points: "
+              f"{theoretical_points:.1f}")
+        
+        # For differentials, use the full fixture analysis (same as main squad)
+        differential_scored = components['scoring_engine'].build_scores(
+            players, 
+            components['fixture_manager'].fetch_player_fixture_difficulty(
+                config.FIRST_N_GAMEWEEKS, players, config.GAMEWEEK
+            )
+        )[0]
+        
+        # Add multi-fixture information for differentials
+        differential_scored_with_fixtures = (
+            components['differential_analyser']
+            .add_multi_fixture_info(differential_scored, config.GAMEWEEK,
+                                   config.FIRST_N_GAMEWEEKS, 
+                                   components['fixture_manager'])
+        )
+        
+        # Add differential suggestions
+        differentials = components[
+            'differential_analyser'].get_differential_suggestions(
+            differential_scored_with_fixtures,
+            config.GAMEWEEK,
+            config.FIRST_N_GAMEWEEKS
+        )
+        components['differential_analyser'].print_differential_suggestions(
+            differentials,
+            config.GAMEWEEK,
+            config.FIRST_N_GAMEWEEKS
+        )
     
     return theoretical_starting_display, theoretical_points, theoretical_cost
 
@@ -371,13 +448,13 @@ def analyse_unavailable_players(components, config, scored, prev_squad_ids):
         )
 
         if substitute_analysis["recommendation"] == "wildcard_needed":
-            print(f"\n⚠️  RECOMMENDATION: Consider activating wildcard")
+            print(f"\nRECOMMENDATION: Consider activating wildcard")
             print(f"   Too many unavailable players for available transfers")
         elif substitute_analysis["recommendation"] == "use_substitutes":
-            print(f"\n💡 RECOMMENDATION: Use substitutes, save transfers")
+            print(f"\nRECOMMENDATION: Use substitutes, save transfers")
             print(f"   Substitution score loss acceptable")
     else:
-        print(f"\n✅ All previous squad players are available")
+        print(f"\nAll previous squad players are available")
 
 
 def optimise_squad(
@@ -387,7 +464,7 @@ def optimise_squad(
         available_budget
         ):
     """Optimise squad selection with transfer considerations."""
-    print("\n🧠 Thinking...")
+    print("\nThinking...")
 
     penalty_mode = (
         config.ACCEPT_TRANSFER_PENALTY and 
@@ -444,9 +521,6 @@ def optimise_squad(
 def evaluate_transfer_strategy(components, config, scored, prev_squad_ids, 
                              starting_with_transfers, transfers_made):
     """Evaluate whether transfers should be made."""
-    if config.ACCEPT_TRANSFER_PENALTY:
-        return True, {"reason": "Transfer penalty mode - already optimised"}
-    
     should_make_transfers, transfer_analysis = (
         components['transfer_evaluator'].evaluate_transfer_strategy(
             scored, prev_squad_ids, starting_with_transfers, transfers_made, 
@@ -464,13 +538,13 @@ def finalise_squad_selection(components, config, should_make_transfers,
     """Finalise the squad selection based on transfer analysis."""
     if should_make_transfers:
         if penalty_points > 0:
-            print(f"\n✅ Making {transfers_made} transfer(s) with "
+            print(f"\nMaking {transfers_made} transfer(s) with "
                   f"{penalty_points} penalty points")
         else:
-            print(f"\n✅ Making {transfers_made} transfer(s)")
+            print(f"\nMaking {transfers_made} transfer(s)")
         return starting_with_transfers, bench_with_transfers
     else:
-        print(f"\n❌ Transfers not worth it - keeping current squad")
+        print(f"\nTransfers not worth it - keeping current squad")
         if prev_squad_ids is not None:
             return components[
                 'transfer_evaluator'
@@ -514,7 +588,7 @@ def optimise_starting_xi(components, config, starting, bench, players,
 
     # Fallback if optimisation failed
     if starting_optimised.empty:
-        print("⚠️  Starting XI optimisation infeasible with form constraint. "
+        print("Starting XI optimisation infeasible with form constraint. "
               "Using fallback selection...")
         
         full_squad = pd.concat([starting, bench], ignore_index=True)
@@ -537,7 +611,7 @@ def optimise_starting_xi(components, config, starting, bench, players,
                 bench_optimised
             )
         else:
-            print("❌ Unable to create starting XI. Using original selection.")
+            print("Unable to create starting XI. Using original selection.")
             return starting, bench
 
     return starting_optimised, bench_optimised
@@ -554,146 +628,6 @@ def calculate_your_points(starting_display: pd.DataFrame,
     else:
         # Normal: Only starting XI counts
         return starting_display["projected_points"].sum()
-
-
-def display_final_results(components, config, starting, bench):
-    """Display final squad results with proper formatting."""
-    token_manager = components['token_manager']
-    
-    # Add fixture information
-    try:
-        starting = components['fixture_manager'].add_next_fixture(
-            starting, config.GAMEWEEK
-        )
-        bench = components['fixture_manager'].add_next_fixture(
-            bench, config.GAMEWEEK
-        )
-    except Exception as e:
-        print(f"⚠️  Warning: Could not add fixture information - {e}")
-
-    # Add projected points analysis
-    starting_display = (
-        components['points_calculator']
-        .add_points_analysis_to_display(starting)
-    )
-    bench_display = (
-        components['points_calculator']
-        .add_points_analysis_to_display(bench)
-    )
-
-    # Apply consistent formatting
-    starting_display = components['display_utils'].sort_and_format_starting_xi(
-        starting_display
-    )
-    starting_display = components['display_utils'].apply_captain_and_vice(
-        starting_display
-    )
-
-    # Display results
-    print(f"\n=== Starting XI for GW{config.GAMEWEEK} ===")
-    components['display_utils'].print_squad_table(starting_display, RENAME_MAP)
-
-    print(f"\n=== Bench (in order) for GW{config.GAMEWEEK} ===")
-    components['display_utils'].print_squad_table(bench_display, RENAME_MAP)
-
-    total_cost = starting["now_cost_m"].sum() + bench["now_cost_m"].sum()
-    
-    # Calculate projected points based on chip
-    if token_manager.should_include_bench_points():
-        # Bench Boost: All 15 players count
-        total_projected_points = (
-            starting_display["projected_points"].sum() + 
-            bench_display["projected_points"].sum()
-        )
-    else:
-        # Normal: Only starting XI counts
-        total_projected_points = starting_display["projected_points"].sum()
-    
-    points_label = token_manager.get_points_label()
-    
-    print(f"\nTotal Squad Cost: {total_cost:.1f}m")
-    print(f"{points_label}: {total_projected_points:.1f}")
-
-    # Save squad data
-    FileUtils.save_squad_data(config.GAMEWEEK, starting_display, bench_display)
-    
-    return starting_display, bench_display
-
-
-def display_squad_comparison(theoretical_points, theoretical_cost, 
-                           your_points, your_cost, penalty_points=0, 
-                           token_manager=None, starting_display=None):
-    """Display comparison between theoretical and actual squad."""
-    if theoretical_points <= 0:
-        return
-    
-    net_your_points = your_points - penalty_points
-    
-    # Get appropriate points label
-    points_label = (token_manager.get_points_label() 
-                   if token_manager else "Starting XI Points")
-    
-    print(f"\n🎯 SQUAD COMPARISON (including captain multiplier)")
-    print(f"📊 Nerdball XI: {theoretical_points:.1f} pts")
-    
-    # Show captain information
-    if starting_display is not None and not starting_display.empty:
-        captain_info = _get_captain_info(starting_display, token_manager)
-        if captain_info:
-            print(captain_info)
-    
-    if penalty_points > 0:
-        print(f"🏈 Your Squad (gross): {your_points:.1f} pts")
-        print(f"💰 Transfer Penalty: -{penalty_points:.1f} pts")
-        print(f"🎯 Your {points_label}: {net_your_points:.1f} pts")
-    else:
-        print(f"🏈 Your {points_label}: {your_points:.1f} pts")
-    
-    gap = theoretical_points - net_your_points
-    gap_pct = (gap / theoretical_points * 100) if theoretical_points > 0 else 0
-    print(f"📈 Gap to theoretical: {gap:.1f} pts ({gap_pct:.1f}%)")
-    
-    # Performance assessment
-    if gap < 2:
-        print("🏆 Pretty sweet squad.")
-    elif gap < 5:
-        print("👍 Nice effort.")
-    else:
-        print("💡 Not bad, could be better.")
-
-
-def _get_captain_info(starting_display, token_manager):
-    """Extract captain information for display."""
-    # Find captain (player with (C) in name)
-    captain_mask = starting_display["display_name"].str.contains(
-        r"\(C\)", na=False
-    )
-    
-    if not captain_mask.any():
-        return None
-    
-    captain = starting_display[captain_mask].iloc[0]
-    captain_name = captain["display_name"].replace(" (C)", "")
-    
-    # Get base points (before captain multiplier)
-    if "proj_pts" in captain:
-        base_points = captain["proj_pts"]
-    else:
-        # Fallback: reverse engineer from projected_points
-        multiplier = 3 if (token_manager and 
-                         token_manager.config.TRIPLE_CAPTAIN) else 2
-        base_points = captain["projected_points"] / multiplier
-    
-    # Calculate captain bonus
-    multiplier = 3 if (token_manager and 
-                     token_manager.config.TRIPLE_CAPTAIN) else 2
-    captain_bonus = base_points * (multiplier - 1)
-    
-    # Format display
-    if token_manager and token_manager.config.TRIPLE_CAPTAIN:
-        return f"🔥 Triple Captain: {captain_name} (+{captain_bonus:.1f}) 🔥"
-    else:
-        return f"💪 Captain: {captain_name} (+{captain_bonus:.1f})"
 
 
 def main():
@@ -731,7 +665,7 @@ def main():
     players, scored, available_budget = process_player_data(components, config)
 
     # Generate theoretical best squad for comparison
-    _, theoretical_points, theoretical_cost = (
+    theoretical_starting_display, theoretical_points, theoretical_cost = (
         generate_theoretical_squad(
             components,
             config,
@@ -740,8 +674,9 @@ def main():
         )
     )
 
-    # Analyse unavailable players
-    analyse_unavailable_players(components, config, scored, prev_squad_ids)
+    # Analyse unavailable players (only for granular output)
+    if config.GRANULAR_OUTPUT:
+        analyse_unavailable_players(components, config, scored, prev_squad_ids)
 
     # Optimise squad
     (starting_with_transfers,
@@ -757,11 +692,36 @@ def main():
         )
     )
 
-    # Evaluate transfer strategy
-    should_make_transfers, transfer_analysis = evaluate_transfer_strategy(
+    # For penalty mode, get the improvement data from the transfer evaluator
+    transfer_analysis = {}
+    if config.ACCEPT_TRANSFER_PENALTY and hasattr(
+        components['transfer_evaluator'], '_last_best_scenario'):
+        scenario = components['transfer_evaluator']._last_best_scenario
+        transfer_analysis = {
+            "reason": "Transfer penalty mode - transfers already optimised",
+            "points_improvement_ppgw": scenario.get(
+            'points_improvement_ppgw', 0
+            ),
+            "gameweeks_analysed": scenario.get(
+            'gameweeks_analysed', config.FIRST_N_GAMEWEEKS
+            )
+        }
+
+    # Evaluate transfer strategy 
+    (should_make_transfers,
+     transfer_analysis_from_evaluator)= evaluate_transfer_strategy(
         components, config, scored, prev_squad_ids, 
         starting_with_transfers, transfers_made
     )
+    
+    # Use the analysis from evaluator if it has more data,
+    # otherwise use penalty mode data
+    if (transfer_analysis_from_evaluator
+        and 'points_improvement_ppgw'
+        in transfer_analysis_from_evaluator):
+        transfer_analysis = transfer_analysis_from_evaluator
+    elif not transfer_analysis:
+        transfer_analysis = transfer_analysis_from_evaluator
 
     # Finalise squad selection
     starting, bench = finalise_squad_selection(
@@ -775,9 +735,23 @@ def main():
         components, config, starting, bench, players, available_budget
     )
 
-    # Display final results
-    starting_display, bench_display = display_final_results(
-        components, config, starting, bench
+    # Extract transfer details for display
+    transfer_details = extract_transfer_details(
+        prev_squad_ids, starting_with_transfers, bench_with_transfers, players
+    )
+
+
+    # Display final results with enhanced logic - PASS TRANSFER DATA
+    starting_display, bench_display = display_final_results_enhanced(
+        components, config, starting, bench,
+        theoretical_starting_display,  # Pass the actual dataframe
+        components.get('theoretical_bench'), 
+        theoretical_points,  # Pass the actual points
+        should_make_transfers,  # NEW: Pass transfer decision
+        transfers_made,        # NEW: Pass number of transfers
+        penalty_points,        # NEW: Pass penalty points
+        transfer_analysis,     # NEW: Pass transfer analysis
+        transfer_details       # NEW: Pass specific transfer details
     )
 
     # Display comparison with theoretical squad
@@ -788,10 +762,10 @@ def main():
         your_cost = (
             starting["now_cost_m"].sum() + bench["now_cost_m"].sum()
         )
-        display_squad_comparison(
+        enhance_squad_comparison_display(
             theoretical_points, theoretical_cost, 
             your_points, your_cost, penalty_points, token_manager,
-            starting_display
+            starting_display, config
         )
 
 
