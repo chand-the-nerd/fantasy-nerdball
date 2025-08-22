@@ -330,7 +330,7 @@ class HistoricalDataManager:
         current_xg_context = player_data.get(
             'current_xg_context',
             'insufficient_data'
-            )
+        )
         
         # Calculate season progression factor
         gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
@@ -538,17 +538,74 @@ class HistoricalDataManager:
             games_factor = min(total_games / 60, 1.0)  # Cap at 60 games
             return 0.7 + (0.3 * games_factor)
     
+    def _get_current_season_data(self, current_players: pd.DataFrame) -> dict:
+        """
+        Extract current season data in historical format after GW8.
+        
+        Args:
+            current_players (pd.DataFrame): Current season player data
+            
+        Returns:
+            dict: Current season data formatted like historical seasons
+        """
+        gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
+        
+        # Only use current season data after 8 gameweeks
+        if gameweeks_completed < 8:
+            return {}
+        
+        current_season_data = {}
+        current_season = "2024-25"  # Current season identifier
+        
+        for _, player in current_players.iterrows():
+            name_key = player.get("name_key", "")
+            if not name_key:
+                continue
+            
+            # Calculate per-game metrics
+            minutes_played = player.get("minutes", 0)
+            games_played = max(1, round(minutes_played / 90))
+            
+            if games_played >= 8:  # Only include players with decent sample
+                points_per_game = player.get("total_points", 0) / games_played
+                
+                # Calculate xG metrics if available
+                goals = player.get("goals_scored", 0)
+                assists = player.get("assists", 0)
+                xg = player.get("expected_goals", 0)
+                xa = player.get("expected_assists", 0)
+                
+                goal_involvements_per_game = (goals + assists) / games_played
+                xgi_per_game = (xg + xa) / games_played
+                
+                # Calculate xOP if sufficient data
+                historical_xop = 1.0
+                if xgi_per_game > 0.1:
+                    historical_xop = goal_involvements_per_game / xgi_per_game
+                    historical_xop = max(0.2, min(3.0, historical_xop))
+                
+                current_season_data[name_key] = {
+                    f"ppg_{current_season}": points_per_game,
+                    f"games_{current_season}": games_played,
+                    f"reliability_{current_season}": min(1.0, games_played / gameweeks_completed),
+                    f"historical_xOP_{current_season}": historical_xop,
+                    f"position_{current_season}": player.get("pos_id", 3)
+                }
+        
+        return current_season_data
+    
     def merge_past_seasons(self, current: pd.DataFrame) -> pd.DataFrame:
         """
-        Enhanced merge with proper NA handling for missing historical data 
-        and conservative volatility penalties.
+        Enhanced merge with proper NA handling for missing historical data,
+        conservative volatility penalties, and current season integration 
+        after GW8.
 
         Args:
             current (pd.DataFrame): Current season player data.
 
         Returns:
             pd.DataFrame: Enhanced player data with weighted xG performance 
-                         modifiers.
+                         modifiers and current season integration.
         """
         # Fetch historical data
         hist_frames = [
@@ -558,7 +615,13 @@ class HistoricalDataManager:
         # Merge historical data
         hist = self._merge_historical_frames(hist_frames)
         
-        # Calculate weighted averages
+        # After GW8, include current season data in historical calculations
+        gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
+        if gameweeks_completed >= 8:
+            current_season_data = self._get_current_season_data(current)
+            hist = self._integrate_current_season_data(hist, current_season_data)
+        
+        # Calculate weighted averages (now includes current season if applicable)
         hist = self._calculate_weighted_historical_averages(hist)
         
         # Calculate xG performance modifiers
@@ -569,8 +632,11 @@ class HistoricalDataManager:
         current = current.assign(current_reliability=current_reliability)
         
         if self.config.GRANULAR_OUTPUT:
+            if gameweeks_completed >= 8:
+                print("Current season data integrated into historical analysis "
+                      f"after {gameweeks_completed} completed gameweeks")
             print("Calculated reliability based on starts over "
-                  f"{max(1, self.config.GAMEWEEK - 1)} completed gameweek(s)")
+                  f"{gameweeks_completed} completed gameweek(s)")
             print("Applied consistent per-game weighted xG analysis with "
                   f"conservative volatility penalties across "
                   f"{len(self.config.PAST_SEASONS)} seasons")
@@ -582,6 +648,38 @@ class HistoricalDataManager:
             "xOP_historical_baseline"
         ]
         return current.merge(hist[merge_cols], on="name_key", how="left")
+    
+    def _integrate_current_season_data(self, hist: pd.DataFrame, 
+                                     current_season_data: dict) -> pd.DataFrame:
+        """
+        Integrate current season data into historical dataframe after GW8.
+        
+        Args:
+            hist (pd.DataFrame): Historical data
+            current_season_data (dict): Current season data by name_key
+            
+        Returns:
+            pd.DataFrame: Historical data with current season integrated
+        """
+        if not current_season_data:
+            return hist
+        
+        # Convert current season data to DataFrame
+        current_df_data = []
+        for name_key, data in current_season_data.items():
+            row_data = {"name_key": name_key}
+            row_data.update(data)
+            current_df_data.append(row_data)
+        
+        if not current_df_data:
+            return hist
+        
+        current_df = pd.DataFrame(current_df_data)
+        
+        # Merge with historical data
+        hist = hist.merge(current_df, on="name_key", how="outer")
+        
+        return hist
     
     def _merge_historical_frames(self, hist_frames: list) -> pd.DataFrame:
         """Merge multiple historical dataframes."""
@@ -607,31 +705,51 @@ class HistoricalDataManager:
     
     def _calculate_weighted_historical_averages(
             self, hist: pd.DataFrame) -> pd.DataFrame:
-        """Calculate weighted averages from historical data."""
-        # Get relevant columns for calculations
-        ppg_cols = [
-            c for c in hist.columns if c.startswith("ppg_")]
-        games_cols = [
-            c for c in hist.columns if c.startswith("games_")]
-        reliability_cols = [
-            c for c in hist.columns if c.startswith("reliability_")]
-        historical_xop_cols = [
-            c for c in hist.columns if c.startswith("historical_xOP_")]
+        """
+        Calculate weighted averages from historical data, now potentially 
+        including current season after GW8.
+        """
+        # Get relevant columns for calculations (including current season)
+        ppg_cols = [c for c in hist.columns if c.startswith("ppg_")]
+        games_cols = [c for c in hist.columns if c.startswith("games_")]
+        reliability_cols = [c for c in hist.columns if c.startswith("reliability_")]
+        historical_xop_cols = [c for c in hist.columns if c.startswith("historical_xOP_")]
+
+        # Determine weights (adjust if current season is included)
+        gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
+        if gameweeks_completed >= 8 and "ppg_2024-25" in ppg_cols:
+            # Include current season with proportional weight
+            current_season_weight = min(0.6, gameweeks_completed / 38)
+            historical_weights = [w * (1 - current_season_weight) 
+                                for w in self.config.HISTORIC_SEASON_WEIGHTS]
+            all_weights = [current_season_weight] + historical_weights
+            
+            # Reorder columns to put current season first
+            ppg_cols = [c for c in ppg_cols if "2024-25" in c] + \
+                      [c for c in ppg_cols if "2024-25" not in c]
+            games_cols = [c for c in games_cols if "2024-25" in c] + \
+                        [c for c in games_cols if "2024-25" not in c]
+            reliability_cols = [c for c in reliability_cols if "2024-25" in c] + \
+                              [c for c in reliability_cols if "2024-25" not in c]
+            historical_xop_cols = [c for c in historical_xop_cols if "2024-25" in c] + \
+                                 [c for c in historical_xop_cols if "2024-25" not in c]
+        else:
+            # Use standard historical weights
+            all_weights = self.config.HISTORIC_SEASON_WEIGHTS
 
         # Initialise averages
         hist["avg_ppg_past2"] = 0.0
         hist["total_games_past2"] = 0
         hist["avg_reliability"] = 0.0
         hist["historical_xOP"] = 1.0
-        # Weighted historical Expected Overperformance
 
         # Calculate traditional weighted averages
         for ppg_col, games_col, reliability_col, weight in zip(
-            ppg_cols,
-            games_cols,
-            reliability_cols,
-            self.config.HISTORIC_SEASON_WEIGHTS
+            ppg_cols, games_cols, reliability_cols, all_weights
         ):
+            if ppg_col not in hist.columns:
+                continue
+                
             hist[ppg_col] = hist[ppg_col].fillna(0)
             hist[games_col] = hist[games_col].fillna(0)
             hist[reliability_col] = hist[reliability_col].fillna(0)
@@ -646,27 +764,23 @@ class HistoricalDataManager:
             hist["total_games_past2"] += hist[games_col]
 
         # Calculate weighted historical xOP
-        for xop_col, weight in zip(
-            historical_xop_cols,
-            self.config.HISTORIC_SEASON_WEIGHTS
-            ):
-            if xop_col in hist.columns:
-                hist[xop_col] = hist[xop_col].fillna(1.0)  # Default to neutral
-                # Only include seasons where player had sufficient games
-                season_suffix = xop_col.split('_')[-1]
-                games_col = f"games_{season_suffix}"
-                if games_col in hist.columns:
-                    sufficient_games_mask = hist[games_col] >= 8
-                    # Initialise historical_xOP to 1.0 for first calculation
-                    if xop_col == historical_xop_cols[0]:
-                        hist["historical_xOP"] = 1.0
-                    # Add weighted contribution
-                    hist.loc[
-                        sufficient_games_mask,
-                        "historical_xOP"] += (
-                            (hist.loc[sufficient_games_mask, xop_col]
-                             - 1.0) * weight
-                        )
+        for xop_col, weight in zip(historical_xop_cols, all_weights):
+            if xop_col not in hist.columns:
+                continue
+                
+            hist[xop_col] = hist[xop_col].fillna(1.0)  # Default to neutral
+            # Only include seasons where player had sufficient games
+            season_suffix = xop_col.split('_')[-1]
+            games_col = f"games_{season_suffix}"
+            if games_col in hist.columns:
+                sufficient_games_mask = hist[games_col] >= 8
+                # Initialise historical_xOP to 1.0 for first calculation
+                if xop_col == historical_xop_cols[0]:
+                    hist["historical_xOP"] = 1.0
+                # Add weighted contribution
+                hist.loc[sufficient_games_mask, "historical_xOP"] += (
+                    (hist.loc[sufficient_games_mask, xop_col] - 1.0) * weight
+                )
 
         # Round historical_xOP to 2 decimal places
         hist["historical_xOP"] = hist["historical_xOP"].round(2)
@@ -690,10 +804,8 @@ class HistoricalDataManager:
                 # Calculate normal xG modifier
                 xg_modifier = self.calculate_xg_performance_modifier(
                     player_data)
-                hist.loc[
-                    idx,
-                    "xOP_historical_baseline"
-                    ] = row.get("historical_xOP", 1.0)
+                hist.loc[idx, "xOP_historical_baseline"] = row.get(
+                    "historical_xOP", 1.0)
             else:
                 # New player - calculate modifier but mark baseline as NA
                 xg_modifier = self.calculate_xg_performance_modifier(
@@ -703,8 +815,7 @@ class HistoricalDataManager:
             # Apply data availability factor
             if has_historical_data:
                 availability_factor = self.calculate_data_availability_factor(
-                    player_data
-                    )
+                    player_data)
             else:
                 availability_factor = 0.7  # Give new players moderate impact
             
@@ -743,8 +854,9 @@ class HistoricalDataManager:
         Returns:
             str: Player position (GK, DEF, MID, FWD)
         """
-        # Look for position in any season
-        for season in self.config.PAST_SEASONS:
+        # Look for position in any season (including current)
+        all_seasons = self.config.PAST_SEASONS + ["2024-25"]
+        for season in all_seasons:
             pos_key = f"position_{season}"
             if pos_key in player_row and pd.notna(player_row[pos_key]):
                 pos_num = player_row[pos_key]

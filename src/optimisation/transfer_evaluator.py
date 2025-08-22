@@ -911,8 +911,7 @@ class TransferEvaluator:
             if hasattr(self, '_last_best_scenario'):
                 scenario = self._last_best_scenario
                 return True, {
-                    "reason": ("Transfer penalty mode - "
-                               "transfers already optimised"),
+                    "reason": ("Transfers not worth it"),
                     "points_improvement_ppgw": scenario.get(
                     'points_improvement_ppgw', 0),
                     "gameweeks_analysed": scenario.get(
