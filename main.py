@@ -21,6 +21,7 @@ from src.optimisation.transfer_evaluator import TransferEvaluator
 from src.utils.file_utils import FileUtils
 from src.utils.squad_display_utils import SquadDisplayUtils
 from src.utils.token_manager import TokenManager
+from src.utils.calculation_display_utils import CalculationDisplayUtils
 from src.utils.enhanced_main_display import (
     display_final_results_enhanced, 
     enhance_squad_comparison_display
@@ -180,6 +181,7 @@ def initialise_components(config, token_manager):
         'squad_selector': SquadSelector(config),
         'transfer_evaluator': TransferEvaluator(config),
         'display_utils': SquadDisplayUtils(config),
+        'calculation_display': CalculationDisplayUtils(config),
         'token_manager': token_manager
     }
 
@@ -397,6 +399,13 @@ def generate_theoretical_squad(components, config, players,
 
     # Only print detailed output in granular mode
     if config.GRANULAR_OUTPUT:
+        # Display detailed calculations for theoretical squad if enabled
+        if config.DETAILED_CALCULATION:
+            print(f"\n=== THEORETICAL SQUAD CALCULATIONS ===")
+            components['calculation_display'].display_squad_calculations(
+                theoretical_starting_display, theoretical_bench_display
+            )
+        
         # Display theoretical squad
         print(f"\n=== NERDBALL XI for GW{config.GAMEWEEK} ===")
         components['display_utils'].print_squad_table(
@@ -833,7 +842,7 @@ def main():
         components['transfer_evaluator'], '_last_best_scenario'):
         scenario = components['transfer_evaluator']._last_best_scenario
         transfer_analysis = {
-            "reason": "Transfer penalty mode - transfers already optimised",
+            "reason": "Transfers not worth it",
             "points_improvement_ppgw": scenario.get(
             'points_improvement_ppgw', 0
             ),
@@ -893,6 +902,13 @@ def main():
         transfer_details,      # NEW: Pass specific transfer details
         prev_gw_summary        # NEW: Pass previous gameweek summary
     )
+
+    # Display detailed calculations for your actual squad if enabled
+    if config.GRANULAR_OUTPUT and config.DETAILED_CALCULATION:
+        print(f"\n=== YOUR SQUAD CALCULATIONS ===")
+        components['calculation_display'].display_squad_calculations(
+            starting_display, bench_display
+        )
 
     # Display comparison with theoretical squad
     if theoretical_points > 0:

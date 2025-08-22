@@ -17,6 +17,9 @@ class Config:
     EXCLUDE_UNAVAILABLE = True
     # Set to True for detailed technical output, False for clean summary
     GRANULAR_OUTPUT = False
+    # Set to True to see how players scores are calculated, GRANULAR_OUTPUT
+    # must also be set to True
+    DETAILED_CALCULATION = True
 
     # === TOKENS ===
     WILDCARD = False # Set to True when either Wildcard or Free Hit is used
@@ -44,6 +47,7 @@ class Config:
     PAST_SEASONS = ["2024-25", "2023-24", "2022-23"]
     # Recent seasons weighted more heavily for xG consistency detection
     # Redistributed weights to maintain same relative importance
+    # NOTE: After GW8, current season will be added with proportional weight
     HISTORIC_SEASON_WEIGHTS = [0.5, 0.3, 0.2]  # Sums to 1.0
     # How many upcoming fixtures' difficulty to consider
     FIRST_N_GAMEWEEKS = 5
@@ -57,9 +61,22 @@ class Config:
 
     # === SCORING WEIGHTS ===
     # These should total 1.0
+    # NOTE: For new players (no historical data), form and fixture weights
+    # will be redistributed: Form = 1.0 - DIFFICULTY_WEIGHT, History = 0.0
     FORM_WEIGHT = 0.4      # Importance of current season average
     HISTORIC_WEIGHT = 0.4   # Importance of historic seasons' average
     DIFFICULTY_WEIGHT = 0.2 # Importance of upcoming fixture difficulty
+
+    # === EARLY SEASON PENALTY SETTINGS ===
+    EARLY_SEASON_PENALTY_INITIAL = 4.0  # Divide form by this initially
+    EARLY_SEASON_DECAY_FACTOR = 0.75    # Decay factor per gameweek
+    EARLY_SEASON_PENALTY_GAMEWEEKS = 8   # Number of GWs penalty applies
+
+    # === CURRENT SEASON INTEGRATION ===
+    # After GW8, current season data will be integrated into historical
+    # analysis to preserve information not captured in 'form'
+    CURRENT_SEASON_INTEGRATION_GW = 8    # GW when integration begins
+    CURRENT_SEASON_MAX_WEIGHT = 0.6      # Maximum weight for current season
 
     # === SQUAD COMPOSITION ===
     SQUAD_SIZE = {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3}

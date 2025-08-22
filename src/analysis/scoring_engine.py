@@ -15,7 +15,7 @@ class ScoringEngine:
         """
         Calculate FPL scores and base quality scores for each player based on 
         form, historical performance, and fixture difficulty, with reliability
-        considerations.
+        considerations and early season penalties.
 
         Args:
             players (pd.DataFrame): Player data with form and historical PPG.
@@ -23,7 +23,8 @@ class ScoringEngine:
 
         Returns:
             tuple: (scored_dataframe, involvement_stats_dict) containing the 
-                   player data with calculated scores and involvement statistics.
+                   player data with calculated scores and involvement 
+                   statistics.
         """
         df = players.merge(fixture_scores, on="name_key", how="left")
 
@@ -33,8 +34,8 @@ class ScoringEngine:
         # Calculate team and promotion adjustments
         df = self._calculate_team_adjustments(df)
 
-        # Calculate base quality components
-        df = self._calculate_base_quality(df)
+        # Calculate base quality components with adaptive weighting
+        df = self._calculate_base_quality_adaptive(df)
 
         # Apply reliability adjustments for squad selection
         df = self._apply_reliability_adjustments(df)
@@ -72,27 +73,124 @@ class ScoringEngine:
         )
         return df
     
-    def _calculate_base_quality(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Calculate base quality components using z-score normalisation."""
-        # Calculate z-scores for each component
-        form_component = self.config.FORM_WEIGHT * self._z_score(df["form"])
-        historic_component = (
-            self.config.HISTORIC_WEIGHT * self._z_score(df["avg_ppg_past2"])
+    def _calculate_base_quality_adaptive(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculate base quality with adaptive weighting for new players and 
+        early season penalty applied directly to form contribution.
+        """
+        # Store form_adjusted for display purposes
+        gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
+        early_season_penalty = self._calculate_early_season_penalty(
+            gameweeks_completed
         )
-        fixture_component = (
-            self.config.DIFFICULTY_WEIGHT * self._z_score(df["fixture_bonus"])
-        )
-
-        # Base quality score (for projected points when they DO play)
-        # Now includes xG performance modifier
-        df["base_quality"] = (
-            (form_component + historic_component + fixture_component + 
-             df["promoted_penalty"]) 
-            * df["team_modifier"] 
-            * df["xConsistency"]
+        df["form_adjusted"] = df["form"] / early_season_penalty
+        
+        # Calculate z-scores for each component using RAW values
+        form_component = self._z_score(df["form"])
+        historic_component = self._z_score(df["avg_ppg_past2"])
+        fixture_component = self._z_score(df["fixture_bonus"])
+        
+        # Apply adaptive weighting with early season penalty applied directly
+        # to form contribution
+        df["base_quality"] = df.apply(
+            lambda row: self._calculate_weighted_base_quality(
+                row, form_component.loc[row.name], 
+                historic_component.loc[row.name],
+                fixture_component.loc[row.name]
+            ), axis=1
         )
         
         return df
+    
+    def _calculate_early_season_penalty(self, gameweeks_completed: int) -> float:
+        """
+        Calculate early season penalty divisor that decays over first N 
+        fixtures. Form contribution is divided by this factor, starting 
+        from GW2.
+        
+        Args:
+            gameweeks_completed (int): Number of gameweeks completed
+            
+        Returns:
+            float: Divisor for form contribution (starts at config value in 
+                   GW2, decays to 1.0)
+        """
+        current_gameweek = self.config.GAMEWEEK
+        
+        if current_gameweek <= 1:
+            return 1.0  # No penalty in GW1 (form is 0 anyway)
+        
+        # Calculate when penalty should end (when divisor reaches 1.0)
+        penalty_end_gw = 2 + self.config.EARLY_SEASON_PENALTY_GAMEWEEKS
+        if current_gameweek >= penalty_end_gw:
+            return 1.0  # No penalty after specified gameweeks
+        
+        # Use config values for penalty calculation
+        initial_divisor = self.config.EARLY_SEASON_PENALTY_INITIAL
+        decay_factor = self.config.EARLY_SEASON_DECAY_FACTOR
+        
+        # Calculate current divisor based on current gameweek:
+        # GW2: INITIAL * (DECAY^0) = INITIAL
+        # GW3: INITIAL * (DECAY^1) = INITIAL * DECAY
+        # GW4: INITIAL * (DECAY^2) = INITIAL * DECAY^2
+        # etc.
+        penalty_steps = current_gameweek - 2
+        current_divisor = initial_divisor * (decay_factor ** penalty_steps)
+        
+        # Ensure divisor doesn't go below 1.0
+        return max(1.0, current_divisor)
+    
+    def _calculate_weighted_base_quality(self, row: pd.Series, 
+                                       form_z: float, historic_z: float,
+                                       fixture_z: float) -> float:
+        """
+        Calculate weighted base quality with adaptive weights for new players
+        and early season penalty applied directly to form contribution.
+        
+        Args:
+            row (pd.Series): Player data row
+            form_z (float): Form z-score (calculated from raw form)
+            historic_z (float): Historical z-score
+            fixture_z (float): Fixture z-score
+            
+        Returns:
+            float: Weighted base quality score with early season penalty 
+                   applied
+        """
+        # Check if player has historical data
+        has_historical_data = row.get("avg_ppg_past2", 0) > 0
+        
+        if has_historical_data:
+            # Use standard config weights for players with history
+            form_weight = self.config.FORM_WEIGHT
+            historic_weight = self.config.HISTORIC_WEIGHT
+            fixture_weight = self.config.DIFFICULTY_WEIGHT
+        else:
+            # New players: History = 0%, redistribute between form and fixtures
+            form_weight = 1.0 - self.config.DIFFICULTY_WEIGHT
+            historic_weight = 0.0
+            fixture_weight = self.config.DIFFICULTY_WEIGHT
+        
+        # Apply early season penalty directly to form contribution
+        gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
+        early_season_penalty = self._calculate_early_season_penalty(
+            gameweeks_completed
+        )
+        form_contribution = (form_z * form_weight) / early_season_penalty
+        
+        # Calculate weighted score with penalised form contribution
+        base_quality = (
+            form_contribution + 
+            (historic_z * historic_weight) + 
+            (fixture_z * fixture_weight) + 
+            row.get("promoted_penalty", 0)
+        )
+        
+        # Apply team modifier and xG consistency
+        base_quality *= row.get("team_modifier", 1.0)
+        base_quality *= row.get("xConsistency", 1.0)
+        
+        return base_quality
     
     def _z_score(self, series: pd.Series) -> pd.Series:
         """
@@ -200,15 +298,21 @@ class ScoringEngine:
             # Fill any NaN fixture multipliers with 1.0 (normal gameweek)
             df["fixture_multiplier"] = df["fixture_multiplier"].fillna(1.0)
             
-            df["projected_points"] = df["projected_points"] * df["fixture_multiplier"]
+            df["projected_points"] = (
+                df["projected_points"] * df["fixture_multiplier"]
+            )
             
             # Clean up any NaN/inf values that might have been created
             df["projected_points"] = df["projected_points"].fillna(0.0)
-            df["projected_points"] = df["projected_points"].replace([float("inf"), float("-inf")], 0.0)
+            df["projected_points"] = df["projected_points"].replace(
+                [float("inf"), float("-inf")], 0.0
+            )
             
-            # Ensure BGW players have exactly 0 points, others have minimum 1
+            # Ensure BGW players have exactly 0 points, others minimum 1
             bgw_mask = df["fixture_multiplier"] == 0.0
-            df.loc[~bgw_mask, "projected_points"] = df.loc[~bgw_mask, "projected_points"].clip(lower=1.0)
+            df.loc[~bgw_mask, "projected_points"] = (
+                df.loc[~bgw_mask, "projected_points"].clip(lower=1.0)
+            )
             df.loc[bgw_mask, "projected_points"] = 0.0
 
         return df
@@ -216,7 +320,7 @@ class ScoringEngine:
     def _apply_availability_filter(self, df: pd.DataFrame) -> tuple:
         """
         Apply availability filter to players based on config setting.
-        Enhanced to penalize non-playing players after GW1.
+        Enhanced to penalise non-playing players after GW1.
         
         Args:
             df (pd.DataFrame): Player dataframe with scores
@@ -224,7 +328,7 @@ class ScoringEngine:
         Returns:
             tuple: (modified_dataframe, involvement_stats_dict)
         """
-        # Initialize involvement stats
+        # Initialise involvement stats
         involvement_stats = {
             'high_involvement': 0,
             'zero_involvement': 0,
@@ -248,7 +352,7 @@ class ScoringEngine:
         
         involvement_stats['unavailable'] = unavailable_mask.sum()
         
-        # After GW1, heavily penalize players who haven't been playing
+        # After GW1, heavily penalise players who haven't been playing
         if self.config.GAMEWEEK > 1:
             gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
             
