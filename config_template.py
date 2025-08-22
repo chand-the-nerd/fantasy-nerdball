@@ -43,11 +43,7 @@ class Config:
     FPL_SCORE_TO_POINTS_MULTIPLIER = 1.0
 
     # === HISTORICAL DATA SETTINGS (Enhanced for xG Analysis) ===
-    # Only include seasons with xG data available (2022-23 onwards)
     PAST_SEASONS = ["2024-25", "2023-24", "2022-23"]
-    # Recent seasons weighted more heavily for xG consistency detection
-    # Redistributed weights to maintain same relative importance
-    # NOTE: After GW8, current season will be added with proportional weight
     HISTORIC_SEASON_WEIGHTS = [0.5, 0.3, 0.2]  # Sums to 1.0
     # How many upcoming fixtures' difficulty to consider
     FIRST_N_GAMEWEEKS = 5
@@ -61,8 +57,6 @@ class Config:
 
     # === SCORING WEIGHTS ===
     # These should total 1.0
-    # NOTE: For new players (no historical data), form and fixture weights
-    # will be redistributed: Form = 1.0 - DIFFICULTY_WEIGHT, History = 0.0
     FORM_WEIGHT = 0.4      # Importance of current season average
     HISTORIC_WEIGHT = 0.4   # Importance of historic seasons' average
     DIFFICULTY_WEIGHT = 0.2 # Importance of upcoming fixture difficulty
