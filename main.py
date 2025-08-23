@@ -924,6 +924,11 @@ def main():
             starting_display, config
         )
 
+    if not starting_display.empty and not bench_display.empty:
+        FileUtils.save_squad_data(config.GAMEWEEK, starting_display, bench_display)
+        if config.GRANULAR_OUTPUT:
+            print(f"✅ Squad data saved for GW{config.GAMEWEEK}")
+
 
 if __name__ == "__main__":
     main()
