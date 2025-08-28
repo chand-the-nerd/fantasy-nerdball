@@ -19,6 +19,7 @@ class SquadSelector:
         free_transfers: int = None,
         show_transfer_summary: bool = True,
         available_budget: float = None,
+        use_projected_points: bool = False,
     ) -> tuple:
         """
         Select optimal FPL squad using Integer Linear Programming with
@@ -53,7 +54,13 @@ class SquadSelector:
         y = [pulp.LpVariable(f"y_{i}", cat="Binary") for i in range(n)]
 
         # Set up optimisation problem
-        prob = self._setup_optimisation_problem(df, x, y, n)
+        prob = self._setup_optimisation_problem(
+            df,
+            x,
+            y,
+            n,
+            use_projected_points
+            )
         
         # Add constraints
         self._add_basic_constraints(prob, x, y, n)
@@ -126,24 +133,32 @@ class SquadSelector:
     
     def _clean_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """Clean the dataframe for optimisation."""
-        df = df.reset_index(drop=True).drop_duplicates(subset="name_key")
+        df = df.reset_index(drop=True).drop_duplicates(
+            subset=["name_key", "position"])
         df = df[
             ~df["display_name"].str.lower().isin(self.config.BLACKLIST_PLAYERS)
         ].copy()
         return df
     
     def _setup_optimisation_problem(self, df: pd.DataFrame, x: list, y: list, 
-                                  n: int) -> pulp.LpProblem:
+                                    n: int, use_projected_points: bool = False
+                                    ) -> pulp.LpProblem:
         """Set up the main optimisation problem with objective function."""
         prob = pulp.LpProblem("FPL_Squad_Selection", pulp.LpMaximize)
         
-        # Use projected_points for starting XI optimisation,
-        # fpl_score for squad
-        prob += pulp.lpSum(
-            y[i] * df.iloc[i]["projected_points"] + 
-            0.2 * (x[i] - y[i]) * df.iloc[i]["fpl_score"]
-            for i in range(n)
-        )
+        if use_projected_points:
+            # For starting XI selection: pure projected points optimization
+            prob += pulp.lpSum(
+                y[i] * df.iloc[i]["projected_points"]
+                for i in range(n)
+            )
+        else:
+            # For squad selection: fpl_score with bench weighting
+            prob += pulp.lpSum(
+                y[i] * df.iloc[i]["fpl_score"] + 
+                0.2 * (x[i] - y[i]) * df.iloc[i]["fpl_score"]
+                for i in range(n)
+            )
         
         return prob
     
