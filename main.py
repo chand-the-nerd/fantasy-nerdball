@@ -342,6 +342,7 @@ def generate_theoretical_squad(components, config, players,
             free_transfers=None,
             show_transfer_summary=False,
             available_budget=budget_for_comparison,
+            use_projected_points=False
         )
     )
     
@@ -523,6 +524,7 @@ def optimise_squad(
                 scored, config.FORCED_SELECTIONS, prev_squad_ids,
                 config.FREE_TRANSFERS, show_transfer_summary=True,
                 available_budget=available_budget,
+                use_projected_points=False
             )
         )
         
@@ -613,6 +615,7 @@ def optimise_starting_xi(components, config, starting, bench, players,
             scored_next, updated_forced_selections,
             prev_squad_ids=None, free_transfers=None,
             show_transfer_summary=False, available_budget=available_budget,
+            use_projected_points=True
         )
     )
 

@@ -371,7 +371,8 @@ class TransferEvaluator:
                 squad_selector.select_squad_ilp(
                     df, forced_selections, prev_squad_ids, free_transfers, 
                     show_transfer_summary=True, 
-                    available_budget=available_budget
+                    available_budget=available_budget,
+                    use_projected_points=False
                 )
             )
             return starting, bench, forced_display, 0, 0
@@ -442,7 +443,8 @@ class TransferEvaluator:
         # Get optimal squad with this transfer limit
         starting, bench, forced_display = squad_selector.select_squad_ilp(
             df, forced_selections, prev_squad_ids, max_transfers_allowed,
-            show_transfer_summary=False, available_budget=available_budget
+            show_transfer_summary=False, available_budget=available_budget,
+            use_projected_points=False
         )
         
         if starting.empty:
