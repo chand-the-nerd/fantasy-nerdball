@@ -252,12 +252,10 @@ def process_player_data(components, config):
         print("Fetching current players with xG analysis...")
     
     players = components['player_processor'].fetch_current_players()
-
-    # Calculate available budget based on previous squad value
-    available_budget = (
-        components['player_processor']
-        .calculate_budget_from_previous_squad(config.GAMEWEEK, players)
-    )
+    available_budget = config.BUDGET
+    
+    if config.GRANULAR_OUTPUT:
+        print(f"Using fixed budget from config: £{available_budget:.1f}m")
 
     if config.GRANULAR_OUTPUT:
         print("Analysing historical xG performance...")
@@ -326,12 +324,11 @@ def generate_theoretical_squad(components, config, players,
         players, fixture_scores_comparison
     )[0]  # Take only the dataframe, ignore stats
     
-    budget_for_comparison = (
-        available_budget if available_budget is not None else config.BUDGET
-    )
+    # Always use the fixed budget from config instead of calculated budget
+    budget_for_comparison = config.BUDGET
     
     if config.GRANULAR_OUTPUT:
-        print(f"Available budget for comparison: {budget_for_comparison:.1f}m")
+        print(f"Using fixed budget: {budget_for_comparison:.1f}m")
     
     # No forced selections or transfer constraints for theoretical squad
     theoretical_starting, theoretical_bench, _ = (
@@ -799,7 +796,7 @@ def main():
                                     .fetch_current_players())
         )
 
-    # Process player data - this now displays all stats in correct order
+    # Process player data - now always uses config.BUDGET
     if not config.GRANULAR_OUTPUT:
         print("🤕 Seeing who's available this week...")
     players, scored, available_budget = process_player_data(components, config)
@@ -835,7 +832,7 @@ def main():
             config,
             scored,
             prev_squad_ids,
-            available_budget
+            available_budget  # This will always be config.BUDGET now
         )
     )
 

@@ -1,4 +1,4 @@
-"""Module for squad selection using integer linear programming."""
+"""Module for squad selection using integer linear programming with enhanced constraints."""
 
 import pandas as pd
 import pulp
@@ -71,6 +71,8 @@ class SquadSelector:
             prob, x, prev_squad_ids, free_transfers, df)
         self._add_bench_constraints(prob, x, y, df, n)
         self._add_team_constraints(prob, x, df, n)
+        # NEW: Add same team-position constraint
+        self._add_same_team_position_constraints(prob, x, df, n)
         self._add_budget_constraint(prob, x, df, available_budget, n)
 
         # Solve the problem
@@ -271,6 +273,42 @@ class SquadSelector:
                           if df.iloc[i]["team_id"] == team)
                 <= self.config.MAX_PER_TEAM
             )
+    
+    def _add_same_team_position_constraints(self, prob: pulp.LpProblem, x: list,
+                                          df: pd.DataFrame, n: int):
+        """
+        Add constraints to prevent having 2+ players from the same team 
+        in the same position.
+        
+        Args:
+            prob: The optimization problem
+            x: Decision variables for squad selection
+            df: Player dataframe
+            n: Number of players
+        """
+        positions = ["GK", "DEF", "MID", "FWD"]
+        
+        for position in positions:
+            # Get unique teams that have players in this position
+            teams_in_position = df[df["position"] == position]["team_id"].unique()
+            
+            for team_id in teams_in_position:
+                # For each team-position combination, ensure at most 1 player is selected
+                team_pos_players = pulp.lpSum(
+                    x[i] for i in range(n)
+                    if (df.iloc[i]["position"] == position and 
+                        df.iloc[i]["team_id"] == team_id)
+                )
+                prob += team_pos_players <= 1
+        
+        # Optional: Add debug output if granular output is enabled
+        if self.config.GRANULAR_OUTPUT:
+            constraint_count = 0
+            for position in positions:
+                teams_in_position = df[df["position"] == position]["team_id"].unique()
+                constraint_count += len(teams_in_position)
+            
+            print(f"Added {constraint_count} same team-position constraints")
     
     def _add_budget_constraint(
             self,
