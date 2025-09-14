@@ -55,11 +55,30 @@ class Config:
     # Higher values = more balanced weighting across all fixtures
     FIXTURE_DECAY_FACTOR = 0.8
 
-    # === SCORING WEIGHTS ===
-    # These should total 1.0
-    FORM_WEIGHT = 0.4      # Importance of current season average
-    HISTORIC_WEIGHT = 0.4   # Importance of historic seasons' average
-    DIFFICULTY_WEIGHT = 0.2 # Importance of upcoming fixture difficulty
+    # === SCORING WEIGHTS BY POSITION ===
+    # These should total 1.0 for each position
+    POSITION_SCORING_WEIGHTS = {
+        "GK": {
+            "form": 0.3,        # Importance of current season average
+            "historic": 0.4,    # Importance of historic seasons' average
+            "difficulty": 0.3   # Importance of upcoming fixture difficulty
+        },
+        "DEF": {
+            "form": 0.4,
+            "historic": 0.4,
+            "difficulty": 0.2
+        },
+        "MID": {
+            "form": 0.5,
+            "historic": 0.3,
+            "difficulty": 0.2
+        },
+        "FWD": {
+            "form": 0.6,
+            "historic": 0.3,
+            "difficulty": 0.1
+        }
+    }
 
     # === EARLY SEASON PENALTY SETTINGS ===
     EARLY_SEASON_PENALTY_INITIAL = 4.0  # Divide form by this initially

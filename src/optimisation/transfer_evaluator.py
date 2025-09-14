@@ -229,7 +229,7 @@ class TransferEvaluator:
         }
     
     def _evaluate_substitution_strategy(self, substitute_scenarios: list, 
-                                      free_transfers: int) -> dict:
+                                    free_transfers: int) -> dict:
         """
         Evaluate overall substitution strategy based on scenarios.
         
@@ -242,28 +242,28 @@ class TransferEvaluator:
         """
         # Calculate total impact of substitutions (already in ppgw)
         total_score_loss = sum(scenario["score_loss"] 
-                             for scenario in substitute_scenarios)
+                            for scenario in substitute_scenarios)
         forced_transfers = len(
             [s for s in substitute_scenarios if s["best_substitute"] is None]
         )
 
-        # Use MIN_TRANSFER_VALUE directly (already per-gameweek)
-        threshold_ppgw = self.config.MIN_TRANSFER_VALUE
+        # Use MIN_TRANSFER_VALUE as total threshold across all transfers
+        threshold_total = self.config.MIN_TRANSFER_VALUE
 
-        # Decision logic based on projected points per gameweek
+        # Decision logic based on total projected points improvement
         if forced_transfers > free_transfers:
             decision = {
                 "recommendation": "wildcard_needed",
                 "reason": (f"Need {forced_transfers} forced transfers but "
-                          f"only have {free_transfers} free"),
+                        f"only have {free_transfers} free"),
                 "total_score_loss": total_score_loss,
                 "scenarios": substitute_scenarios,
             }
-        elif total_score_loss > threshold_ppgw:
+        elif total_score_loss > threshold_total:
             decision = {
                 "recommendation": "make_transfers",
                 "reason": (f"Score loss ({total_score_loss:.1f}) exceeds "
-                          f"transfer threshold ({threshold_ppgw:.1f})"),
+                        f"transfer threshold ({threshold_total:.1f})"),
                 "total_score_loss": total_score_loss,
                 "scenarios": substitute_scenarios,
             }
@@ -271,7 +271,7 @@ class TransferEvaluator:
             decision = {
                 "recommendation": "use_substitutes",
                 "reason": (f"Score loss ({total_score_loss:.1f}) is "
-                           "acceptable, save transfers"),
+                        "acceptable, save transfers"),
                 "total_score_loss": total_score_loss,
                 "scenarios": substitute_scenarios,
             }
@@ -281,7 +281,7 @@ class TransferEvaluator:
                 substitute_scenarios,
                 total_score_loss, 
                 decision,
-                threshold_ppgw
+                threshold_total
             )
         return decision
     
@@ -595,66 +595,61 @@ class TransferEvaluator:
                   f"Net: {scenario['net_ppgw']:.1f} points{status}")
     
     def _apply_value_threshold(self, best_scenario: dict, 
-                             baseline_scenario: dict) -> dict:
-        """Apply MIN_TRANSFER_VALUE threshold check using ppgw directly."""
-        improvement_ppgw = 0  # Default value
+                            baseline_scenario: dict) -> dict:
+        """Apply MIN_TRANSFER_VALUE threshold check using total basis."""
+        improvement_total = 0  # Default value
         
         if (best_scenario['actual_transfers'] > 
             baseline_scenario['actual_transfers']):
             baseline_ppgw = baseline_scenario['net_ppgw']
             best_ppgw = best_scenario['net_ppgw']
             improvement_ppgw = best_ppgw - baseline_ppgw
+            improvement_total = improvement_ppgw * self.config.FIRST_N_GAMEWEEKS
             extra_transfers_for_improvement = (
                 best_scenario['actual_transfers'] - 
                 baseline_scenario['actual_transfers']
             )
             
-            # Use MIN_TRANSFER_VALUE directly (already per-gameweek)
-            threshold_ppgw = self.config.MIN_TRANSFER_VALUE
+            # Use MIN_TRANSFER_VALUE as total threshold across all transfers
+            threshold_total = self.config.MIN_TRANSFER_VALUE
             
             if self.config.GRANULAR_OUTPUT:
-                print(f"\nTransfer Value Check (per gameweek basis):")
+                print(f"\nTransfer Value Check (total improvement basis):")
                 print(f"   Baseline ({baseline_scenario['actual_transfers']} "
-                      f"transfers): {baseline_ppgw:.1f} points")
+                    f"transfers): {baseline_ppgw:.1f} points per gameweek")
                 print(f"   Best scenario ({best_scenario['actual_transfers']} "
-                      f"transfers): {best_ppgw:.1f} points")
+                    f"transfers): {best_ppgw:.1f} points per gameweek")
                 print(
-                    f"   Improvement: {improvement_ppgw:.1f} points per gameweek")
-                print(f"   Extra transfers for improvement: "
-                      f"{extra_transfers_for_improvement}")
-                print(f"   Improvement per extra transfer: "
-                      f"{improvement_ppgw/extra_transfers_for_improvement:.1f} "
-                      f"points per gameweek")
-                print(f"   Minimum threshold: {threshold_ppgw:.1f} "
-                      f"points per gameweek")
+                    f"   Total improvement: {improvement_total:.1f} points "
+                )
+                print(f"   Extra transfers: "
+                    f"{extra_transfers_for_improvement}")
+                print(f"   Total improvement threshold: {threshold_total:.1f} "
+                    f"points")
             
-            required_improvement_ppgw = (
-                threshold_ppgw * extra_transfers_for_improvement
-            )
-            
-            if improvement_ppgw < required_improvement_ppgw:
+            if improvement_total < threshold_total:
                 if self.config.GRANULAR_OUTPUT:
                     print(f"   INSUFFICIENT VALUE GAINED: Using baseline "
-                          f"({baseline_scenario['actual_transfers']} transfers) "
-                          "instead")
+                        f"({baseline_scenario['actual_transfers']} transfers) "
+                        "instead")
                 best_scenario = baseline_scenario
                 if self.config.GRANULAR_OUTPUT:
                     print(f"   SELECTED: {best_scenario['actual_transfers']} "
-                          f"transfers → {best_scenario['net_ppgw']:.1f} points")
+                        f"transfers → {best_scenario['net_ppgw']:.1f} points")
             else:
                 if self.config.GRANULAR_OUTPUT:
                     print(f"   SUFFICIENT VALUE: Extra transfers worthwhile")
                     print(f"   SELECTED: {best_scenario['actual_transfers']} "
-                          f"transfers → {best_scenario['net_ppgw']:.1f} points")
+                        f"transfers → {best_scenario['net_ppgw']:.1f} points")
         else:
             if self.config.GRANULAR_OUTPUT:
                 print(f"\nUsing optimal scenario with "
-                      f"{best_scenario['actual_transfers']} transfers")
+                    f"{best_scenario['actual_transfers']} transfers")
                 print(f"   SELECTED: {best_scenario['actual_transfers']} "
-                      f"transfers → {best_scenario['net_ppgw']:.1f} points")
+                    f"transfers → {best_scenario['net_ppgw']:.1f} points")
         
         # Store the improvement data in the scenario for later use
-        best_scenario['points_improvement_ppgw'] = improvement_ppgw
+        best_scenario['points_improvement_total'] = improvement_total
         best_scenario['gameweeks_analysed'] = self.config.FIRST_N_GAMEWEEKS
         
         return best_scenario
@@ -703,8 +698,8 @@ class TransferEvaluator:
         transfers_made: int
     ) -> tuple:
         """
-        Evaluate whether the transfers provide sufficient projected 
-        points improvement using per-gameweek analysis.
+        Evaluate whether the transfers provide sufficient total projected 
+        points improvement.
 
         Args:
             no_transfer_squad (pd.DataFrame): Starting XI with no transfers.
@@ -717,52 +712,50 @@ class TransferEvaluator:
         if transfers_made == 0:
             return True, {"reason": "No transfers needed", "improvement": 0}
 
-        # Calculate per-gameweek projected points improvement
+        # Calculate total projected points improvement
         no_transfer_points = no_transfer_squad["projected_points"].sum()
         transfer_points = transfer_squad["projected_points"].sum()
         
         no_transfer_ppgw = no_transfer_points / self.config.FIRST_N_GAMEWEEKS
         transfer_ppgw = transfer_points / self.config.FIRST_N_GAMEWEEKS
         points_improvement_ppgw = transfer_ppgw - no_transfer_ppgw
+        total_improvement = points_improvement_ppgw * self.config.FIRST_N_GAMEWEEKS
 
-        # Use MIN_TRANSFER_VALUE directly (already per-gameweek)
-        threshold_ppgw = self.config.MIN_TRANSFER_VALUE
-        min_improvement_needed_ppgw = threshold_ppgw * transfers_made
+        # Use MIN_TRANSFER_VALUE as total threshold across all transfers
+        threshold_total = self.config.MIN_TRANSFER_VALUE
         
         analysis = {
             "transfers_made": transfers_made,
             "no_transfer_ppgw": no_transfer_ppgw,
             "transfer_ppgw": transfer_ppgw,
             "points_improvement_ppgw": points_improvement_ppgw,
-            "improvement_per_transfer_ppgw": (
-                points_improvement_ppgw / transfers_made
+            "total_improvement": total_improvement,
+            "improvement_per_transfer": (
+                total_improvement / transfers_made
                 if transfers_made > 0 else 0
             ),
-            "min_improvement_needed_ppgw": min_improvement_needed_ppgw,
-            "threshold_per_transfer_ppgw": threshold_ppgw,
+            "threshold_total": threshold_total,
             "gameweeks_analysed": self.config.FIRST_N_GAMEWEEKS,
         }
 
-        # Decision logic based on per-gameweek projected points improvement
-        if points_improvement_ppgw < 0:
+        # Decision logic based on total projected points improvement
+        if total_improvement < 0:
             return False, {
                 **analysis, 
-                "reason": "Transfers would decrease projected points per "
-                         "gameweek"
+                "reason": "Transfers would decrease total projected points"
             }
 
-        if points_improvement_ppgw < min_improvement_needed_ppgw:
+        if total_improvement < threshold_total:
             return False, {
                 **analysis,
-                "reason": (f"Improvement ({points_improvement_ppgw:.1f} ppgw) "
-                          f"below threshold ({min_improvement_needed_ppgw:.1f}"
-                          f" ppgw)")
+                "reason": (f"Total improvement ({total_improvement:.1f}) "
+                        f"below threshold ({threshold_total:.1f})")
             }
 
         return True, {
             **analysis, 
-            "reason": f"Transfers provide sufficient improvement "
-            f"({points_improvement_ppgw:.1f} ppgw)"
+            "reason": f"Transfers provide sufficient total improvement "
+            f"({total_improvement:.1f})"
         }
     
     def get_no_transfer_squad(self, df: pd.DataFrame, 
@@ -947,21 +940,21 @@ class TransferEvaluator:
         return True, {}
     
     def _print_transfer_value_analysis(self, transfer_analysis: dict):
-        """Print transfer value analysis results using per-gameweek metrics."""
+        """Print transfer value analysis results using total metrics."""
         print(f"\n=== Transfer Value Analysis ===")
         print(f"Transfers to be made: {transfer_analysis['transfers_made']}")
         print(f"Gameweeks analysed: "
-              f"{transfer_analysis.get('gameweeks_analysed', 'N/A')}")
+            f"{transfer_analysis.get('gameweeks_analysed', 'N/A')}")
         print(f"No-transfer points per gameweek: "
-              f"{transfer_analysis['no_transfer_ppgw']:.1f}")
+            f"{transfer_analysis['no_transfer_ppgw']:.1f}")
         print(f"With-transfer points per gameweek: "
-              f"{transfer_analysis['transfer_ppgw']:.1f}")
+            f"{transfer_analysis['transfer_ppgw']:.1f}")
         print(f"Points improvement per gameweek: "
-              f"{transfer_analysis['points_improvement_ppgw']:.1f}")
-        print(f"Improvement per transfer (ppgw): "
-              f"{transfer_analysis['improvement_per_transfer_ppgw']:.1f}")
-        print(f"Threshold per transfer (ppgw): "
-              f"{transfer_analysis['threshold_per_transfer_ppgw']:.1f}")
-        print(f"Minimum improvement needed (ppgw): "
-              f"{transfer_analysis['min_improvement_needed_ppgw']:.1f}")
+            f"{transfer_analysis['points_improvement_ppgw']:.1f}")
+        print(f"Total improvement over {transfer_analysis['gameweeks_analysed']} gameweeks: "
+            f"{transfer_analysis['total_improvement']:.1f}")
+        print(f"Improvement per transfer: "
+            f"{transfer_analysis['improvement_per_transfer']:.1f}")
+        print(f"Total threshold: "
+            f"{transfer_analysis['threshold_total']:.1f}")
         print(f"Decision: {transfer_analysis['reason']}")
