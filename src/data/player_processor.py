@@ -372,62 +372,6 @@ class PlayerProcessor:
         existing_temp_cols = [col for col in temp_columns if col in df.columns]
         return df.drop(columns=existing_temp_cols)
     
-    def calculate_budget_from_previous_squad(
-            self, gameweek: int, current_players: pd.DataFrame) -> float:
-        """
-        Calculate available budget based on previous gameweek's squad value.
-
-        Args:
-            gameweek (int): Current gameweek number
-            current_players (pd.DataFrame): Current player database with prices
-
-        Returns:
-            float: Available budget in millions, or default BUDGET if no
-                   previous squad
-        """
-        if gameweek <= 1:
-            if self.config.GRANULAR_OUTPUT:
-                print(f"Using default budget: £{self.config.BUDGET:.1f}m "
-                      f"(no previous squad)")
-            return self.config.BUDGET
-
-        prev_gw = gameweek - 1
-        prev_squad_file = f"squads/gw{prev_gw}/full_squad.csv"
-
-        if not os.path.exists(prev_squad_file):
-            if self.config.GRANULAR_OUTPUT:
-                print(f"Using default budget: £{self.config.BUDGET:.1f}m "
-                      f"(no previous squad file)")
-            return self.config.BUDGET
-
-        try:
-            prev_squad = pd.read_csv(prev_squad_file)
-            prev_squad_ids = self.match_players_to_current(
-                prev_squad, current_players
-            )
-
-            if not prev_squad_ids:
-                if self.config.GRANULAR_OUTPUT:
-                    print(f"Using default budget: £{self.config.BUDGET:.1f}m "
-                          f"(could not match previous squad)")
-                return self.config.BUDGET
-
-            # Calculate total value using current prices
-            prev_squad_current_df = current_players[
-                current_players["id"].isin(prev_squad_ids)
-            ]
-            total_value = prev_squad_current_df["now_cost_m"].sum()
-
-            if self.config.GRANULAR_OUTPUT:
-                print(f"Previous squad value: £{total_value:.1f}m")
-            return total_value
-
-        except Exception as e:
-            if self.config.GRANULAR_OUTPUT:
-                print(f"Error calculating budget from previous squad: {e}")
-                print(f"Using default budget: £{self.config.BUDGET:.1f}m")
-            return self.config.BUDGET
-    
     def match_players_to_current(self, prev_squad: pd.DataFrame, 
                                current_players: pd.DataFrame) -> list:
         """
