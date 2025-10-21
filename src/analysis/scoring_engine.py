@@ -75,8 +75,8 @@ class ScoringEngine:
     
     def _calculate_base_quality_adaptive(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Calculate base quality with adaptive weighting for new players and 
-        early season penalty applied directly to form contribution.
+        Calculate base quality with position-specific weighting for new 
+        players and early season penalty applied directly to form contribution.
         """
         # Store form_adjusted for display purposes
         gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
@@ -141,11 +141,12 @@ class ScoringEngine:
         return max(1.0, current_divisor)
     
     def _calculate_weighted_base_quality(self, row: pd.Series, 
-                                       form_z: float, historic_z: float,
-                                       fixture_z: float) -> float:
+                                    form_z: float, historic_z: float,
+                                    fixture_z: float) -> float:
         """
-        Calculate weighted base quality with adaptive weights for new players
-        and early season penalty applied directly to form contribution.
+        Calculate weighted base quality with position-specific weights for 
+        new players and early season penalty applied directly to form 
+        contribution.
         
         Args:
             row (pd.Series): Player data row
@@ -155,21 +156,27 @@ class ScoringEngine:
             
         Returns:
             float: Weighted base quality score with early season penalty 
-                   applied
+                applied
         """
+        # Get position-specific weights
+        position = row.get("position", "MID")
+        position_weights = self.config.POSITION_SCORING_WEIGHTS.get(
+            position, self.config.POSITION_SCORING_WEIGHTS["MID"]
+        )
+        
         # Check if player has historical data
         has_historical_data = row.get("avg_ppg_past2", 0) > 0
         
         if has_historical_data:
-            # Use standard config weights for players with history
-            form_weight = self.config.FORM_WEIGHT
-            historic_weight = self.config.HISTORIC_WEIGHT
-            fixture_weight = self.config.DIFFICULTY_WEIGHT
+            # Use position-specific weights for players with history
+            form_weight = position_weights["form"]
+            historic_weight = position_weights["historic"]
+            fixture_weight = position_weights["difficulty"]
         else:
             # New players: History = 0%, redistribute between form and fixtures
-            form_weight = 1.0 - self.config.DIFFICULTY_WEIGHT
+            form_weight = 1.0 - position_weights["difficulty"]
             historic_weight = 0.0
-            fixture_weight = self.config.DIFFICULTY_WEIGHT
+            fixture_weight = position_weights["difficulty"]
         
         # Apply early season penalty directly to form contribution
         gameweeks_completed = max(1, self.config.GAMEWEEK - 1)
@@ -191,7 +198,7 @@ class ScoringEngine:
         base_quality *= row.get("xConsistency", 1.0)
         
         return base_quality
-    
+
     def _z_score(self, series: pd.Series) -> pd.Series:
         """
         Z-score normalisation with NaN/inf handling.
