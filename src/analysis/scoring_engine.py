@@ -148,15 +148,7 @@ class ScoringEngine:
         new players and early season penalty applied directly to form 
         contribution.
         
-        Args:
-            row (pd.Series): Player data row
-            form_z (float): Form z-score (calculated from raw form)
-            historic_z (float): Historical z-score
-            fixture_z (float): Fixture z-score
-            
-        Returns:
-            float: Weighted base quality score with early season penalty 
-                applied
+        Enhanced with form consistency modifier.
         """
         # Get position-specific weights
         position = row.get("position", "MID")
@@ -168,12 +160,10 @@ class ScoringEngine:
         has_historical_data = row.get("avg_ppg_past2", 0) > 0
         
         if has_historical_data:
-            # Use position-specific weights for players with history
             form_weight = position_weights["form"]
             historic_weight = position_weights["historic"]
             fixture_weight = position_weights["difficulty"]
         else:
-            # New players: History = 0%, redistribute between form and fixtures
             form_weight = 1.0 - position_weights["difficulty"]
             historic_weight = 0.0
             fixture_weight = position_weights["difficulty"]
@@ -184,6 +174,10 @@ class ScoringEngine:
             gameweeks_completed
         )
         form_contribution = (form_z * form_weight) / early_season_penalty
+        
+        # Apply form consistency modifier
+        form_consistency = row.get('form_consistency', 1.0)
+        form_contribution *= form_consistency
         
         # Calculate weighted score with penalised form contribution
         base_quality = (

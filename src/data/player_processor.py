@@ -64,6 +64,9 @@ class PlayerProcessor:
         # Enhanced xG analysis for current season
         players = self._calculate_current_season_xg_performance(players)
 
+        # Add form consistency analysis
+        players = self._calculate_form_consistency(players)
+
         # Save to CSV
         os.makedirs("data", exist_ok=True)
         players.to_csv("data/players.csv", index=False)
@@ -433,3 +436,84 @@ class PlayerProcessor:
             print(f"Warning: Could not find current match for "
                   f"{prev_name} ({prev_pos}, {prev_team})")
         return None
+    
+    def _calculate_form_consistency(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculate form consistency using stored historical data.
+        Penalises volatile form.
+        """
+        from ..data.player_history_tracker import PlayerHistoryTracker
+        
+        tracker = PlayerHistoryTracker(self.config)
+        
+        df['form_consistency'] = 1.0  # Default neutral
+        
+        # Get recent gameweeks to analyze (last 5-8 weeks)
+        current_gw = self.config.GAMEWEEK
+        n_weeks = min(8, max(5, current_gw - 1))  # Use 5-8 weeks of data
+        
+        if current_gw <= 2:
+            # Too early in season for meaningful consistency analysis
+            return df
+        
+        for idx, player in df.iterrows():
+            try:
+                player_name = player['web_name']
+                team_name = player['team']
+                
+                # Get player's recent history
+                player_history = tracker.get_player_history(
+                    player_name, team_name)
+                
+                if player_history.empty:
+                    continue
+                
+                # Get recent gameweeks
+                recent_gws = player_history.head(n_weeks)
+                
+                if len(recent_gws) < 3:
+                    # Not enough data
+                    continue
+                
+                # Extract points
+                recent_points = recent_gws['total_points'].values
+                
+                # Calculate consistency metrics
+                mean_points = recent_points.mean()
+                std_points = recent_points.std()
+                
+                if mean_points > 0:
+                    # Coefficient of variation (lower = more consistent)
+                    cv = std_points / mean_points
+                    
+                    # Convert to consistency modifier
+                    # Players with CV < 0.5 are very consistent
+                    # Players with CV > 1.5 are very volatile
+                    if cv < 0.5:
+                        # Very consistent - bonus
+                        consistency_modifier = 1.0 + (0.5 - cv) * 0.3
+                    elif cv > 1.5:
+                        # Very volatile - penalty
+                        consistency_modifier = 1.0 - ((cv - 1.5) * 0.15)
+                    else:
+                        # Normal range - slight adjustment
+                        consistency_modifier = 1.0 + (1.0 - cv) * 0.05
+                    
+                    # Clip to reasonable range
+                    consistency_modifier = np.clip(
+                        consistency_modifier, 0.85, 1.15)
+                    
+                else:
+                    # Zero average - likely not playing
+                    consistency_modifier = 1.0
+                
+                df.loc[idx, 'form_consistency'] = consistency_modifier
+                
+            except Exception as e:
+                # If any error, just use default
+                if self.config.GRANULAR_OUTPUT:
+                    print(f"Warning: Could not calculate consistency for "
+                          f"{player.get('web_name', 'unknown')}: {e}")
+                continue
+        
+        return df

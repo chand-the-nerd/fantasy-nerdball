@@ -48,19 +48,25 @@ class CalculationDisplayUtils:
         print(f"\nMETHODOLOGY:")
         penalty_end_gw = 2 + self.config.EARLY_SEASON_PENALTY_GAMEWEEKS
         print(f"  Early Season Penalty: ÷{early_season_penalty:.3f} " +
-              f"(GW{self.config.GAMEWEEK}, penalty applied GW2-GW{penalty_end_gw-1})")
-        print(f"  Scoring Weights (players with history): " +
-              f"Form {self.config.FORM_WEIGHT:.1%}, " +
-              f"History {self.config.HISTORIC_WEIGHT:.1%}, " +
-              f"Fixtures {self.config.DIFFICULTY_WEIGHT:.1%}")
+            f"(GW{self.config.GAMEWEEK}, penalty applied GW2-GW{penalty_end_gw-1})")
+        
+        # Use MID as example for position-specific weights (since it's most common)
+        mid_weights = self.config.POSITION_SCORING_WEIGHTS.get("MID", {
+            "form": 0.5, "historic": 0.3, "difficulty": 0.2
+        })
+        
+        print(f"  Scoring Weights (players with history, MID example): " +
+            f"Form {mid_weights['form']:.1%}, " +
+            f"History {mid_weights['historic']:.1%}, " +
+            f"Fixtures {mid_weights['difficulty']:.1%}")
         print(f"  Scoring Weights (new players): " +
-              f"Form {1.0 - self.config.DIFFICULTY_WEIGHT:.1%}, " +
-              f"History 0%, " +
-              f"Fixtures {self.config.DIFFICULTY_WEIGHT:.1%}")
+            f"Form {1.0 - mid_weights['difficulty']:.1%}, " +
+            f"History 0%, " +
+            f"Fixtures {mid_weights['difficulty']:.1%}")
         print(f"  Baseline Points: GK {self.config.BASELINE_POINTS_PER_GAME['GK']}, " +
-              f"DEF {self.config.BASELINE_POINTS_PER_GAME['DEF']}, " +
-              f"MID {self.config.BASELINE_POINTS_PER_GAME['MID']}, " +
-              f"FWD {self.config.BASELINE_POINTS_PER_GAME['FWD']}")
+            f"DEF {self.config.BASELINE_POINTS_PER_GAME['DEF']}, " +
+            f"MID {self.config.BASELINE_POINTS_PER_GAME['MID']}, " +
+            f"FWD {self.config.BASELINE_POINTS_PER_GAME['FWD']}")
     
     def _calculate_early_season_penalty_display(self, 
                                               gameweeks_completed: int) -> float:
@@ -93,7 +99,7 @@ class CalculationDisplayUtils:
             self._display_single_player_calculation(player, squad_type)
     
     def _display_single_player_calculation(self, player: pd.Series, 
-                                         squad_type: str):
+                                        squad_type: str):
         """Display detailed calculation for a single player."""
         name = player.get('display_name', 'Unknown')
         pos = player.get('position', 'UNK')
@@ -122,24 +128,29 @@ class CalculationDisplayUtils:
         print(f"    Early season penalty: ÷{early_penalty:.3f}")
         print(f"    Form (adjusted): {form_adjusted:.2f}")
         print(f"    Historical PPG: {hist_ppg:.2f} " + 
-              ("(NEW PLAYER)" if is_new_player else ""))
+            ("(NEW PLAYER)" if is_new_player else ""))
         print(f"    Fixture bonus: {fixture_bonus:.2f}")
         
-        # Z-scores (approximate - we can't recalculate the exact z-scores here
-        # without the full dataset, but we can show the concept)
+        # Get position-specific weights
+        position_weights = self.config.POSITION_SCORING_WEIGHTS.get(
+            pos, self.config.POSITION_SCORING_WEIGHTS.get("MID", {
+                "form": 0.5, "historic": 0.3, "difficulty": 0.2
+            })
+        )
+        
         print(f"  WEIGHTS APPLIED:")
         if is_new_player:
-            form_weight = 1.0 - self.config.DIFFICULTY_WEIGHT
+            form_weight = 1.0 - position_weights["difficulty"]
             hist_weight = 0.0
-            fix_weight = self.config.DIFFICULTY_WEIGHT
+            fix_weight = position_weights["difficulty"]
             print(f"    New player weighting: Form {form_weight:.1%}, " +
-                  f"History {hist_weight:.1%}, Fixtures {fix_weight:.1%}")
+                f"History {hist_weight:.1%}, Fixtures {fix_weight:.1%}")
         else:
-            form_weight = self.config.FORM_WEIGHT
-            hist_weight = self.config.HISTORIC_WEIGHT
-            fix_weight = self.config.DIFFICULTY_WEIGHT
+            form_weight = position_weights["form"]
+            hist_weight = position_weights["historic"]
+            fix_weight = position_weights["difficulty"]
             print(f"    Standard weighting: Form {form_weight:.1%}, " +
-                  f"History {hist_weight:.1%}, Fixtures {fix_weight:.1%}")
+                f"History {hist_weight:.1%}, Fixtures {fix_weight:.1%}")
         
         # Adjustments
         promoted_penalty = player.get('promoted_penalty', 0)
@@ -150,6 +161,12 @@ class CalculationDisplayUtils:
         print(f"    Promoted team penalty: {promoted_penalty:+.2f}")
         print(f"    Team modifier: ×{team_modifier:.2f}")
         print(f"    xG consistency: ×{x_consistency:.2f}")
+        
+        # NEW: Show form consistency if not neutral
+        form_consistency = player.get('form_consistency', 1.0)
+        if form_consistency != 1.0:
+            consistency_label = "consistent" if form_consistency > 1.0 else "volatile"
+            print(f"    Form consistency: ×{form_consistency:.2f} ({consistency_label})")
         
         # Reliability
         current_reliability = player.get('current_reliability', 0)
