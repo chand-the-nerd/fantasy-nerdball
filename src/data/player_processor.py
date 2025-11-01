@@ -483,28 +483,24 @@ class PlayerProcessor:
                 std_points = recent_points.std()
                 
                 if mean_points > 0:
-                    # Coefficient of variation (lower = more consistent)
                     cv = std_points / mean_points
                     
-                    # Convert to consistency modifier
-                    # Players with CV < 0.5 are very consistent
-                    # Players with CV > 1.5 are very volatile
+                    # STRONGER penalties/bonuses: 0.70x to 1.30x range (±30%)
                     if cv < 0.5:
-                        # Very consistent - bonus
-                        consistency_modifier = 1.0 + (0.5 - cv) * 0.3
+                        # Very consistent - bigger bonus
+                        consistency_modifier = 1.0 + (0.5 - cv) * 0.8
                     elif cv > 1.5:
-                        # Very volatile - penalty
-                        consistency_modifier = 1.0 - ((cv - 1.5) * 0.15)
+                        # Very volatile - bigger penalty
+                        consistency_modifier = 1.0 - ((cv - 1.5) * 0.4)
                     else:
-                        # Normal range - slight adjustment
-                        consistency_modifier = 1.0 + (1.0 - cv) * 0.05
+                        # Normal range
+                        consistency_modifier = 1.0 + (1.0 - cv) * 0.2
                     
-                    # Clip to reasonable range
+                    # Wider clip range
                     consistency_modifier = np.clip(
-                        consistency_modifier, 0.85, 1.15)
+                        consistency_modifier, 0.60, 1.40)
                     
                 else:
-                    # Zero average - likely not playing
                     consistency_modifier = 1.0
                 
                 df.loc[idx, 'form_consistency'] = consistency_modifier
