@@ -596,38 +596,34 @@ class TransferEvaluator:
     
     def _apply_value_threshold(self, best_scenario: dict, 
                             baseline_scenario: dict) -> dict:
-        """Apply MIN_TRANSFER_VALUE threshold check using total basis."""
-        improvement_total = 0  # Default value
+        """Apply MIN_TRANSFER_VALUE threshold check using per-gameweek basis."""
+        improvement_ppgw = 0  # Default value
         
         if (best_scenario['actual_transfers'] > 
             baseline_scenario['actual_transfers']):
             baseline_ppgw = baseline_scenario['net_ppgw']
             best_ppgw = best_scenario['net_ppgw']
             improvement_ppgw = best_ppgw - baseline_ppgw
-            improvement_total = improvement_ppgw * self.config.FIRST_N_GAMEWEEKS
             extra_transfers_for_improvement = (
                 best_scenario['actual_transfers'] - 
                 baseline_scenario['actual_transfers']
             )
             
-            # Use MIN_TRANSFER_VALUE as total threshold across all transfers
-            threshold_total = self.config.MIN_TRANSFER_VALUE
+            # Use MIN_TRANSFER_VALUE as PER-GAMEWEEK threshold
+            threshold_ppgw = self.config.MIN_TRANSFER_VALUE
             
             if self.config.GRANULAR_OUTPUT:
-                print(f"\nTransfer Value Check (total improvement basis):")
+                print(f"\nTransfer Value Check (per-gameweek basis):")
                 print(f"   Baseline ({baseline_scenario['actual_transfers']} "
                     f"transfers): {baseline_ppgw:.1f} points per gameweek")
                 print(f"   Best scenario ({best_scenario['actual_transfers']} "
                     f"transfers): {best_ppgw:.1f} points per gameweek")
-                print(
-                    f"   Total improvement: {improvement_total:.1f} points "
-                )
+                print(f"   Per-gameweek improvement: {improvement_ppgw:.1f} points")
                 print(f"   Extra transfers: "
                     f"{extra_transfers_for_improvement}")
-                print(f"   Total improvement threshold: {threshold_total:.1f} "
-                    f"points")
+                print(f"   Per-gameweek threshold: {threshold_ppgw:.1f} points")
             
-            if improvement_total < threshold_total:
+            if improvement_ppgw < threshold_ppgw:
                 if self.config.GRANULAR_OUTPUT:
                     print(f"   INSUFFICIENT VALUE GAINED: Using baseline "
                         f"({baseline_scenario['actual_transfers']} transfers) "
@@ -649,7 +645,7 @@ class TransferEvaluator:
                     f"transfers → {best_scenario['net_ppgw']:.1f} points")
         
         # Store the improvement data in the scenario for later use
-        best_scenario['points_improvement_total'] = improvement_total
+        best_scenario['points_improvement_ppgw'] = improvement_ppgw
         best_scenario['gameweeks_analysed'] = self.config.FIRST_N_GAMEWEEKS
         
         return best_scenario
