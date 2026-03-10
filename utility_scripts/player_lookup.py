@@ -206,7 +206,7 @@ def display_recent_form(player, config):
                 mean_points = points.mean()
                 std_points = points.std()
                 cv = std_points / mean_points if mean_points > 0 else 0
-                blank_freq = (points < 2).sum() / len(points)
+                blank_freq = (points < 3).sum() / len(points)
                 
                 cv_label = '(volatile)' if cv > 1.0 else '(consistent)'
                 
@@ -214,7 +214,7 @@ def display_recent_form(player, config):
                 print(f"  Average: {mean_points:.2f} points")
                 print(f"  Std Dev: {std_points:.2f}")
                 print(f"  CV: {cv:.2f} {cv_label}")
-                print(f"  Blank Rate: {blank_freq * 100:.0f}% (< 2 points)")
+                print(f"  Blank Rate: {blank_freq * 100:.0f}% (< 3 points)")
                 
                 form_consistency = player.get('form_consistency', 1.0)
                 print(f"  Form Consistency Modifier: "
