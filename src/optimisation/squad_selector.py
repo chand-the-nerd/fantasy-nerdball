@@ -200,7 +200,16 @@ class SquadSelector:
     
     def _add_form_constraints(self, prob: pulp.LpProblem, y: list, 
                             df: pd.DataFrame, n: int):
-        """Add form constraint - only players with form > 0 in starting XI."""
+        """Add form constraint - only players with form > 0 in starting XI.
+
+        Skipped when no player has positive form (e.g. GW1/preseason,
+        before the FPL API has any current-season form data), since
+        applying it then would zero out every player and make the
+        problem infeasible.
+        """
+        if not (df["form"] > 0).any():
+            return
+
         for i in range(n):
             if df.iloc[i]["form"] <= 0:
                 prob += y[i] == 0
