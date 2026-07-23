@@ -440,76 +440,96 @@ class PlayerProcessor:
     def _calculate_form_consistency(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Calculate form consistency using stored historical data.
-        Penalises volatile form.
+        Penalises volatile, spiky form and high blank rates more strongly.
         """
+        import numpy as np
         from ..data.player_history_tracker import PlayerHistoryTracker
-        
+
         tracker = PlayerHistoryTracker(self.config)
-        
+
         df['form_consistency'] = 1.0  # Default neutral
-        
-        # Get recent gameweeks to analyze (last 5-8 weeks)
+
         current_gw = self.config.GAMEWEEK
-        n_weeks = min(8, max(5, current_gw - 1))  # Use 5-8 weeks of data
-        
+        n_weeks = min(8, max(5, current_gw - 1))
+
         if current_gw <= 2:
-            # Too early in season for meaningful consistency analysis
             return df
-        
+
         for idx, player in df.iterrows():
             try:
                 player_name = player['web_name']
                 team_name = player['team']
-                
-                # Get player's recent history
-                player_history = tracker.get_player_history(
-                    player_name, team_name)
-                
+
+                player_history = tracker.get_player_history(player_name, team_name)
                 if player_history.empty:
                     continue
-                
-                # Get recent gameweeks
+
                 recent_gws = player_history.head(n_weeks)
-                
                 if len(recent_gws) < 3:
-                    # Not enough data
                     continue
-                
-                # Extract points
-                recent_points = recent_gws['total_points'].values
-                
-                # Calculate consistency metrics
+
+                # --- Points series ---
+                recent_points = recent_gws['total_points'].to_numpy(dtype=float)
+
                 mean_points = recent_points.mean()
-                std_points = recent_points.std()
-                
-                if mean_points > 0:
-                    cv = std_points / mean_points
-                    
-                    # STRONGER penalties/bonuses: 0.70x to 1.30x range (±30%)
-                    if cv < 0.5:
-                        # Very consistent - bigger bonus
-                        consistency_modifier = 1.0 + (0.5 - cv) * 0.8
-                    elif cv > 1.5:
-                        # Very volatile - bigger penalty
-                        consistency_modifier = 1.0 - ((cv - 1.5) * 0.4)
-                    else:
-                        # Normal range
-                        consistency_modifier = 1.0 + (1.0 - cv) * 0.2
-                    
-                    # Wider clip range
-                    consistency_modifier = np.clip(
-                        consistency_modifier, 0.60, 1.40)
-                    
-                else:
+                if mean_points <= 0:
+                    # No meaningful attacking output
                     consistency_modifier = 1.0
-                
+                    df.loc[idx, 'form_consistency'] = consistency_modifier
+                    continue
+
+                std_points = recent_points.std(ddof=0)
+                cv = std_points / mean_points
+
+                # --- Blank rate (strong penalty for frequent blanks) ---
+                # "Blank" = < 3 points
+                blank_rate = (recent_points < 3).mean()  # 0.0–1.0
+
+                # --- Spike detection (single huge haul vs rest) ---
+                sorted_points = np.sort(recent_points)[::-1]
+                if len(sorted_points) >= 2:
+                    second_best = max(sorted_points[1], 1e-6)
+                    spike_ratio = sorted_points[0] / second_best
+                else:
+                    spike_ratio = 1.0
+
+                if cv <= 0.4:
+                    # Very consistent – strong bonus
+                    base = 1.1 + (0.4 - cv) * 0.5   # up to ~1.3x
+                elif cv <= 1.0:
+                    # Slightly variable – mild bonus/neutral
+                    base = 1.0 + (1.0 - cv) * 0.1
+                elif cv <= 1.6:
+                    # Clearly volatile
+                    base = 1.0 - (cv - 1.0) * 0.3
+                else:
+                    # Very volatile
+                    base = 0.82 - (cv - 1.6) * 0.2
+
+                # Up to -50% for 100% blanks
+                blank_mult = 1.0 - blank_rate * 0.5
+                blank_mult = np.clip(blank_mult, 0.5, 1.1)
+
+                # If best score is much bigger than second-best, treat as "one big haul".
+                if spike_ratio > 2.5:
+                    # 2.5–4.5+ → 0.75–0.50 multiplier
+                    spike_mult = 1.0 - min(spike_ratio - 2.5, 2.0) * 0.25
+                else:
+                    spike_mult = 1.0
+
+                consistency_modifier = base * blank_mult * spike_mult
+
+                # Keep within sane bounds
+                consistency_modifier = float(np.clip(consistency_modifier, 0.4, 1.4))
+
                 df.loc[idx, 'form_consistency'] = consistency_modifier
-                
+
             except Exception as e:
-                # If any error, just use default
                 if self.config.GRANULAR_OUTPUT:
-                    print(f"Warning: Could not calculate consistency for "
-                          f"{player.get('web_name', 'unknown')}: {e}")
+                    print(
+                        f"Warning: Could not calculate consistency for "
+                        f"{player.get('web_name', 'unknown')}: {e}"
+                    )
                 continue
-        
+
         return df

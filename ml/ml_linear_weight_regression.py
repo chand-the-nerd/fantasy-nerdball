@@ -49,7 +49,7 @@ for pos in ['GK', 'DEF', 'MID', 'FWD']:
 
     plt.xlabel("Gameweek")
     plt.ylabel("Smoothed Weight")
-    plt.title("Stacked Bar Chart of Smoothed Weights by Gameweek")
+    plt.title(f"Stacked Bar Chart of Smoothed Weights by Gameweek for {pos}")
     plt.legend()
     plt.xticks(smoothed_df['gameweek'])
     plt.tight_layout()

@@ -62,16 +62,13 @@ def generate_action_data(should_make_transfers, transfers_made,
             and 'points_improvement_ppgw'
             in transfer_analysis):
             points_gain = transfer_analysis['points_improvement_ppgw']
-            action_data.append(f"- REASON    Squad optimisation opportunity, "
-                               f"gain {points_gain:.1f} projected points")
+            action_data.append(f"- REASON    Squad optimisation opportunity.")
         elif transfer_analysis and 'points_gain' in transfer_analysis:
             points_gain = transfer_analysis['points_gain']
-            action_data.append(f"- REASON    Squad optimisation opportunity, "
-                               f"gain {points_gain:.1f} projected points")
+            action_data.append(f"- REASON    Squad optimisation opportunity.")
         elif transfer_details and 'points_gain' in transfer_details:
             points_gain = transfer_details['points_gain']
-            action_data.append(f"- REASON    Squad optimisation opportunity, "
-                               f"gain {points_gain:.1f} projected points")
+            action_data.append(f"- REASON    Squad optimisation opportunity.")
         elif penalty_points > 0:
             action_data.append("- REASON    Improvement worth penalty cost")
         else:
