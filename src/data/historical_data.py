@@ -1,9 +1,12 @@
 """Module for managing historical player performance data with xG analysis
 """
 
+import os
 import pandas as pd
 import numpy as np
 from ..utils.text_utils import normalize_name
+
+RECALCULATED_POINTS_DIR = "data/historic"
 
 
 class HistoricalDataManager:
@@ -40,12 +43,24 @@ class HistoricalDataManager:
             pd.DataFrame: DataFrame containing performance metrics including 
                          weighted xG analysis.
         """
-        url = (
-            f"https://raw.githubusercontent.com/vaastav/"
-            f"Fantasy-Premier-League/master/data/"
-            f"{season_folder}/players_raw.csv"
+        recalculated_path = os.path.join(
+            RECALCULATED_POINTS_DIR, f"{season_folder}_updated_points.csv"
         )
-        df = pd.read_csv(url)
+        if os.path.exists(recalculated_path):
+            # Points recalculated under current_rules.py (see
+            # HistoricPointsRecalculator) take precedence over raw
+            # historic points, so DEFCON reflects this season's rules.
+            if self.config.GRANULAR_OUTPUT:
+                print(f"Using recalculated points for {season_folder} "
+                      f"from {recalculated_path}")
+            df = pd.read_csv(recalculated_path)
+        else:
+            url = (
+                f"https://raw.githubusercontent.com/vaastav/"
+                f"Fantasy-Premier-League/master/data/"
+                f"{season_folder}/players_raw.csv"
+            )
+            df = pd.read_csv(url)
 
         # Calculate basic metrics
         df = self._calculate_basic_metrics(df)
