@@ -6,20 +6,21 @@ import pandas as pd
 
 class FileUtils:
     """Utility class for file operations."""
-    
+
     @staticmethod
-    def load_previous_squad_from_gameweek(current_gameweek: int, 
-                                        prev_gameweek: int) -> pd.DataFrame:
+    def load_previous_squad_from_gameweek(
+            current_gameweek: int,
+            prev_gameweek: int) -> pd.DataFrame:
         """
-        Load squad from a specific previous gameweek.
+        Load the squad from a specific previous gameweek.
 
         Args:
             current_gameweek (int): Current gameweek number.
-            prev_gameweek (int): Gameweek to load squad from.
+            prev_gameweek (int): Gameweek to load the squad from.
 
         Returns:
-            pd.DataFrame or None: Previous squad data or None if file 
-                                 doesn't exist.
+            pd.DataFrame or None: Previous squad data, or None if the
+                                  file does not exist.
         """
         if prev_gameweek <= 0:
             print(f"Cannot load squad from GW{prev_gameweek} "
@@ -29,96 +30,125 @@ class FileUtils:
         squad_file = f"squads/gw{prev_gameweek}/full_squad.csv"
 
         if not os.path.exists(squad_file):
-            print(f"Warning: Squad file not found at {squad_file}")
+            print(f"Warning: squad file not found at {squad_file}")
             if current_gameweek - prev_gameweek > 1:
                 print("(This is expected when Free Hit was used)")
             else:
                 print("Proceeding without transfer constraints "
-                      "(assuming new team)")
+                      "(assuming a new team)")
             return None
 
         try:
             prev_squad = pd.read_csv(squad_file)
+
+            if "player_code" not in prev_squad.columns:
+                print(f"Note: {squad_file} predates player_code "
+                      "tracking, so players will be matched by name. "
+                      "Squads saved from this gameweek onwards will "
+                      "match exactly.")
+
             return prev_squad
-        except Exception as e:
-            print(f"Error loading squad: {e}")
+        except Exception as error:
+            print(f"Error loading squad: {error}")
             return None
-    
+
     @staticmethod
     def load_previous_squad(gameweek: int) -> pd.DataFrame:
         """
-        Load the previous gameweek's squad from CSV file.
+        Load the previous gameweek's squad from CSV.
 
         Args:
-            gameweek (int): Current gameweek (will load gameweek-1's squad).
+            gameweek (int): Current gameweek (loads gameweek - 1).
 
         Returns:
-            pd.DataFrame or None: Previous squad data or None if file 
-                                 doesn't exist.
+            pd.DataFrame or None: Previous squad data, or None if the
+                                  file does not exist.
         """
         if gameweek <= 1:
             print("No previous squad to load (this is GW1 or earlier)")
             return None
 
         prev_gw = gameweek - 1
-        return FileUtils.load_previous_squad_from_gameweek(gameweek, prev_gw)
-    
+        return FileUtils.load_previous_squad_from_gameweek(
+            gameweek, prev_gw
+        )
+
     @staticmethod
-    def save_squad_data(gameweek: int, starting_display: pd.DataFrame, 
-                       bench_display: pd.DataFrame):
+    def save_squad_data(gameweek: int, starting_display: pd.DataFrame,
+                        bench_display: pd.DataFrame):
         """
         Save squad data to CSV files with projected points.
 
         Args:
             gameweek (int): Current gameweek number.
-            starting_display (pd.DataFrame): Starting XI with display format.
-            bench_display (pd.DataFrame): Bench with display formatting.
+            starting_display (pd.DataFrame): Starting XI.
+            bench_display (pd.DataFrame): Bench.
         """
         squad_dir = f"squads/gw{gameweek}"
         os.makedirs(squad_dir, exist_ok=True)
 
-        # Save combined squad with all details including projected points
-        squad_combined = pd.concat([starting_display, bench_display], 
-                                 ignore_index=True)
+        squad_combined = pd.concat(
+            [starting_display, bench_display], ignore_index=True
+        )
         squad_combined["squad_role"] = (
-            ["Starting XI"] * len(starting_display) + 
+            ["Starting XI"] * len(starting_display) +
             ["Bench"] * len(bench_display)
         )
-        
+
         combined_file = f"{squad_dir}/full_squad.csv"
         squad_combined.to_csv(combined_file, index=False)
 
-        # Save simple squad overview with projected points included
-        simple_squad = FileUtils._create_simple_squad_overview(squad_combined)
+        simple_squad = FileUtils._create_simple_squad_overview(
+            squad_combined
+        )
         simple_file = f"{squad_dir}/full_squad_simple.csv"
         simple_squad.to_csv(simple_file, index=False)
 
         print(f"\nSquad saved to {squad_dir}/")
         print(f"  - {combined_file}")
         print(f"  - {simple_file}")
-    
+
     @staticmethod
     def _create_simple_squad_overview(
-        squad_combined: pd.DataFrame) -> pd.DataFrame:
-        """Create simplified squad overview for easier reading."""
+            squad_combined: pd.DataFrame) -> pd.DataFrame:
+        """
+        Create a simplified squad overview.
+
+        The FPL element id and permanent player code are carried
+        through so that next gameweek's run can identify these players
+        exactly. Matching on display name alone pairs the wrong player
+        whenever two squad members share a surname, and fails outright
+        once a player changes club.
+        """
+        display_cols = [
+            "display_name",
+            "position",
+            "now_cost_m",
+            "team",
+            "projected_points",
+            "squad_role",
+        ]
+
+        identifier_cols = [
+            col for col in ("id", "player_code")
+            if col in squad_combined.columns
+        ]
+
+        available = [
+            col for col in display_cols
+            if col in squad_combined.columns
+        ]
+
         simple_squad = squad_combined[
-            [
-                "display_name",
-                "position",
-                "now_cost_m",
-                "team",
-                "projected_points",
-                "squad_role",
-            ]
+            identifier_cols + available
         ].copy()
-        
+
         simple_squad = simple_squad.rename(
             columns={
                 "display_name": "player",
                 "now_cost_m": "price",
                 "team": "club",
-                "projected_points": "projected_points",
             }
         )
-        
+
         return simple_squad
