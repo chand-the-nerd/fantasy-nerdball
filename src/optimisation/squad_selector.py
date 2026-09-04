@@ -69,7 +69,7 @@ class SquadSelector:
         self._add_forced_selection_constraints(prob, x, forced_player_ids, df)
         self._add_transfer_constraints(
             prob, x, prev_squad_ids, free_transfers, df)
-        self._add_bench_constraints(prob, x, y, df, n)
+        self._add_bench_constraints(prob, x, y, df, n, forced_player_ids)
         self._add_team_constraints(prob, x, df, n)
         # MODIFIED: Add same team-position constraint (now allows up to 2)
         self._add_same_team_position_constraints(prob, x, df, n)
@@ -254,17 +254,38 @@ class SquadSelector:
                 print("🃏 WILDCARD ACTIVE: No transfer constraints applied")
     
     def _add_bench_constraints(self, prob: pulp.LpProblem, x: list, y: list,
-                             df: pd.DataFrame, n: int):
+                             df: pd.DataFrame, n: int,
+                             forced_player_ids: list = None):
         """Add bench-specific constraints."""
-        # Bench must have exactly one £4.0m GK
-        prob += (
-            pulp.lpSum(
-                (x[i] - y[i])
-                for i in range(n)
-                if (df.iloc[i]["position"] == "GK" and 
-                    df.iloc[i]["now_cost_m"] == 4.0)
-            ) == 1
+        forced_player_ids = forced_player_ids or []
+        cap = getattr(self.config, "BENCH_GK_MAX_COST", 4.0)
+
+        # The benched GK should be a cheap one, so budget isn't wasted on a
+        # keeper who never plays. Skipped when both GKs are forced above the
+        # cap, since one of them has to take the bench slot regardless.
+        forced_gk_costs = [
+            df.iloc[i]["now_cost_m"]
+            for i in range(n)
+            if (df.iloc[i]["position"] == "GK"
+                and df.iloc[i]["id"] in forced_player_ids)
+        ]
+        cap_conflicts = (
+            len(forced_gk_costs) >= 2
+            and all(cost > cap for cost in forced_gk_costs)
         )
+
+        if not cap_conflicts:
+            prob += (
+                pulp.lpSum(
+                    (x[i] - y[i])
+                    for i in range(n)
+                    if (df.iloc[i]["position"] == "GK" and
+                        df.iloc[i]["now_cost_m"] <= cap)
+                ) == 1
+            )
+        elif self.config.GRANULAR_OUTPUT:
+            print("Bench GK price cap relaxed: both GKs are forced "
+                  f"above £{cap}m")
 
         # Allow up to 2 of DEF, MID, FWD on bench
         for pos in ["DEF", "MID", "FWD"]:
