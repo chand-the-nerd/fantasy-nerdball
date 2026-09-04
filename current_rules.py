@@ -62,11 +62,11 @@ class CurrentRules:
     # === DEFENSIVE CONTRIBUTION (DEFCON) ===
     # Points are awarded per multiple of `threshold` defensive actions
     # reached in a single match. Uncapped - multiple bonuses can be scored.
-    DEFCON_UNCAPPED = True
+    DEFCON_UNCAPPED = False
     DEFCON_RULES = {
         "DEF": {
             "threshold": 10,
-            "points_per_threshold": 4,
+            "points_per_threshold": 2,
             "stats": ["clearances_blocks_interceptions", "tackles"],
         },
         "MID": {
