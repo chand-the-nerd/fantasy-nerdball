@@ -1,0 +1,16 @@
+.git
+.github
+node_modules
+web/frontend/node_modules
+web/frontend/dist
+__pycache__
+**/__pycache__
+*.pyc
+.venv
+venv
+.env
+config.py
+*.db
+data/
+squads/
+localdata/

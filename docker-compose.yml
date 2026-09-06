@@ -1,0 +1,37 @@
+# Local stack. Mirrors Railway closely enough to catch deployment problems
+# before they reach it. Run from the repository root.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: nerdball
+      POSTGRES_PASSWORD: nerdball
+      POSTGRES_DB: nerdball
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nerdball"]
+      interval: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports: ["8000:8000"]
+    environment:
+      DATABASE_URL: postgresql://nerdball:nerdball@db:5432/nerdball
+      SECRET_KEY: local-development-key
+      PUBLIC_BASE_URL: http://localhost:8000
+      DEV_MODE: "true"
+      DEV_LOGIN_EMAIL: you@example.com
+      ALLOWED_EMAILS: you@example.com
+      CURRENT_SEASON: "2026-27"
+    volumes: ["nerdball-data:/data"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  nerdball-data:
