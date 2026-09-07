@@ -1,12 +1,10 @@
-import { useEffect, useState } from "react";
-import {
-  ForcedEditor,
-  TeamModifierEditor,
-  WeightsEditor,
-  type Reference,
-} from "./SettingsEditors";
+import { useEffect, useMemo, useState } from "react";
+import { PlayerPicker, type PoolPlayer } from "./PlayerPicker";
+import { TeamSliders } from "./TeamSliders";
+import { WeightBar, type Weights } from "./WeightBar";
+import { checkConstraints } from "./constraints";
 import { api, ApiError } from "../lib/api";
-import type { Me, Settings } from "../lib/types";
+import type { Me, Reference, Settings } from "../lib/types";
 
 interface Member {
   id: number;
@@ -20,6 +18,34 @@ interface MembersResponse {
   seats_total: number;
   members: Member[];
   invites: { id: number; email: string }[];
+}
+
+const POSITIONS = ["GK", "DEF", "MID", "FWD"];
+const POSITION_LABELS: Record<string, string> = {
+  GK: "Goalkeepers",
+  DEF: "Defenders",
+  MID: "Midfielders",
+  FWD: "Forwards",
+};
+
+function Section({
+  title,
+  blurb,
+  children,
+}: {
+  title: string;
+  blurb: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="setup-section">
+      <div className="section-head">
+        <h2>{title}</h2>
+        <p className="muted">{blurb}</p>
+      </div>
+      <div className="setup-grid">{children}</div>
+    </section>
+  );
 }
 
 function Toggle({
@@ -46,10 +72,10 @@ function Toggle({
 
 export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => void }) {
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [entryId, setEntryId] = useState(me.fpl_entry_id ? String(me.fpl_entry_id) : "");
-  const [blacklist, setBlacklist] = useState("");
   const [reference, setReference] = useState<Reference | null>(null);
+  const [pool, setPool] = useState<PoolPlayer[]>([]);
   const [members, setMembers] = useState<MembersResponse | null>(null);
+  const [entryId, setEntryId] = useState(me.fpl_entry_id ? String(me.fpl_entry_id) : "");
   const [inviteEmail, setInviteEmail] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
@@ -57,13 +83,10 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
   useEffect(() => {
     api
       .settings()
-      .then((s) => {
-        setSettings(s);
-        setBlacklist((s.blacklist_players || []).join(", "));
-      })
+      .then(setSettings)
       .catch((err) => setError(err instanceof ApiError ? err.message : String(err)));
-
     api.reference().then(setReference).catch(() => undefined);
+    api.players().then((data) => setPool(data.players)).catch(() => undefined);
 
     if (me.is_admin) {
       fetch("/api/admin/members")
@@ -76,19 +99,55 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
   const patch = (changes: Partial<Settings>) =>
     setSettings((current) => (current ? { ...current, ...changes } : current));
 
+  const weightsFor = (position: string): Weights => {
+    const stored = (settings?.overrides?.POSITION_SCORING_WEIGHTS as
+      | Record<string, Weights>
+      | undefined)?.[position];
+    if (stored) return stored;
+
+    const fallback = reference?.default_weights?.[position];
+    if (fallback && "form" in fallback) {
+      return {
+        form: fallback.form ?? 0.5,
+        historic: fallback.historic ?? 0.25,
+        difficulty: fallback.difficulty ?? 0.25,
+      };
+    }
+    return { form: 0.5, historic: 0.25, difficulty: 0.25 };
+  };
+
+  const setWeights = (position: string, weights: Weights) => {
+    if (!settings) return;
+    const current =
+      (settings.overrides?.POSITION_SCORING_WEIGHTS as Record<string, Weights>) ?? {};
+    patch({
+      overrides: {
+        ...settings.overrides,
+        POSITION_SCORING_WEIGHTS: { ...current, [position]: weights },
+      },
+    });
+  };
+
+  const problems = useMemo(() => {
+    if (!settings || !reference) return [];
+    return checkConstraints({
+      forced: settings.forced_selections ?? {},
+      blacklist: settings.blacklist_players ?? [],
+      pool,
+      budget: settings.budget,
+      excludeUnavailable: settings.exclude_unavailable,
+      limits: reference.squad_limits,
+    });
+  }, [settings, reference, pool]);
+
+  const blocking = problems.some((p) => p.level === "error");
+
   const save = async () => {
     if (!settings) return;
     setError("");
     setStatus("");
     try {
-      const saved = await api.saveSettings({
-        ...settings,
-        blacklist_players: blacklist
-          .split(",")
-          .map((name) => name.trim())
-          .filter(Boolean),
-      });
-      setSettings(saved);
+      setSettings(await api.saveSettings(settings));
       setStatus("Settings saved. They apply on your next run.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
@@ -100,9 +159,8 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
     setStatus("");
     try {
       const value = entryId.trim() ? Number(entryId.trim()) : null;
-      const updated = await api.linkEntry(value);
-      onMeChange(updated);
-      setStatus(value ? "FPL team linked. Your points will sync on the Form page." : "FPL team unlinked.");
+      onMeChange(await api.linkEntry(value));
+      setStatus(value ? "FPL team linked." : "FPL team unlinked.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     }
@@ -120,8 +178,8 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
         const body = await response.json().catch(() => ({}));
         throw new Error(body.detail || "Couldn't add that address.");
       }
-      setInviteEmail("");
       setStatus(`${inviteEmail} can now sign in with Google.`);
+      setInviteEmail("");
       setMembers(await (await fetch("/api/admin/members")).json());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -129,6 +187,10 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
   };
 
   if (!settings) return <p className="muted">{error || "Loading settings…"}</p>;
+
+  const forced = settings.forced_selections ?? {};
+  const setForced = (position: string, names: string[]) =>
+    patch({ forced_selections: { ...forced, [position]: names } });
 
   return (
     <>
@@ -145,7 +207,27 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
       {error && <div className="notice bad">{error}</div>}
       {status && <div className="notice good">{status}</div>}
 
-      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", alignItems: "start" }}>
+      {problems.length > 0 && (
+        <div className={`notice ${blocking ? "bad" : ""}`}>
+          <strong>
+            {blocking
+              ? "These picks can't produce a valid squad"
+              : "Worth knowing before you run"}
+          </strong>
+          <ul className="problem-list">
+            {problems.map((problem, index) => (
+              <li key={index} className={problem.level}>
+                {problem.text}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <Section
+        title="Gameweek"
+        blurb="What's true of your squad right now. Worth checking every week."
+      >
         <div className="panel">
           <h3>This gameweek</h3>
           <div className="grid-2">
@@ -158,7 +240,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
                 value={settings.budget}
                 onChange={(e) => patch({ budget: Number(e.target.value) })}
               />
-              <span className="hint">Your squad value plus whatever's in the bank.</span>
+              <span className="hint">Squad value plus whatever's in the bank.</span>
             </div>
             <div className="field">
               <label htmlFor="fts">Free transfers</label>
@@ -172,7 +254,6 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
               />
             </div>
           </div>
-
           <Toggle
             checked={settings.accept_transfer_penalty}
             onChange={(v) => patch({ accept_transfer_penalty: v })}
@@ -189,7 +270,9 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
 
         <div className="panel">
           <h3>Chips</h3>
-          <p className="muted" style={{ marginTop: -6 }}>One at a time. Turn it off again after the deadline.</p>
+          <p className="muted" style={{ marginTop: -6 }}>
+            One at a time, and turn it off again after the deadline.
+          </p>
           <Toggle
             checked={settings.wildcard}
             onChange={(v) => patch({ wildcard: v, bench_boost: false, triple_captain: false })}
@@ -215,7 +298,12 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
             hint="Loads the squad from two gameweeks ago, since the Free Hit side has reverted."
           />
         </div>
+      </Section>
 
+      <Section
+        title="Model tuning"
+        blurb="How the optimiser decides. Set these once and leave them unless something isn't working."
+      >
         <div className="panel">
           <h3>Model</h3>
           <div className="grid-2">
@@ -229,7 +317,9 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
                 value={settings.first_n_gameweeks}
                 onChange={(e) => patch({ first_n_gameweeks: Number(e.target.value) })}
               />
-              <span className="hint">How far the fixture difficulty looks. Raise it for wildcard planning.</span>
+              <span className="hint">
+                How far fixture difficulty looks. Raise it for wildcard planning.
+              </span>
             </div>
             <div className="field">
               <label htmlFor="minval">Transfer threshold</label>
@@ -240,7 +330,9 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
                 value={settings.min_transfer_value}
                 onChange={(e) => patch({ min_transfer_value: Number(e.target.value) })}
               />
-              <span className="hint">Score improvement a transfer must clear before it's worth making.</span>
+              <span className="hint">
+                Improvement a transfer must clear before it's worth making.
+              </span>
             </div>
           </div>
           <div className="field">
@@ -259,63 +351,103 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
             checked={settings.use_ml_weights}
             onChange={(v) => patch({ use_ml_weights: v })}
             title="Use trained position weights"
-            hint="Reads the weights produced by the ML training scripts instead of the manual defaults."
+            hint="Reads the weights from the ML training scripts instead of the ones below."
           />
+        </div>
+
+        <div className="panel span-2">
+          <h3>Model weighting</h3>
+          <p className="muted" style={{ marginTop: -6 }}>
+            Drag the handles to divide each position's score between recent form,
+            historic points per game and upcoming fixture difficulty. The three
+            always total 100%.
+          </p>
+          {settings.use_ml_weights && (
+            <div className="notice" style={{ margin: "14px 0 0" }}>
+              Trained weights are switched on, so these are ignored until you turn
+              that off.
+            </div>
+          )}
+          <div className={settings.use_ml_weights ? "weights is-inactive" : "weights"}>
+            {POSITIONS.map((position) => (
+              <WeightBar
+                key={position}
+                label={POSITION_LABELS[position]}
+                weights={weightsFor(position)}
+                onChange={(weights) => setWeights(position, weights)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="panel">
+          <h3>Forced picks</h3>
+          <p className="muted" style={{ marginTop: -6 }}>
+            Players the squad is always built around.
+          </p>
+          {POSITIONS.map((position) => {
+            const limit = reference?.squad_limits?.[position] ?? 5;
+            const chosen = forced[position] ?? [];
+            return (
+              <div className="field" key={position}>
+                <label htmlFor={`forced-${position}`}>
+                  {POSITION_LABELS[position]}{" "}
+                  <span className={chosen.length > limit ? "count-over" : "count"}>
+                    {chosen.length}/{limit}
+                  </span>
+                </label>
+                <PlayerPicker
+                  inputId={`forced-${position}`}
+                  pool={pool}
+                  position={position}
+                  selected={chosen}
+                  limit={limit}
+                  onChange={(names) => setForced(position, names)}
+                />
+              </div>
+            );
+          })}
         </div>
 
         <div className="panel">
           <h3>Players to avoid</h3>
+          <p className="muted" style={{ marginTop: -6 }}>
+            Removed from the pool entirely, whatever the numbers say.
+          </p>
           <div className="field">
-            <label htmlFor="blacklist">Never pick these</label>
-            <textarea
-              id="blacklist"
-              rows={3}
-              value={blacklist}
-              onChange={(e) => setBlacklist(e.target.value)}
-              placeholder="Separate names with commas"
+            <PlayerPicker
+              inputId="blacklist"
+              pool={pool}
+              selected={settings.blacklist_players ?? []}
+              onChange={(names) => patch({ blacklist_players: names })}
+              placeholder="Search any position"
             />
-            <span className="hint">
-              Matched on display name, so a shared surname removes everyone who has it.
-            </span>
           </div>
         </div>
 
-        {reference && (
-          <WeightsEditor
-            reference={reference}
-            weights={
-              (settings.overrides?.POSITION_SCORING_WEIGHTS as Record<
-                string,
-                Record<string, number>
-              >) ?? {}
-            }
-            onChange={(weights) =>
-              patch({
-                overrides: {
-                  ...settings.overrides,
-                  POSITION_SCORING_WEIGHTS: weights,
-                },
-              })
-            }
-          />
-        )}
+        <div className="panel span-2">
+          <h3>Team adjustments</h3>
+          <p className="muted" style={{ marginTop: -6 }}>
+            Below 1.00 marks a club down, above marks it up. For what the numbers
+            can't know yet — a new manager, a European run, a defence about to
+            regress.
+          </p>
+          {reference && reference.teams.length > 0 ? (
+            <TeamSliders
+              teams={reference.teams}
+              modifiers={settings.team_modifiers ?? {}}
+              onChange={(modifiers) => patch({ team_modifiers: modifiers })}
+            />
+          ) : (
+            <p className="muted">
+              Club names come from the FPL API, which isn't responding. Reload to
+              try again.
+            </p>
+          )}
+        </div>
+      </Section>
 
-        {reference && (
-          <ForcedEditor
-            reference={reference}
-            forced={settings.forced_selections ?? {}}
-            onChange={(forced) => patch({ forced_selections: forced })}
-          />
-        )}
-
-        {reference && (
-          <TeamModifierEditor
-            reference={reference}
-            modifiers={settings.team_modifiers ?? {}}
-            onChange={(modifiers) => patch({ team_modifiers: modifiers })}
-          />
-        )}
-
+      <Section title="Users" blurb="Your FPL side, and who else can sign in.">
         <div className="panel">
           <h3>Your FPL team</h3>
           <div className="field">
@@ -329,8 +461,8 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
               placeholder="e.g. 1234567"
             />
             <span className="hint">
-              The number in your team's URL on the FPL site. Linking it pulls your real
-              points in each week so you can see them against the global average.
+              The number in your team's URL on the FPL site. Linking it pulls your
+              real points in each week, to chart against the global average.
             </span>
           </div>
           <button className="btn quiet small" onClick={linkEntry} type="button">
@@ -367,7 +499,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
             </button>
           </div>
         )}
-      </div>
+      </Section>
     </>
   );
 }

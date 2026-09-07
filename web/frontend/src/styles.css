@@ -10,6 +10,11 @@
   --flag: #e5484d;
   --gain: #5dd39e;
 
+  /* Categorical, for the three parts of the weighting bar only. */
+  --w-form: #f2c14e;
+  --w-history: #56c7e8;
+  --w-fixtures: #7f9cf5;
+
   --rail: 208px;
   --radius: 4px;
 
@@ -939,4 +944,384 @@ tr.you td {
   padding: 8px 10px;
   font: inherit;
   font-variant-numeric: tabular-nums;
+}
+
+
+/* ── Setup: sections ─────────────────────────────────────────────────── */
+
+.setup-section {
+  margin-bottom: 34px;
+}
+
+.section-head {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+  margin-bottom: 16px;
+}
+
+.section-head h2 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--floodlight);
+}
+
+.section-head p {
+  margin: 4px 0 0;
+}
+
+.setup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.setup-grid .span-2 {
+  grid-column: 1 / -1;
+}
+
+.problem-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.problem-list li.error {
+  color: var(--flag);
+}
+
+.problem-list li.warning {
+  color: var(--fade);
+}
+
+.count {
+  color: var(--fade);
+  font-variant-numeric: tabular-nums;
+}
+
+.count-over {
+  color: var(--flag);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Weighting bar ───────────────────────────────────────────────────── */
+
+.weights {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.weights.is-inactive {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.weight-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 7px;
+}
+
+.weight-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.weight-readout {
+  display: flex;
+  gap: 14px;
+  font-size: 12.5px;
+  color: var(--fade);
+  font-variant-numeric: tabular-nums;
+}
+
+.weight-readout span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.weight-readout i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.weight-track {
+  position: relative;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--turf-night);
+  border: 1px solid var(--line);
+  touch-action: none;
+}
+
+.weight-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transition: none;
+}
+
+.weight-handle {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 26px;
+  margin-left: -6px;
+  transform: translateY(-50%);
+  background: var(--chalk);
+  border-radius: 3px;
+  border: 1px solid var(--turf-night);
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.weight-handle:hover,
+.weight-handle.is-dragging {
+  background: #ffffff;
+}
+
+.weight-handle:focus-visible {
+  outline: 2px solid var(--floodlight);
+  outline-offset: 2px;
+}
+
+/* ── Player picker ───────────────────────────────────────────────────── */
+
+.picker {
+  position: relative;
+}
+
+.picker input[type="text"] {
+  width: 100%;
+  background: var(--turf-night);
+  border: 1px solid var(--line);
+  color: var(--chalk);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font: inherit;
+}
+
+.picker input:disabled {
+  opacity: 0.5;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 5px 3px 9px;
+  border-radius: 999px;
+  font-size: 13px;
+  border: 1px solid;
+  cursor: default;
+}
+
+.chip.tone-ok {
+  border-color: var(--line);
+  background: var(--panel-lift);
+  color: var(--chalk);
+}
+
+.chip.tone-doubt {
+  border-color: var(--floodlight);
+  background: rgba(242, 193, 78, 0.14);
+  color: var(--floodlight);
+}
+
+.chip.tone-out,
+.chip.tone-unknown {
+  border-color: var(--flag);
+  background: rgba(229, 72, 77, 0.15);
+  color: #ff9ea1;
+}
+
+.chip button {
+  background: none;
+  border: 0;
+  color: inherit;
+  opacity: 0.65;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 3px;
+}
+
+.chip button:hover {
+  opacity: 1;
+}
+
+.chip-warn {
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+.picker-list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--panel-lift);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.picker-list button {
+  display: grid;
+  grid-template-columns: 8px 1fr auto auto;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  background: none;
+  border: 0;
+  color: var(--chalk);
+  text-align: left;
+  padding: 7px 8px;
+  border-radius: var(--radius);
+  font-size: 13.5px;
+}
+
+.picker-list button.is-highlighted {
+  background: var(--panel);
+}
+
+.picker-list .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.picker-list .dot.tone-ok {
+  background: var(--gain);
+}
+.picker-list .dot.tone-doubt {
+  background: var(--floodlight);
+}
+.picker-list .dot.tone-out {
+  background: var(--flag);
+}
+
+.picker-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-meta,
+.picker-price {
+  color: var(--fade);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Team modifier sliders ───────────────────────────────────────────── */
+
+.team-sliders-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.team-slider {
+  display: grid;
+  grid-template-columns: 150px 1fr 48px;
+  align-items: center;
+  gap: 14px;
+  padding: 5px 0;
+}
+
+.team-slider label {
+  font-size: 13.5px;
+  color: var(--fade);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-slider.is-moved label {
+  color: var(--chalk);
+}
+
+.team-slider-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.team-slider-centre {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1px;
+  height: 12px;
+  margin-top: -6px;
+  background: var(--line);
+  pointer-events: none;
+}
+
+.team-slider input[type="range"] {
+  width: 100%;
+  accent-color: var(--fade);
+  background: transparent;
+}
+
+.team-slider.is-moved input[type="range"] {
+  accent-color: var(--floodlight);
+}
+
+.team-slider output {
+  text-align: right;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mod-neutral {
+  color: var(--fade);
+  opacity: 0.6;
+}
+.mod-up {
+  color: var(--gain);
+}
+.mod-down {
+  color: var(--flag);
+}
+
+@media (max-width: 620px) {
+  .team-slider {
+    grid-template-columns: 104px 1fr 44px;
+    gap: 10px;
+  }
+
+  .weight-readout {
+    gap: 10px;
+    font-size: 11.5px;
+  }
 }

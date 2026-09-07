@@ -38,7 +38,15 @@ def shared_data_dir() -> Path:
 def user_workspace(user_id: int, season: str) -> Path:
     """Directory the engine will treat as its project root."""
     path = settings.data_dir / "managers" / str(user_id) / season
-    (path / "squads").mkdir(parents=True, exist_ok=True)
+    try:
+        (path / "squads").mkdir(parents=True, exist_ok=True)
+    except PermissionError as error:
+        raise PermissionError(
+            f"Can't write to {settings.data_dir}. On Railway this usually means "
+            "the mounted volume is owned by root while the app runs as a "
+            "non-root user. Redeploy so the entrypoint can take ownership of "
+            f"the mount, or check the volume is mounted at {settings.data_dir}."
+        ) from error
     return path
 
 

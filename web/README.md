@@ -115,21 +115,20 @@ docker compose up --build
 Then open http://localhost:8000 and use the developer sign-in link, which
 skips Google entirely. It only appears when `DEV_MODE=true`.
 
-To work on the interface with hot reload, run the API and the Vite dev server
-separately:
+For a proper local loop with hot reload, see `DEVELOPING.md`. The short
+version is two terminals:
 
 ```bash
 # terminal 1
-cd web/backend && pip install -r requirements.txt
-DEV_MODE=true DEV_LOGIN_EMAIL=you@example.com SECRET_KEY=dev \
-NERDBALL_ENGINE_DIR=/path/to/fantasy-nerdball NERDBALL_DATA_DIR=./localdata \
-uvicorn app.main:app --reload --port 8000
+./web/dev.sh
 
 # terminal 2
-cd web/frontend && npm install && npm run dev
+cd web/frontend && npm run dev
 ```
 
-Vite proxies `/api` to port 8000.
+Then open http://localhost:5173 — Vite proxies `/api` to port 8000. Run
+`python web/backend/seed_demo.py` to put a squad on screen without waiting for
+a real optimisation.
 
 ---
 
@@ -166,6 +165,11 @@ other.
 - `scikit-learn` is installed so the ML weight training scripts can be run as a
   Railway one-off command. Drop it from `requirements.txt` if you'd rather have
   a smaller image and train weights locally.
+- The container starts as root only long enough for `entrypoint.sh` to take
+  ownership of the mounted volume, which arrives owned by root and would
+  otherwise be unwritable. It then drops to the unprivileged `nerdball` user
+  via `gosu`. The application itself never runs as root, and the `chown` is
+  skipped on reboots once the mount is already owned correctly.
 - Sessions are signed cookies with a thirty-day life, `Secure` and `SameSite=Lax`.
   `DEV_MODE` relaxes the `Secure` flag for local HTTP and is the only thing that
   enables the developer sign-in route.

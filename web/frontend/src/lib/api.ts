@@ -1,6 +1,7 @@
-import type { Reference } from "../components/SettingsEditors";
 import type {
   GameweekInfo,
+  PlayerPool,
+  Reference,
   League,
   Me,
   Performance,
@@ -57,6 +58,7 @@ export const api = {
 
   gameweek: () => request<GameweekInfo>("/api/gameweek"),
   reference: () => request<Reference>("/api/me/reference"),
+  players: () => request<PlayerPool>("/api/players"),
   sync: () => request<{ gameweeks_synced: number }>("/api/sync", { method: "POST" }),
 
   startRun: (gameweek?: number) =>

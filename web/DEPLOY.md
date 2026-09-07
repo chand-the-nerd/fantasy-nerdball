@@ -329,6 +329,11 @@ three-per-club limit. Relax them under Setup.
 **Everything's slow after a redeploy.** The volume isn't mounted, or isn't
 mounted at `/data`. Check Settings → Volumes.
 
+**`PermissionError: [Errno 13] Permission denied: '/data/managers'`.** Railway
+mounts the volume owned by root, and the app runs unprivileged. The image's
+entrypoint fixes this on startup, so if you see it, you're on a build from
+before that entrypoint existed — redeploy and it clears.
+
 **Sign-in works, then immediately signs you out.** `SECRET_KEY` isn't set, so
 the app is using its development default and the cookie isn't stable.
 

@@ -147,3 +147,29 @@ export interface GameweekInfo {
   deadline: string | null;
   average_last_gw: number | null;
 }
+
+export interface Reference {
+  positions: string[];
+  weight_keys: string[];
+  default_weights: Record<string, Record<string, number>>;
+  teams: string[];
+  squad_limits: Record<string, number>;
+}
+
+export interface PlayerPool {
+  season: string;
+  players: {
+    id: number;
+    name: string;
+    full_name: string;
+    position: string;
+    team: string;
+    price: number;
+    status: string;
+    news: string;
+    chance_of_playing: number | null;
+    total_points: number;
+    selected_by: number;
+    ambiguous: boolean;
+  }[];
+}
