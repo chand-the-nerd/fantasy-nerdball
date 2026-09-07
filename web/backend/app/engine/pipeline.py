@@ -130,6 +130,10 @@ def _serialise_squad(starting_df: pd.DataFrame, bench_df: pd.DataFrame) -> dict:
     return {"starting": starting, "bench": bench, "formation": _formation(starting)}
 
 
+# Source column, then target key. Several display columns — fixture_diff,
+# historic_ppg, reliability, minspg — are created by PointsCalculator on the
+# final squad and do NOT exist on the scored pool, so each falls back to the
+# raw column it is derived from. The first source that has a value wins.
 SCORE_FIELDS = [
     ("id", "id"),
     ("player_code", "code"),
@@ -143,9 +147,12 @@ SCORE_FIELDS = [
     ("historic_ppg", "historic_ppg"),
     ("avg_ppg_past2", "historic_ppg"),
     ("fixture_diff", "fixture_difficulty"),
+    ("diff", "fixture_difficulty"),
     ("fixture_multiplier", "fixture_multiplier"),
     ("reliability", "start_rate"),
+    ("current_reliability", "start_rate_fraction"),
     ("minspg", "minutes_per_game"),
+    ("minutes", "minutes_total"),
     ("xConsistency", "xg_modifier"),
     ("team_modifier", "team_modifier"),
     ("selected_by_percent", "ownership"),
@@ -154,7 +161,9 @@ SCORE_FIELDS = [
 ]
 
 
-def _serialise_scores(scored: pd.DataFrame, per_position: int = 40) -> list[dict]:
+def _serialise_scores(
+    scored: pd.DataFrame, gameweek: int, per_position: int = 40
+) -> list[dict]:
     """Keep the best few dozen per position, not the whole pool.
 
     Six hundred players is a lot of JSON for a page that only ever shows the
@@ -177,12 +186,47 @@ def _serialise_scores(scored: pd.DataFrame, per_position: int = 40) -> list[dict
     if not kept:
         return []
 
+    targets = []
+    for _, target in SCORE_FIELDS:
+        if target not in targets:
+            targets.append(target)
+
     rows = []
     for _, row in pd.concat(kept).iterrows():
-        record: dict = {}
+        record: dict = {key: None for key in targets}
         for source, target in SCORE_FIELDS:
             if source in row.index and record.get(target) is None:
                 record[target] = _clean(row[source])
+        # Round the raw fixture difficulty the way the display would.
+        if record.get("fixture_difficulty") is not None:
+            try:
+                record["fixture_difficulty"] = round(
+                    float(record["fixture_difficulty"]), 1
+                )
+            except (TypeError, ValueError):
+                record["fixture_difficulty"] = None
+
+        # current_reliability is a 0-1 fraction; the display shows a percentage.
+        if record.get("start_rate") is None and record.get("start_rate_fraction") is not None:
+            try:
+                record["start_rate"] = round(
+                    float(record["start_rate_fraction"]) * 100
+                )
+            except (TypeError, ValueError):
+                pass
+        record.pop("start_rate_fraction", None)
+
+        # minspg is a display column. From the raw frame only the season total
+        # is available, so derive the per-gameweek figure here.
+        if record.get("minutes_per_game") is None and record.get("minutes_total") is not None:
+            try:
+                record["minutes_per_game"] = round(
+                    float(record["minutes_total"]) / max(1, gameweek - 1)
+                )
+            except (TypeError, ValueError):
+                pass
+        record.pop("minutes_total", None)
+
         # FPL hands ownership back as a string. Coerce once here rather than
         # leaving every consumer to remember to.
         raw_ownership = record.get("ownership")
@@ -261,7 +305,7 @@ def run_optimisation(
         say("Checking form, fixtures and expected goals")
         players, scored, available_budget = nerdball.process_player_data(components, config)
 
-        scored_players = _serialise_scores(scored)
+        scored_players = _serialise_scores(scored, config.GAMEWEEK)
 
         say("Sketching out my ideal side")
         theoretical_starting, theoretical_points, theoretical_cost = (
