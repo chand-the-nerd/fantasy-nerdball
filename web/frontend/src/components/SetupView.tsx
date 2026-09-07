@@ -6,20 +6,6 @@ import { checkConstraints } from "./constraints";
 import { api, ApiError } from "../lib/api";
 import type { Me, Reference, Settings } from "../lib/types";
 
-interface Member {
-  id: number;
-  email: string;
-  name: string;
-  is_admin: boolean;
-}
-
-interface MembersResponse {
-  seats_used: number;
-  seats_total: number;
-  members: Member[];
-  invites: { id: number; email: string }[];
-}
-
 const POSITIONS = ["GK", "DEF", "MID", "FWD"];
 const POSITION_LABELS: Record<string, string> = {
   GK: "Goalkeepers",
@@ -74,9 +60,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [reference, setReference] = useState<Reference | null>(null);
   const [pool, setPool] = useState<PoolPlayer[]>([]);
-  const [members, setMembers] = useState<MembersResponse | null>(null);
   const [entryId, setEntryId] = useState(me.fpl_entry_id ? String(me.fpl_entry_id) : "");
-  const [inviteEmail, setInviteEmail] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
 
@@ -88,13 +72,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
     api.reference().then(setReference).catch(() => undefined);
     api.players().then((data) => setPool(data.players)).catch(() => undefined);
 
-    if (me.is_admin) {
-      fetch("/api/admin/members")
-        .then((r) => (r.ok ? r.json() : null))
-        .then(setMembers)
-        .catch(() => undefined);
-    }
-  }, [me.is_admin]);
+  }, []);
 
   const patch = (changes: Partial<Settings>) =>
     setSettings((current) => (current ? { ...current, ...changes } : current));
@@ -166,26 +144,6 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
     }
   };
 
-  const invite = async () => {
-    setError("");
-    try {
-      const response = await fetch("/api/admin/invites", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail }),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.detail || "Couldn't add that address.");
-      }
-      setStatus(`${inviteEmail} can now sign in with Google.`);
-      setInviteEmail("");
-      setMembers(await (await fetch("/api/admin/members")).json());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  };
-
   if (!settings) return <p className="muted">{error || "Loading settings…"}</p>;
 
   const forced = settings.forced_selections ?? {};
@@ -228,7 +186,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
         title="Gameweek"
         blurb="What's true of your squad right now. Worth checking every week."
       >
-        <div className="panel">
+        <div className="panel col-half">
           <h3>This gameweek</h3>
           <div className="grid-2">
             <div className="field">
@@ -268,7 +226,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
           />
         </div>
 
-        <div className="panel">
+        <div className="panel col-half">
           <h3>Chips</h3>
           <p className="muted" style={{ marginTop: -6 }}>
             One at a time, and turn it off again after the deadline.
@@ -304,7 +262,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
         title="Model tuning"
         blurb="How the optimiser decides. Set these once and leave them unless something isn't working."
       >
-        <div className="panel">
+        <div className="panel col-half">
           <h3>Model</h3>
           <div className="grid-2">
             <div className="field">
@@ -355,7 +313,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
           />
         </div>
 
-        <div className="panel span-2">
+        <div className="panel col-half">
           <h3>Model weighting</h3>
           <p className="muted" style={{ marginTop: -6 }}>
             Drag the handles to divide each position's score between recent form,
@@ -380,7 +338,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
           </div>
         </div>
 
-        <div className="panel">
+        <div className="panel col-half">
           <h3>Forced picks</h3>
           <p className="muted" style={{ marginTop: -6 }}>
             Players the squad is always built around.
@@ -409,7 +367,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
           })}
         </div>
 
-        <div className="panel">
+        <div className="panel col-half">
           <h3>Players to avoid</h3>
           <p className="muted" style={{ marginTop: -6 }}>
             Removed from the pool entirely, whatever the numbers say.
@@ -425,7 +383,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
           </div>
         </div>
 
-        <div className="panel span-2">
+        <div className="panel">
           <h3>Team adjustments</h3>
           <p className="muted" style={{ marginTop: -6 }}>
             Below 1.00 marks a club down, above marks it up. For what the numbers
@@ -447,8 +405,8 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
         </div>
       </Section>
 
-      <Section title="Users" blurb="Your FPL side, and who else can sign in.">
-        <div className="panel">
+      <Section title="Users" blurb="Your FPL side. Access is managed from the admin page.">
+        <div className="panel col-half">
           <h3>Your FPL team</h3>
           <div className="field">
             <label htmlFor="entry">Team id</label>
@@ -465,40 +423,13 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
               real points in each week, to chart against the global average.
             </span>
           </div>
-          <button className="btn quiet small" onClick={linkEntry} type="button">
-            {entryId.trim() ? "Link team" : "Unlink team"}
-          </button>
-        </div>
-
-        {me.is_admin && members && (
-          <div className="panel">
-            <h3>Managers</h3>
-            <p className="muted" style={{ marginTop: -6 }}>
-              {members.seats_used} of {members.seats_total} seats taken.
-            </p>
-            <div className="stat-rows">
-              {members.members.map((member) => (
-                <div key={member.id}>
-                  <span>{member.name || member.email}</span>
-                  <span>{member.is_admin ? "owner" : "manager"}</span>
-                </div>
-              ))}
-            </div>
-            <div className="field" style={{ marginTop: 16 }}>
-              <label htmlFor="invite">Invite a Google account</label>
-              <input
-                id="invite"
-                type="text"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="friend@gmail.com"
-              />
-            </div>
-            <button className="btn quiet small" onClick={invite} type="button">
-              Add manager
+          <div className="panel-foot">
+            <button className="btn quiet small" onClick={linkEntry} type="button">
+              {entryId.trim() ? "Link team" : "Unlink team"}
             </button>
           </div>
-        )}
+        </div>
+
       </Section>
     </>
   );

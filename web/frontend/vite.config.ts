@@ -6,13 +6,9 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: false,
-    rollupOptions: {
-      output: {
-        // The charting library is only needed on the Form page; keeping it in
-        // its own chunk stops it delaying the first paint of the pitch.
-        manualChunks: { charts: ["recharts"] },
-      },
-    },
+    // No manual chunking: the Form page is hidden, so nothing imports the
+    // charting library and forcing it into a chunk would only emit dead code.
+    // Re-enabling Form with a lazy import gets it split automatically.
   },
   server: {
     port: 5173,

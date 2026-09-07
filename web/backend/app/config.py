@@ -64,6 +64,12 @@ class Settings:
 
         self.current_season = os.getenv("CURRENT_SEASON", "2026-27")
 
+        # Gates the admin page. Unset means the admin page stays locked for
+        # everyone, which is a safer default than leaving it open.
+        self.admin_password = os.getenv("ADMIN_PASSWORD", "")
+        # How long an unlock lasts before the password is asked for again.
+        self.admin_session_minutes = int(os.getenv("ADMIN_SESSION_MINUTES", "30"))
+
         # A single optimisation run is CPU-bound and chdir-based, so runs
         # are serialised. This only caps how many can queue up.
         self.max_queued_runs = int(os.getenv("MAX_QUEUED_RUNS", "20"))
@@ -84,6 +90,10 @@ class Settings:
     @property
     def oauth_redirect_uri(self) -> str:
         return f"{self.public_base_url}/api/auth/callback"
+
+    @property
+    def admin_configured(self) -> bool:
+        return bool(self.admin_password)
 
     @property
     def google_configured(self) -> bool:

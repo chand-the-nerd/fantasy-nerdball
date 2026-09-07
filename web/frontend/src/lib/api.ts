@@ -81,4 +81,25 @@ export const api = {
       body: JSON.stringify({ gameweek, actual_points }),
     }),
   league: () => request<League>("/api/performance/league"),
+
+  adminStatus: () =>
+    request<{ configured: boolean; unlocked: boolean; session_minutes: number }>(
+      "/api/admin/status",
+    ),
+  adminUnlock: (password: string) =>
+    request<{ unlocked: boolean }>("/api/admin/unlock", {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    }),
+  adminLock: () => request<{ unlocked: boolean }>("/api/admin/lock", { method: "POST" }),
+  adminMembers: () => request<any>("/api/admin/members"),
+  adminAddInvite: (email: string) =>
+    request<{ email: string }>("/api/admin/invites", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+  adminRemoveInvite: (id: number) =>
+    request<void>(`/api/admin/invites/${id}`, { method: "DELETE" }),
+  adminRemoveMember: (id: number) =>
+    request<void>(`/api/admin/members/${id}`, { method: "DELETE" }),
 };

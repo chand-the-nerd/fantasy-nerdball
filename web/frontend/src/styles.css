@@ -183,6 +183,10 @@ button {
   min-width: 0;
 }
 
+.main > * {
+  max-width: 1240px;
+}
+
 .topbar {
   display: flex;
   align-items: baseline;
@@ -950,13 +954,13 @@ tr.you td {
 /* ── Setup: sections ─────────────────────────────────────────────────── */
 
 .setup-section {
-  margin-bottom: 34px;
+  margin-bottom: 38px;
 }
 
 .section-head {
   border-bottom: 1px solid var(--line);
   padding-bottom: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .section-head h2 {
@@ -971,15 +975,40 @@ tr.you td {
   margin: 4px 0 0;
 }
 
+/* An explicit twelve-column grid rather than auto-fit, so every row is
+   deliberately composed and adds up to the full width instead of leaving a
+   ragged last item stretched across whatever space is left over. */
 .setup-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(12, 1fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
-.setup-grid .span-2 {
-  grid-column: 1 / -1;
+.setup-grid > * {
+  grid-column: span 12;
+}
+
+/* Two columns from 1040px, not 820px. The 208px rail plus padding comes off
+   the viewport before anything is split, so at 820px a half column would be
+   about 270px — too narrow for a slider row or a picker dropdown. 1040px is
+   where a half column clears 380px. */
+@media (min-width: 1040px) {
+  .setup-grid > .col-half {
+    grid-column: span 6;
+  }
+}
+
+/* Panels stretch to match their row, so the action sits at the foot rather
+   than floating mid-panel. */
+.panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.panel > .panel-foot {
+  margin-top: auto;
+  padding-top: 14px;
 }
 
 .problem-list {
@@ -1241,6 +1270,24 @@ tr.you td {
 
 /* ── Team modifier sliders ───────────────────────────────────────────── */
 
+.team-slider-columns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 34px;
+}
+
+@media (min-width: 1040px) {
+  .team-slider-columns {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 1600px) {
+  .team-slider-columns {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 .team-sliders-head {
   display: flex;
   justify-content: space-between;
@@ -1252,9 +1299,9 @@ tr.you td {
 
 .team-slider {
   display: grid;
-  grid-template-columns: 150px 1fr 48px;
+  grid-template-columns: 118px minmax(90px, 1fr) 44px;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   padding: 5px 0;
 }
 
@@ -1323,5 +1370,159 @@ tr.you td {
   .weight-readout {
     gap: 10px;
     font-size: 11.5px;
+  }
+}
+
+/* ── Footer and admin overlay ────────────────────────────────────────── */
+
+.app-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 40px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--fade);
+  opacity: 0.75;
+}
+
+.admin-link {
+  background: none;
+  border: 0;
+  color: var(--fade);
+  font-size: 12.5px;
+  padding: 2px 4px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.admin-link:hover {
+  color: var(--chalk);
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(4, 10, 8, 0.72);
+  display: grid;
+  place-items: start center;
+  padding: 8vh 20px 40px;
+  overflow-y: auto;
+}
+
+.admin-panel {
+  width: 100%;
+  max-width: 460px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px;
+}
+
+.admin-panel.wide {
+  max-width: 780px;
+}
+
+.admin-panel h2 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--floodlight);
+  margin-bottom: 10px;
+}
+
+.admin-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
+.admin-section {
+  margin-top: 24px;
+}
+
+.admin-section h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.admin-section h3 .muted {
+  font-weight: 400;
+  font-size: 13px;
+}
+
+.admin-section p.muted {
+  margin: -4px 0 12px;
+}
+
+.admin-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.admin-panel .admin-head .admin-actions {
+  margin-top: 0;
+}
+
+.admin-add {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.who-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.who-cell img {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+}
+
+.link-button.danger {
+  color: var(--flag);
+}
+
+.link-button.danger:hover {
+  color: #ff9ea1;
+}
+
+.admin-panel code {
+  font-family: inherit;
+  font-weight: 600;
+  color: var(--chalk);
+  background: var(--turf-night);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 12.5px;
+}
+
+@media (max-width: 620px) {
+  .overlay {
+    padding: 4vh 12px 30px;
+  }
+
+  .admin-panel {
+    padding: 18px 15px;
+  }
+
+  .admin-add {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
