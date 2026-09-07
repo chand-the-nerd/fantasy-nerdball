@@ -25,9 +25,10 @@ ENV PYTHONUNBUFFERED=1 \
     STATIC_DIR=/app/static \
     NERDBALL_DATA_DIR=/data
 
-# PuLP ships its own CBC solver binary, which needs libstdc++ and libgomp.
+# libstdc++/libgomp are for the CBC solver binary PuLP ships. gosu drops
+# privileges in the entrypoint after the mounted volume has been fixed up.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libstdc++6 libgomp1 curl \
+        libstdc++6 libgomp1 curl gosu \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -52,15 +53,23 @@ RUN cp ./nerdball/config_example.py ./nerdball/config.py
 
 COPY --from=frontend /build/dist ./static
 
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+
 RUN mkdir -p /data && \
     useradd --create-home --uid 10001 nerdball && \
-    chown -R nerdball:nerdball /app /data
-USER nerdball
+    chown -R nerdball:nerdball /app /data && \
+    chmod +x /usr/local/bin/entrypoint.sh
+
+# No USER directive. The container starts as root so the entrypoint can take
+# ownership of the volume Railway mounts at runtime, then immediately drops to
+# the nerdball user via gosu. The application never runs as root.
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS "http://localhost:${PORT:-8000}/api/health" || exit 1
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # Exactly one worker. The optimiser switches the process working directory and
 # holds a lock while it runs, so a second worker would fight it.
