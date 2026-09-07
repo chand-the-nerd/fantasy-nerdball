@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PlayerPicker, type PoolPlayer } from "./PlayerPicker";
 import { TeamSliders } from "./TeamSliders";
 import { WeightBar, type Weights } from "./WeightBar";
+import { FplTeamPanel } from "./FplTeamPanel";
 import { checkConstraints } from "./constraints";
 import { api, ApiError } from "../lib/api";
 import type { Me, Reference, Settings } from "../lib/types";
@@ -60,7 +61,6 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [reference, setReference] = useState<Reference | null>(null);
   const [pool, setPool] = useState<PoolPlayer[]>([]);
-  const [entryId, setEntryId] = useState(me.fpl_entry_id ? String(me.fpl_entry_id) : "");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
 
@@ -73,6 +73,10 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
     api.players().then((data) => setPool(data.players)).catch(() => undefined);
 
   }, []);
+
+  const reloadSettings = () => {
+    api.settings().then(setSettings).catch(() => undefined);
+  };
 
   const patch = (changes: Partial<Settings>) =>
     setSettings((current) => (current ? { ...current, ...changes } : current));
@@ -127,18 +131,6 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
     try {
       setSettings(await api.saveSettings(settings));
       setStatus("Settings saved. They apply on your next run.");
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
-    }
-  };
-
-  const linkEntry = async () => {
-    setError("");
-    setStatus("");
-    try {
-      const value = entryId.trim() ? Number(entryId.trim()) : null;
-      onMeChange(await api.linkEntry(value));
-      setStatus(value ? "FPL team linked." : "FPL team unlinked.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     }
@@ -305,12 +297,6 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
             />
             <span className="hint">A hit is a one-off cost spread across this many weeks.</span>
           </div>
-          <Toggle
-            checked={settings.use_ml_weights}
-            onChange={(v) => patch({ use_ml_weights: v })}
-            title="Use trained position weights"
-            hint="Reads the weights from the ML training scripts instead of the ones below."
-          />
         </div>
 
         <div className="panel col-half">
@@ -322,8 +308,14 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
           </p>
           {settings.use_ml_weights && (
             <div className="notice" style={{ margin: "14px 0 0" }}>
-              Trained weights are switched on, so these are ignored until you turn
-              that off.
+              Trained weights are switched on, so these are ignored.{" "}
+              <button
+                className="link-button"
+                type="button"
+                onClick={() => patch({ use_ml_weights: false })}
+              >
+                Turn them off
+              </button>
             </div>
           )}
           <div className={settings.use_ml_weights ? "weights is-inactive" : "weights"}>
@@ -406,30 +398,11 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
       </Section>
 
       <Section title="Users" blurb="Your FPL side. Access is managed from the admin page.">
-        <div className="panel col-half">
-          <h3>Your FPL team</h3>
-          <div className="field">
-            <label htmlFor="entry">Team id</label>
-            <input
-              id="entry"
-              type="text"
-              inputMode="numeric"
-              value={entryId}
-              onChange={(e) => setEntryId(e.target.value)}
-              placeholder="e.g. 1234567"
-            />
-            <span className="hint">
-              The number in your team's URL on the FPL site. Linking it pulls your
-              real points in each week, to chart against the global average.
-            </span>
-          </div>
-          <div className="panel-foot">
-            <button className="btn quiet small" onClick={linkEntry} type="button">
-              {entryId.trim() ? "Link team" : "Unlink team"}
-            </button>
-          </div>
-        </div>
-
+        <FplTeamPanel
+          me={me}
+          onMeChange={onMeChange}
+          onSettingsChanged={reloadSettings}
+        />
       </Section>
     </>
   );

@@ -62,6 +62,12 @@ class EntryLinkIn(BaseModel):
     fpl_entry_id: int | None = Field(default=None, ge=1)
 
 
+class ImportSquadIn(BaseModel):
+    gameweek: int | None = Field(default=None, ge=1, le=38)
+    apply_budget: bool = True
+    apply_free_transfers: bool = True
+
+
 class RunIn(BaseModel):
     gameweek: int | None = Field(default=None, ge=1, le=38)
     season: str | None = None

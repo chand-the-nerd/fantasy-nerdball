@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import requests
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..auth import current_user
+from ..config import settings
 from ..db import get_session
-from ..models import User, UserSettings
-from ..schemas import EntryLinkIn, SettingsIn, SettingsOut, UserOut
-from ..services import fpl
+from ..models import Squad, User, UserSettings
+from ..schemas import EntryLinkIn, ImportSquadIn, SettingsIn, SettingsOut, UserOut
+from ..services import fpl, fpl_import
 
 router = APIRouter(prefix="/api/me", tags=["me"])
 
@@ -156,7 +158,14 @@ def link_entry(
 
     user.fpl_entry_id = payload.fpl_entry_id
     session.commit()
-    fpl.sync_entry_history(session, user)
+
+    # Pulling their history is a nicety. If it fails the link itself is still
+    # good, so don't fail the request over it.
+    try:
+        fpl.sync_entry_history(session, user)
+    except Exception:
+        pass
+
     session.refresh(user)
     return user
 
@@ -190,4 +199,150 @@ def reference(user: User = Depends(current_user)) -> dict:
         "default_weights": default_weights,
         "teams": teams,
         "squad_limits": {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3},
+    }
+
+
+@router.get("/fpl-entry")
+def entry_details(
+    user: User = Depends(current_user), session: Session = Depends(get_session)
+) -> dict:
+    """What is currently linked, so the page can say so plainly."""
+    if not user.fpl_entry_id:
+        return {"linked": False}
+
+    try:
+        details = fpl.verify_entry(user.fpl_entry_id)
+    except requests.RequestException:
+        # Still linked; we just can't decorate it with the team name.
+        return {"linked": True, "entry_id": user.fpl_entry_id, "unreachable": True}
+
+    try:
+        upcoming = fpl.current_gameweek()
+    except Exception:
+        upcoming = None
+
+    imported = None
+    if upcoming and upcoming > 1:
+        squad = session.scalar(
+            select(Squad).where(
+                Squad.user_id == user.id,
+                Squad.season == settings.current_season,
+                Squad.gameweek == upcoming - 1,
+            )
+        )
+        if squad is not None:
+            imported = {
+                "gameweek": squad.gameweek,
+                "from_fpl": bool((squad.payload or {}).get("imported")),
+            }
+
+    return {
+        "linked": True,
+        "unreachable": False,
+        "upcoming_gameweek": upcoming,
+        "importable_gameweek": (upcoming - 1) if upcoming and upcoming > 1 else None,
+        "existing_squad": imported,
+        **details,
+    }
+
+
+@router.post("/import-squad")
+def import_squad(
+    payload: ImportSquadIn,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Save the manager's real FPL side as a previous gameweek.
+
+    Without this the optimiser has nothing to compare against mid-season and
+    treats you as a new team, so its first set of transfers is meaningless.
+    """
+    if not user.fpl_entry_id:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Link your FPL team first, then import.",
+        )
+
+    try:
+        upcoming = fpl.current_gameweek()
+    except Exception:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "The FPL API isn't responding. Try again shortly.",
+        )
+
+    gameweek = payload.gameweek or (upcoming - 1)
+    if gameweek < 1:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "There's no gameweek before the first one to import.",
+        )
+    if gameweek >= upcoming:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Gameweek {gameweek} hasn't been played yet. The latest you can "
+            f"import is gameweek {upcoming - 1}.",
+        )
+
+    try:
+        result = fpl_import.import_summary(user.fpl_entry_id, gameweek, upcoming)
+    except fpl_import.SquadImportError as error:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error))
+    except requests.RequestException:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "The FPL API isn't responding. Try again shortly.",
+        )
+
+    squad = session.scalar(
+        select(Squad).where(
+            Squad.user_id == user.id,
+            Squad.season == settings.current_season,
+            Squad.gameweek == gameweek,
+        )
+    )
+    if squad is None:
+        squad = Squad(
+            user_id=user.id, season=settings.current_season, gameweek=gameweek
+        )
+        session.add(squad)
+
+    data = result["payload"]
+    squad.formation = data["formation"]
+    squad.projected_points = 0.0
+    squad.squad_value = result["squad_value"]
+    squad.bank = result["bank"]
+    squad.transfers_made = data["transfers_made"]
+    squad.penalty_points = data["penalty_points"]
+    squad.chip = data["chip"]
+    squad.payload = data
+    squad.engine_rows = result["engine_rows"]
+
+    row = _settings_row(session, user)
+    applied = []
+    if payload.apply_budget:
+        row.budget = result["budget"]
+        applied.append(f"budget set to £{result['budget']}m")
+    if payload.apply_free_transfers:
+        row.free_transfers = result["free_transfers"]
+        applied.append(f"{result['free_transfers']} free transfer"
+                       f"{'s' if result['free_transfers'] != 1 else ''}")
+    if payload.apply_free_transfers and result["free_hit_used"]:
+        row.free_hit_prev_gw = True
+        applied.append("Free Hit flagged")
+
+    session.commit()
+
+    return {
+        "gameweek": gameweek,
+        "formation": data["formation"],
+        "players": len(result["engine_rows"]),
+        "squad_value": result["squad_value"],
+        "bank": result["bank"],
+        "budget": result["budget"],
+        "free_transfers": result["free_transfers"],
+        "free_transfers_note": result["free_transfers_note"],
+        "chip": data["chip"],
+        "free_hit_used": result["free_hit_used"],
+        "applied": applied,
     }

@@ -1526,3 +1526,67 @@ tr.you td {
     align-items: stretch;
   }
 }
+
+/* ── Linked FPL team ─────────────────────────────────────────────────── */
+
+.linked-team {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  margin: 4px 0 16px;
+  background: var(--turf-night);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--gain);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.linked-team > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.linked-team strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linked-team .muted {
+  display: block;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linked-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gain);
+  flex: none;
+}
+
+.import-block {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.import-block h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.import-block p.muted {
+  margin: 0 0 12px;
+  font-size: 13.5px;
+}
+
+.import-block .notice {
+  margin-bottom: 12px;
+}

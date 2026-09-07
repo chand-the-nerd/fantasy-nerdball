@@ -26,8 +26,8 @@ export function SignIn() {
           <em>Nerdball</em>
         </h1>
         <p>
-          Taking the fun out of Fantasy Premier League.<br />
-          FPL Optimisation using Integer Linear Programming, xG Models and FPL Stats.
+          Integer programming, expected goals and three seasons of history, pointed at
+          fifteen players and a hundred million pounds. Sign in to see this week's side.
         </p>
 
         {error && MESSAGES[error] && <div className="notice bad">{MESSAGES[error]}</div>}

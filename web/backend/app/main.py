@@ -63,7 +63,15 @@ app.include_router(admin.router)
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok", "engine": settings.engine_dir.exists()}
+    return {
+        "status": "ok",
+        "engine": settings.engine_dir.exists(),
+        # Railway sets this to the deployed commit. Lets you confirm which
+        # build is actually live rather than inferring it from behaviour.
+        "commit": os.getenv("RAILWAY_GIT_COMMIT_SHA", "unknown")[:8],
+        "admin_configured": settings.admin_configured,
+        "routes": len([r for r in app.routes if getattr(r, "path", "").startswith("/api/")]),
+    }
 
 
 @app.get("/api/gameweek")
@@ -109,6 +117,15 @@ if settings.static_dir.exists():
 
     @app.get("/{full_path:path}")
     def spa(full_path: str, request: Request):
+        # An unmatched /api/ path is a missing route, not a page. Falling
+        # through to index.html here makes a stale deployment look like a
+        # working one: you request an endpoint that doesn't exist and get
+        # the homepage back instead of a 404.
+        if full_path.startswith("api/"):
+            return JSONResponse(
+                {"detail": f"No such endpoint: /{full_path}"}, status_code=404
+            )
+
         candidate = settings.static_dir / full_path
         if full_path and candidate.is_file():
             return FileResponse(candidate)

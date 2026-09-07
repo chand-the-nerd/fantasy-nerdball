@@ -50,6 +50,16 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
+  fplEntry: () => request<any>("/api/me/fpl-entry"),
+  importSquad: (body: {
+    gameweek?: number;
+    apply_budget: boolean;
+    apply_free_transfers: boolean;
+  }) =>
+    request<any>("/api/me/import-squad", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   linkEntry: (fpl_entry_id: number | null) =>
     request<Me>("/api/me/fpl-entry", {
       method: "POST",
