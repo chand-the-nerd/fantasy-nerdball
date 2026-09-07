@@ -69,15 +69,16 @@ def cron_status(admin: User = Depends(current_admin)) -> dict:
     """For the admin page: what's stored, and what's outstanding."""
     state = history_updater.read_state()
     try:
-        pending = history_updater.pending_gameweek()
+        outstanding = history_updater.pending_gameweeks()
     except Exception:
-        pending = None
+        outstanding = []
     return {
         "configured": bool(settings.cron_secret),
         "internal_scheduler": settings.history_auto_update,
         "last_gameweek": state.get("last_gameweek"),
         "updated_at": state.get("updated_at"),
-        "pending_gameweek": pending,
+        "pending_gameweeks": outstanding,
+        "pending_gameweek": outstanding[0] if outstanding else None,
     }
 
 

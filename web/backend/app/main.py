@@ -92,8 +92,16 @@ def start_history_scheduler() -> None:
         while True:
             try:
                 result = history_updater.update()
-                if result.get("status") == "updated":
-                    log.info("Stored player history for GW%s", result.get("gameweek"))
+                if result.get("updated"):
+                    log.info(
+                        "Stored player history for GW%s",
+                        ", ".join(str(g) for g in result["updated"]),
+                    )
+                # A backlog is worked through a few gameweeks at a time, so
+                # come back sooner while there is more to do.
+                if result.get("remaining"):
+                    time.sleep(60)
+                    continue
             except Exception:
                 log.exception("Player history update failed")
             time.sleep(max(5, settings.history_check_minutes) * 60)

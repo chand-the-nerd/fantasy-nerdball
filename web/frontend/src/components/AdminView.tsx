@@ -232,8 +232,8 @@ export function AdminView({ onClose }: { onClose: () => void }) {
                   color: cron.pending_gameweek ? "var(--floodlight)" : "var(--gain)",
                 }}
               >
-                {cron.pending_gameweek
-                  ? `gameweek ${cron.pending_gameweek}`
+                {cron.pending_gameweeks?.length
+                  ? `gameweek${cron.pending_gameweeks.length > 1 ? "s" : ""} ${cron.pending_gameweeks.join(", ")}`
                   : "up to date"}
               </span>
             </div>

@@ -61,17 +61,32 @@ def finished_gameweeks() -> list[int]:
     return sorted(int(e["id"]) for e in events if e.get("finished"))
 
 
+def pending_gameweeks() -> list[int]:
+    """Every finished gameweek not yet stored, oldest first.
+
+    Not just the latest one: starting mid-season, or after any gap, there is a
+    backlog to work through and skipping it would leave permanent holes in the
+    history the form-consistency signal reads.
+    """
+    stored = int(read_state().get("last_gameweek") or 0)
+    return [gw for gw in finished_gameweeks() if gw > stored]
+
+
 def pending_gameweek() -> int | None:
-    """The latest finished gameweek not yet stored, or None if up to date."""
-    finished = finished_gameweeks()
-    if not finished:
-        return None
-    latest = finished[-1]
-    return latest if latest > int(read_state().get("last_gameweek") or 0) else None
+    """The next gameweek due, or None if up to date."""
+    outstanding = pending_gameweeks()
+    return outstanding[0] if outstanding else None
 
 
-def update(force_gameweek: int | None = None) -> dict[str, Any]:
-    """Store the latest finished gameweek's player data.
+# Each gameweek means a pass over every player, so a cold start with a long
+# backlog is capped per invocation and picked up again on the next run.
+MAX_PER_RUN = 3
+
+
+def update(
+    force_gameweek: int | None = None, max_gameweeks: int = MAX_PER_RUN
+) -> dict[str, Any]:
+    """Store any finished gameweeks not yet captured, oldest first.
 
     Returns a summary rather than raising, so a scheduler polling this gets a
     200 with "nothing to do" instead of an error it might alert on.
@@ -80,14 +95,53 @@ def update(force_gameweek: int | None = None) -> dict[str, Any]:
         return {"status": "busy", "detail": "An update is already running."}
 
     try:
-        target = force_gameweek or pending_gameweek()
-        if target is None:
+        if force_gameweek:
+            targets = [force_gameweek]
+        else:
+            targets = pending_gameweeks()[:max_gameweeks]
+
+        if not targets:
             state = read_state()
             return {
                 "status": "up-to-date",
                 "last_gameweek": state.get("last_gameweek"),
                 "updated_at": state.get("updated_at"),
             }
+
+        done: list[int] = []
+        for target in targets:
+            outcome = _update_one(target)
+            if outcome["status"] != "updated":
+                # Stop at the first failure: gameweeks are stored in order, so
+                # carrying on would leave a hole behind the marker.
+                return {
+                    "status": "partial" if done else "failed",
+                    "updated": done,
+                    "stopped_at": target,
+                    "detail": outcome.get("detail", ""),
+                    "log": outcome.get("log", []),
+                }
+            done.append(target)
+
+        remaining = pending_gameweeks()
+        return {
+            "status": "updated",
+            "updated": done,
+            "remaining": remaining,
+            "detail": (
+                f"{len(remaining)} gameweek(s) still to go; the next run picks "
+                "them up." if remaining else "History is up to date."
+            ),
+        }
+    except Exception as error:
+        return {"status": "failed", "detail": f"{type(error).__name__}: {error}"}
+    finally:
+        _update_lock.release()
+
+
+def _update_one(target: int) -> dict[str, Any]:
+    """Store a single gameweek. Assumes the caller holds the lock."""
+    try:
 
         ensure_engine_on_path(settings.engine_dir)
         from src.data.player_history_tracker import PlayerHistoryTracker  # type: ignore
@@ -144,5 +198,3 @@ def update(force_gameweek: int | None = None) -> dict[str, Any]:
         }
     except Exception as error:
         return {"status": "failed", "detail": f"{type(error).__name__}: {error}"}
-    finally:
-        _update_lock.release()
