@@ -305,7 +305,7 @@ button {
 
 .pitch {
   position: relative;
-  padding: 26px 14px 18px;
+  padding: 40px 18px 34px;
   background-image:
     linear-gradient(180deg, rgba(93, 211, 158, 0.07), rgba(93, 211, 158, 0) 62%),
     repeating-linear-gradient(
@@ -337,20 +337,20 @@ button {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 30px;
 }
 
 .line-row {
   display: flex;
   justify-content: center;
-  gap: 10px;
+  gap: 14px;
   flex-wrap: wrap;
 }
 
 .bench {
   border-top: 1px solid var(--line);
   background: rgba(4, 12, 10, 0.55);
-  padding: 12px 14px 14px;
+  padding: 16px 18px 20px;
 }
 
 .bench-head {
@@ -369,20 +369,24 @@ button {
 }
 
 .bench .line-row {
-  gap: 10px;
+  gap: 14px;
 }
 
 /* ── Shirt card ──────────────────────────────────────────────────────── */
 
+/* Every row is display:block. As inline spans they collapsed onto one line
+   and text-overflow:ellipsis silently did nothing, so long names ran past
+   the edge of the card. */
+
 .shirt {
-  width: 92px;
+  width: 116px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
   overflow: hidden;
   text-align: center;
   position: relative;
-  padding: 0;
+  padding: 0 0 9px;
   color: inherit;
   display: block;
 }
@@ -400,50 +404,64 @@ button {
 }
 
 .shirt .band {
-  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  gap: 3px;
+  height: 26px;
+  padding: 0 6px;
+  font-family: "Archivo Narrow", "Archivo", sans-serif;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: 13px;
+  letter-spacing: 0.005em;
+  min-width: 0;
 }
 
-.shirt .who {
-  font-family: "Archivo Narrow", "Archivo", sans-serif;
-  font-weight: 600;
-  font-size: 13px;
-  line-height: 1.2;
-  padding: 6px 4px 2px;
-  white-space: nowrap;
+.shirt .band .name {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .shirt .points {
-  font-size: 18px;
+  display: block;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  line-height: 1.1;
+  line-height: 1.15;
+  padding: 7px 4px 0;
 }
 
 .shirt.is-captain .points {
   color: var(--floodlight);
 }
 
-.shirt .meta {
-  font-size: 11px;
+.shirt .meta,
+.shirt .price {
+  display: block;
   color: var(--fade);
-  padding: 1px 4px 7px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  padding: 0 5px;
+}
+
+.shirt .meta {
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.shirt .price {
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.75;
 }
 
 .armband {
   position: absolute;
-  top: 26px;
-  right: 4px;
+  top: 32px;
+  right: 5px;
   width: 17px;
   height: 17px;
   border-radius: 50%;
@@ -463,15 +481,18 @@ button {
 
 .bench-number {
   position: absolute;
-  top: 26px;
-  left: 4px;
+  top: 32px;
+  left: 6px;
   font-size: 11px;
   font-weight: 700;
   color: var(--fade);
 }
 
 .dgw-mark {
-  color: var(--gain);
+  font-size: 9px;
+  letter-spacing: -1px;
+  opacity: 0.8;
+  flex: none;
 }
 
 /* One orchestrated reveal: the side settles onto the pitch, line by line. */
@@ -846,19 +867,45 @@ tr.you td {
   }
 
   .shirt {
-    width: 72px;
+    width: 84px;
   }
 
-  .shirt .who {
-    font-size: 12px;
+  .shirt .band {
+    font-size: 11.5px;
+    height: 23px;
+    padding: 0 4px;
   }
 
   .shirt .points {
-    font-size: 16px;
+    font-size: 17px;
+    padding-top: 5px;
+  }
+
+  .shirt .meta {
+    font-size: 10.5px;
+  }
+
+  /* Price is the first thing to go when width is tight; it's still in the
+     tooltip and the detail panel. */
+  .shirt .price {
+    display: none;
+  }
+
+  .armband,
+  .bench-number {
+    top: 28px;
   }
 
   .line-row {
-    gap: 6px;
+    gap: 8px;
+  }
+
+  .lines {
+    gap: 20px;
+  }
+
+  .pitch {
+    padding: 26px 10px 22px;
   }
 }
 

@@ -22,15 +22,18 @@ export function PlayerShirt({ player, delay = 0, onSelect }: Props) {
   const doubtful = player.status !== "a" && player.status !== "";
   const abbr = clubAbbr(player.team, player.team_short);
 
+  const venue =
+    player.venue === "Home" ? " (H)" : player.venue === "Away" ? " (A)" : "";
   const fixture = player.next_opponent
-    ? `${player.next_opponent}${player.venue === "Home" ? " (H)" : player.venue === "Away" ? " (A)" : ""}`
-    : `£${player.price.toFixed(1)}m`;
+    ? `${abbr} · ${player.next_opponent}${venue}`
+    : abbr;
 
   const title = [
     `${player.name} · ${player.team} · ${player.position}`,
     `£${player.price.toFixed(1)}m · ${player.projected_points.toFixed(1)} projected`,
     player.form !== null ? `form ${player.form}` : "",
     player.start_rate !== null ? `starts ${player.start_rate}%` : "",
+    player.is_double_gameweek ? "Double gameweek" : "",
     player.news ? player.news : "",
   ]
     .filter(Boolean)
@@ -52,11 +55,14 @@ export function PlayerShirt({ player, delay = 0, onSelect }: Props) {
       title={title}
       onClick={() => onSelect?.(player)}
     >
+      {/* The name sits on the club colour. It's what you scan the pitch for,
+          so it gets the full width of the card and the strongest position. */}
       <span
         className="band"
         style={{ background: colours.band, color: readableOn(colours.band) }}
       >
-        {abbr}
+        <span className="name">{player.name}</span>
+        {player.is_double_gameweek && <span className="dgw-mark">••</span>}
       </span>
 
       {player.is_captain && <span className="armband">C</span>}
@@ -65,12 +71,9 @@ export function PlayerShirt({ player, delay = 0, onSelect }: Props) {
         <span className="bench-number">{player.bench_order - 1}</span>
       )}
 
-      <span className="who">
-        {player.name}
-        {player.is_double_gameweek && <span className="dgw-mark"> ••</span>}
-      </span>
       <span className="points">{player.projected_points.toFixed(1)}</span>
       <span className="meta">{fixture}</span>
+      <span className="price">£{player.price.toFixed(1)}m</span>
     </button>
   );
 }
