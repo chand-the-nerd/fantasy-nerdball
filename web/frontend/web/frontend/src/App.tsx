@@ -1,23 +1,18 @@
-import { Suspense, lazy, useEffect, useState } from "react";
-import { LeagueView } from "./components/LeagueView";
+import { useEffect, useState } from "react";
+import { AdminView } from "./components/AdminView";
 import { SetupView } from "./components/SetupView";
 import { SignIn } from "./components/SignIn";
 import { SquadView } from "./components/SquadView";
-
-// The Form page is the only thing that needs the charting library, so it is
-// fetched when someone opens that tab rather than on first paint.
-const FormView = lazy(() =>
-  import("./components/FormView").then((m) => ({ default: m.FormView })),
-);
 import { api, ApiError } from "./lib/api";
 import type { Me } from "./lib/types";
 
-type Tab = "squad" | "form" | "league" | "setup";
+// Form and League are built and working, but hidden for now. To bring either
+// back, add it to TABS and render it below — the components and their API
+// routes are untouched.
+type Tab = "squad" | "setup";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "squad", label: "Squad" },
-  { id: "form", label: "Form" },
-  { id: "league", label: "League" },
   { id: "setup", label: "Setup" },
 ];
 
@@ -25,18 +20,27 @@ export function App() {
   const [me, setMe] = useState<Me | null>(null);
   const [checked, setChecked] = useState(false);
   const [tab, setTab] = useState<Tab>("squad");
+  const [adminOpen, setAdminOpen] = useState(false);
 
   useEffect(() => {
     api
       .me()
       .then(setMe)
       .catch((err) => {
-        if (!(err instanceof ApiError) || err.status !== 401) {
-          console.error(err);
-        }
+        if (!(err instanceof ApiError) || err.status !== 401) console.error(err);
       })
       .finally(() => setChecked(true));
   }, []);
+
+  // Escape closes the admin overlay, as with any modal.
+  useEffect(() => {
+    if (!adminOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAdminOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [adminOpen]);
 
   if (!checked) return null;
   if (!me) return <SignIn />;
@@ -77,14 +81,33 @@ export function App() {
 
       <main className="main">
         {tab === "squad" && <SquadView />}
-        {tab === "form" && (
-          <Suspense fallback={<p className="muted">Loading your season…</p>}>
-            <FormView me={me} />
-          </Suspense>
-        )}
-        {tab === "league" && <LeagueView />}
         {tab === "setup" && <SetupView me={me} onMeChange={setMe} />}
+
+        <footer className="app-foot">
+          <span>Fantasy Nerdball</span>
+          <button
+            className="admin-link"
+            type="button"
+            onClick={() => setAdminOpen(true)}
+          >
+            Admin
+          </button>
+        </footer>
       </main>
+
+      {adminOpen && (
+        <div
+          className="overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Admin"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setAdminOpen(false);
+          }}
+        >
+          <AdminView onClose={() => setAdminOpen(false)} />
+        </div>
+      )}
     </div>
   );
 }

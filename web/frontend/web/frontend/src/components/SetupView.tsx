@@ -6,20 +6,6 @@ import { checkConstraints } from "./constraints";
 import { api, ApiError } from "../lib/api";
 import type { Me, Reference, Settings } from "../lib/types";
 
-interface Member {
-  id: number;
-  email: string;
-  name: string;
-  is_admin: boolean;
-}
-
-interface MembersResponse {
-  seats_used: number;
-  seats_total: number;
-  members: Member[];
-  invites: { id: number; email: string }[];
-}
-
 const POSITIONS = ["GK", "DEF", "MID", "FWD"];
 const POSITION_LABELS: Record<string, string> = {
   GK: "Goalkeepers",
@@ -74,9 +60,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [reference, setReference] = useState<Reference | null>(null);
   const [pool, setPool] = useState<PoolPlayer[]>([]);
-  const [members, setMembers] = useState<MembersResponse | null>(null);
   const [entryId, setEntryId] = useState(me.fpl_entry_id ? String(me.fpl_entry_id) : "");
-  const [inviteEmail, setInviteEmail] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
 
@@ -88,13 +72,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
     api.reference().then(setReference).catch(() => undefined);
     api.players().then((data) => setPool(data.players)).catch(() => undefined);
 
-    if (me.is_admin) {
-      fetch("/api/admin/members")
-        .then((r) => (r.ok ? r.json() : null))
-        .then(setMembers)
-        .catch(() => undefined);
-    }
-  }, [me.is_admin]);
+  }, []);
 
   const patch = (changes: Partial<Settings>) =>
     setSettings((current) => (current ? { ...current, ...changes } : current));
@@ -163,26 +141,6 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
       setStatus(value ? "FPL team linked." : "FPL team unlinked.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
-    }
-  };
-
-  const invite = async () => {
-    setError("");
-    try {
-      const response = await fetch("/api/admin/invites", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail }),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body.detail || "Couldn't add that address.");
-      }
-      setStatus(`${inviteEmail} can now sign in with Google.`);
-      setInviteEmail("");
-      setMembers(await (await fetch("/api/admin/members")).json());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -447,7 +405,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
         </div>
       </Section>
 
-      <Section title="Users" blurb="Your FPL side, and who else can sign in.">
+      <Section title="Users" blurb="Your FPL side. Access is managed from the admin page.">
         <div className="panel col-half">
           <h3>Your FPL team</h3>
           <div className="field">
@@ -472,37 +430,6 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
           </div>
         </div>
 
-        {me.is_admin && members && (
-          <div className="panel col-half">
-            <h3>Managers</h3>
-            <p className="muted" style={{ marginTop: -6 }}>
-              {members.seats_used} of {members.seats_total} seats taken.
-            </p>
-            <div className="stat-rows">
-              {members.members.map((member) => (
-                <div key={member.id}>
-                  <span>{member.name || member.email}</span>
-                  <span>{member.is_admin ? "owner" : "manager"}</span>
-                </div>
-              ))}
-            </div>
-            <div className="field" style={{ marginTop: 16 }}>
-              <label htmlFor="invite">Invite a Google account</label>
-              <input
-                id="invite"
-                type="text"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="friend@gmail.com"
-              />
-            </div>
-            <div className="panel-foot">
-              <button className="btn quiet small" onClick={invite} type="button">
-                Add manager
-              </button>
-            </div>
-          </div>
-        )}
       </Section>
     </>
   );
