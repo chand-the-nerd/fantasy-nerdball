@@ -26,8 +26,7 @@ export function SignIn() {
           <em>Nerdball</em>
         </h1>
         <p>
-          Integer programming, expected goals and three seasons of history, pointed at
-          fifteen players and a hundred million pounds. Sign in to see this week's side.
+          Fantasy Premier League, reduced to numbers.
         </p>
 
         {error && MESSAGES[error] && <div className="notice bad">{MESSAGES[error]}</div>}
