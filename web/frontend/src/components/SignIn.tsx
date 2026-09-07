@@ -26,7 +26,7 @@ export function SignIn() {
           <em>Nerdball</em>
         </h1>
         <p>
-          Taking the fun out of Fantasy Premier League.
+          Taking the fun out of Fantasy Premier League.<br />
           FPL Optimisation using Integer Linear Programming, xG Models and FPL Stats.
         </p>
 
