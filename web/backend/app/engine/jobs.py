@@ -27,11 +27,18 @@ _worker_lock = threading.Lock()
 
 
 class _LogStream(io.TextIOBase):
-    """Captures the engine's stdout and mirrors it into the run's log."""
+    """Swallows the engine's stdout, keeping it only for diagnostics.
+
+    The optimiser prints a great deal — per-player scores, solver output,
+    intermediate tables. That is the right level for a terminal and the wrong
+    level for someone watching a progress panel, so none of it is shown. The
+    curated milestones come from the pipeline's own progress callback instead.
+    The raw output is retained here so a failed run can still be diagnosed.
+    """
 
     def __init__(self, run_id: int) -> None:
         self.run_id = run_id
-        self._buffer: list[str] = []
+        self.captured: list[str] = []
         self._pending = ""
 
     def write(self, text: str) -> int:  # noqa: D102
@@ -40,13 +47,18 @@ class _LogStream(io.TextIOBase):
             line, self._pending = self._pending.split("\n", 1)
             line = line.rstrip()
             if line:
-                append_log(self.run_id, line)
+                # Bounded: a long run can print thousands of lines.
+                self.captured.append(line)
+                del self.captured[:-400]
         return len(text)
 
     def flush(self) -> None:  # noqa: D102
         if self._pending.strip():
-            append_log(self.run_id, self._pending.strip())
+            self.captured.append(self._pending.strip())
             self._pending = ""
+
+    def tail(self, lines: int = 40) -> str:
+        return "\n".join(self.captured[-lines:])
 
 
 def append_log(run_id: int, line: str) -> None:
@@ -142,12 +154,14 @@ def _execute(run_id: int) -> None:
     except Exception as error:
         stream.flush()
         detail = f"{type(error).__name__}: {error}"
-        append_log(run_id, f"Run failed. {detail}")
+        append_log(run_id, "That didn't work out. Details below.")
         with session_scope() as session:
             run = session.get(Run, run_id)
             if run is not None:
                 run.status = "failed"
-                run.error = detail
+                # The engine's own output is the useful part when something
+                # breaks, so it goes here rather than in the progress feed.
+                run.error = f"{detail}\n\n{stream.tail()}".strip()
                 run.finished_at = utcnow()
         traceback.print_exc()
         return

@@ -353,7 +353,9 @@ button {
   display: flex;
   justify-content: center;
   gap: 14px;
-  flex-wrap: wrap;
+  /* Never wrap. A five-man line or a four-man bench has to read as one row,
+     so the cards shrink to fit instead of spilling onto a second line. */
+  flex-wrap: nowrap;
 }
 
 .bench {
@@ -388,7 +390,11 @@ button {
    the edge of the card. */
 
 .shirt {
-  width: 116px;
+  /* Fluid rather than fixed: grows to the ideal width, shrinks when five have
+     to share a row. min-width:0 is what actually lets a flex item shrink. */
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 116px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
@@ -876,22 +882,25 @@ tr.you td {
   }
 
   .shirt {
-    width: 84px;
+    max-width: 84px;
   }
 
+  /* Type scales with the card so a squeezed five-man row stays legible. */
   .shirt .band {
-    font-size: 11.5px;
-    height: 23px;
-    padding: 0 4px;
+    font-size: clamp(9px, 2.7vw, 11.5px);
+    height: 21px;
+    padding: 0 3px;
+    gap: 2px;
   }
 
   .shirt .points {
-    font-size: 17px;
-    padding-top: 5px;
+    font-size: clamp(13px, 4vw, 17px);
+    padding: 4px 2px 0;
   }
 
   .shirt .meta {
-    font-size: 10.5px;
+    font-size: clamp(8.5px, 2.4vw, 10.5px);
+    padding: 0 2px;
   }
 
   /* Price is the first thing to go when width is tight; it's still in the
@@ -902,19 +911,34 @@ tr.you td {
 
   .armband,
   .bench-number {
-    top: 28px;
+    top: 25px;
+    width: 15px;
+    height: 15px;
+    font-size: 9px;
+  }
+
+  .armband {
+    right: 2px;
+  }
+
+  .bench-number {
+    left: 3px;
   }
 
   .line-row {
-    gap: 8px;
+    gap: 5px;
   }
 
   .lines {
-    gap: 20px;
+    gap: 16px;
   }
 
   .pitch {
-    padding: 26px 10px 22px;
+    padding: 22px 8px 18px;
+  }
+
+  .bench {
+    padding: 12px 8px 14px;
   }
 }
 
@@ -1589,4 +1613,77 @@ tr.you td {
 
 .import-block .notice {
   margin-bottom: 12px;
+}
+
+/* ── Calculations table ──────────────────────────────────────────────── */
+
+.calc-panel {
+  margin-top: 20px;
+}
+
+.calc-scroll {
+  overflow-x: auto;
+  margin-top: 4px;
+}
+
+.calc-table {
+  min-width: 720px;
+}
+
+.calc-table th {
+  white-space: nowrap;
+  padding-bottom: 0;
+}
+
+.calc-table th button {
+  background: none;
+  border: 0;
+  color: var(--fade);
+  font: inherit;
+  font-size: 13px;
+  padding: 0 0 8px;
+  cursor: pointer;
+  border-bottom: 1px dotted transparent;
+}
+
+.calc-table th button:hover {
+  color: var(--chalk);
+  border-bottom-color: var(--line);
+}
+
+.calc-table td {
+  white-space: nowrap;
+}
+
+.calc-table tr.is-bench td {
+  color: var(--fade);
+}
+
+.calc-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.calc-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--floodlight);
+  color: #14110a;
+}
+
+.calc-tag.vice {
+  background: transparent;
+  border: 1px solid var(--floodlight);
+  color: var(--floodlight);
+}
+
+.calc-tag.bench {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--fade);
+  font-weight: 500;
 }

@@ -30,8 +30,16 @@ log = logging.getLogger("nerdball")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
     settings.data_dir.mkdir(parents=True, exist_ok=True)
+    init_db()
+
+    if settings.database_is_fallback:
+        log.warning(
+            "No DATABASE_URL, so storage is SQLite at %s. That file lives on "
+            "the mounted volume and survives redeploys, but attach Railway's "
+            "Postgres plugin for anything long-lived.",
+            settings.data_dir / "nerdball.db",
+        )
     jobs.start_worker()
     if not settings.engine_dir.exists():
         log.warning(
@@ -70,6 +78,10 @@ def health() -> dict:
         # build is actually live rather than inferring it from behaviour.
         "commit": os.getenv("RAILWAY_GIT_COMMIT_SHA", "unknown")[:8],
         "admin_configured": settings.admin_configured,
+        # If this says sqlite, no Postgres is attached. Data still persists
+        # (the file is on the volume), but Postgres is the intended setup.
+        "database": settings.database_backend,
+        "database_is_fallback": settings.database_is_fallback,
         "routes": len([r for r in app.routes if getattr(r, "path", "").startswith("/api/")]),
     }
 

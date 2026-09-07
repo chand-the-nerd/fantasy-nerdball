@@ -175,10 +175,10 @@ def run_optimisation(
     token_manager = TokenManager(config)
 
     with run_in_workspace(workspace):
-        say(f"Setting up gameweek {gameweek}")
+        say(f"Right, gameweek {gameweek}. Let's have a look.")
         components = nerdball.initialise_components(config, token_manager)
 
-        say("Loading last week's squad")
+        say("Digging out last week's squad")
         prev_squad_gameweek = token_manager.get_previous_squad_gameweek()
         from src.utils.file_utils import FileUtils  # type: ignore
 
@@ -192,15 +192,15 @@ def run_optimisation(
                 prev_squad, processor.fetch_current_players()
             )
 
-        say("Reading form, fixtures and expected goals")
+        say("Checking form, fixtures and expected goals")
         players, scored, available_budget = nerdball.process_player_data(components, config)
 
-        say("Picking the model's ideal side for the week")
+        say("Sketching out my ideal side")
         theoretical_starting, theoretical_points, theoretical_cost = (
             nerdball.generate_theoretical_squad(components, config, players, available_budget)
         )
 
-        say("Searching the transfer market")
+        say("Browsing the transfer market")
         (
             starting_wt,
             bench_wt,
@@ -222,7 +222,7 @@ def run_optimisation(
                 ),
             }
 
-        say("Weighing the transfers against a hit")
+        say("Working out whether a hit is worth it")
         should_transfer, evaluator_analysis = nerdball.evaluate_transfer_strategy(
             components, config, scored, prev_squad_ids, starting_wt, transfers_made
         )
@@ -236,7 +236,7 @@ def run_optimisation(
             scored, prev_squad_ids, transfers_made, penalty_points,
         )
 
-        say("Choosing the starting eleven")
+        say("Deciding who starts and who sits")
         starting, bench = nerdball.optimise_starting_xi(
             components, config, starting, bench, players, available_budget
         )
@@ -245,12 +245,12 @@ def run_optimisation(
             prev_squad_ids, starting_wt, bench_wt, players
         )
 
-        say("Adding fixtures and picking a captain")
+        say("Handing out the armband")
         try:
             starting = components["fixture_manager"].add_next_fixture(starting, config.GAMEWEEK)
             bench = components["fixture_manager"].add_next_fixture(bench, config.GAMEWEEK)
         except Exception as error:  # fixtures are cosmetic; never fail the run
-            say(f"Fixture lookup skipped: {error}")
+            say("Couldn't reach the fixture list, carrying on without it")
 
         calculator = components["points_calculator"]
         display_utils = components["display_utils"]
@@ -282,6 +282,8 @@ def run_optimisation(
         FileUtils.save_squad_data(config.GAMEWEEK, starting_display, bench_display)
         engine_rows = read_saved_squad(workspace, config.GAMEWEEK)
 
+    say("Finalising my thoughts")
+
     squad = _serialise_squad(starting_display, bench_display)
     squad.update(
         {
@@ -303,6 +305,20 @@ def run_optimisation(
             if should_transfer and transfer_details
             else {"out": [], "in": []},
             "model_xi": theoretical,
+            # What the evaluator actually weighed up, so the recommendation
+            # can be read as reasoning rather than an oracle.
+            "explored": [
+                {
+                    "player_out": s.get("unavailable_player"),
+                    "position": s.get("position"),
+                    "out_score": _clean(s.get("unavailable_score")),
+                    "replacement": s.get("best_substitute"),
+                    "replacement_score": _clean(s.get("substitute_score")),
+                    "points_lost": _clean(s.get("score_loss")),
+                    "verdict": s.get("recommendation", ""),
+                }
+                for s in (transfer_analysis or {}).get("scenarios", []) or []
+            ],
         }
     )
     return {"squad": squad, "engine_rows": engine_rows}

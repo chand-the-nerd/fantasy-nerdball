@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pitch } from "./Pitch";
 import { RunConsole } from "./RunConsole";
+import { ExploredTransfers, SquadCalculations } from "./SquadCalculations";
 import { api, ApiError } from "../lib/api";
 import type { GameweekInfo, Player, Run, Squad } from "../lib/types";
 
@@ -342,9 +343,12 @@ export function SquadView() {
             <PlayerDetail player={selected} onClose={() => setSelected(null)} />
           )}
           {squad && !selected && <TransferPanel squad={squad} />}
+          {squad && !selected && <ExploredTransfers squad={squad} />}
           {squad && !selected && <ModelXiPanel squad={squad} />}
         </div>
       </div>
+
+      {squad && <SquadCalculations squad={squad} />}
     </>
   );
 }

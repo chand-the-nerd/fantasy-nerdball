@@ -43,6 +43,16 @@ export interface SquadPayload {
   points_gain_per_gw: number | null;
   transfers: { in: string[]; out: string[] };
   model_xi: { projected_points: number; cost: number; starting: Player[] } | null;
+  imported?: boolean;
+  explored?: {
+    player_out: string;
+    position: string;
+    out_score: number | null;
+    replacement: string | null;
+    replacement_score: number | null;
+    points_lost: number | null;
+    verdict: string;
+  }[];
 }
 
 export interface Squad {

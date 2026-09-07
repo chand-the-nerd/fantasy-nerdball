@@ -21,13 +21,22 @@ class Settings:
         # Railway injects PORT. Uvicorn is started with it in the Dockerfile.
         self.port = int(os.getenv("PORT", "8000"))
 
+        # Read early: the SQLite fallback below is written onto this volume,
+        # so it survives a redeploy even without Postgres attached.
+        self.data_dir = Path(os.getenv("NERDBALL_DATA_DIR", "/data"))
+
         # Signs the session cookie. Generate with: openssl rand -hex 32
         self.secret_key = os.getenv("SECRET_KEY", "dev-only-do-not-use-in-prod")
 
-        # Railway's Postgres plugin sets DATABASE_URL.
-        self.database_url = self._normalise_db_url(
-            os.getenv("DATABASE_URL", "sqlite:///./nerdball.db")
-        )
+        # Railway's Postgres plugin sets DATABASE_URL. Without it we fall back
+        # to SQLite ON THE MOUNTED VOLUME. The old fallback wrote to the
+        # container's own filesystem, which is wiped on every redeploy — so
+        # squads and settings silently vanished each time you shipped.
+        raw_database_url = os.getenv("DATABASE_URL", "")
+        self.database_is_fallback = not raw_database_url
+        if not raw_database_url:
+            raw_database_url = f"sqlite:///{self.data_dir / 'nerdball.db'}"
+        self.database_url = self._normalise_db_url(raw_database_url)
 
         # Google OAuth. Create credentials at console.cloud.google.com.
         self.google_client_id = os.getenv("GOOGLE_CLIENT_ID", "")
@@ -48,11 +57,6 @@ class Settings:
         # admin rights on first sign-in.
         self.allowed_emails = _csv_env("ALLOWED_EMAILS")
         self.max_users = int(os.getenv("MAX_USERS", "6"))
-
-        # Where the optimiser's working files live. On Railway, attach a
-        # volume and point this at its mount path so cached reference data
-        # survives redeploys.
-        self.data_dir = Path(os.getenv("NERDBALL_DATA_DIR", "/data"))
 
         # Where the fantasy-nerdball engine was cloned to at build time.
         self.engine_dir = Path(
@@ -90,6 +94,12 @@ class Settings:
     @property
     def oauth_redirect_uri(self) -> str:
         return f"{self.public_base_url}/api/auth/callback"
+
+    @property
+    def database_backend(self) -> str:
+        if self.database_url.startswith("sqlite"):
+            return "sqlite"
+        return "postgres"
 
     @property
     def admin_configured(self) -> bool:
