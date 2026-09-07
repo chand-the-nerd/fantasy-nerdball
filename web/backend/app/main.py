@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
@@ -17,7 +19,7 @@ from .config import settings
 from .db import get_session, init_db
 from .engine import jobs
 from .models import User
-from .routers import admin, auth, me, performance, players, runs, squads, teams
+from .routers import admin, auth, cron, me, performance, players, runs, squads, teams
 from .services import fpl
 
 # The optimiser imports matplotlib for its performance plots. Without a
@@ -41,6 +43,7 @@ async def lifespan(app: FastAPI):
             settings.data_dir / "nerdball.db",
         )
     jobs.start_worker()
+    start_history_scheduler()
     if not settings.engine_dir.exists():
         log.warning(
             "Optimiser not found at %s. Runs will fail until it's cloned.",
@@ -66,8 +69,36 @@ app.include_router(runs.router)
 app.include_router(squads.router)
 app.include_router(players.router)
 app.include_router(teams.router)
+app.include_router(cron.router)
 app.include_router(performance.router)
 app.include_router(admin.router)
+
+
+def start_history_scheduler() -> None:
+    """Tops up player history from inside the app, on a timer.
+
+    An external scheduler works just as well and is easier to see, but this
+    means the app is correct on its own rather than depending on one being
+    wired up. The check is cheap when there's nothing to do.
+    """
+    if not settings.history_auto_update:
+        return
+
+    from .services import history_updater
+
+    def loop() -> None:
+        # A short first pass so a redeploy catches up promptly.
+        time.sleep(90)
+        while True:
+            try:
+                result = history_updater.update()
+                if result.get("status") == "updated":
+                    log.info("Stored player history for GW%s", result.get("gameweek"))
+            except Exception:
+                log.exception("Player history update failed")
+            time.sleep(max(5, settings.history_check_minutes) * 60)
+
+    threading.Thread(target=loop, name="history-scheduler", daemon=True).start()
 
 
 @app.get("/api/health")

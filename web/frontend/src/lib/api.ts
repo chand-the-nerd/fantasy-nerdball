@@ -115,6 +115,8 @@ export const api = {
     }),
   adminRemoveInvite: (id: number) =>
     request<void>(`/api/admin/invites/${id}`, { method: "DELETE" }),
+  cronStatus: () => request<any>("/api/cron/status"),
+  cronRunNow: () => request<any>("/api/cron/run-now", { method: "POST" }),
   adminRemoveMember: (id: number) =>
     request<void>(`/api/admin/members/${id}`, { method: "DELETE" }),
 };

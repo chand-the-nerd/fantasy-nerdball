@@ -34,6 +34,7 @@ export function AdminView({ onClose }: { onClose: () => void }) {
   const [unlocked, setUnlocked] = useState(false);
   const [password, setPassword] = useState("");
   const [data, setData] = useState<Members | null>(null);
+  const [cron, setCron] = useState<any>(null);
   const [newEmail, setNewEmail] = useState("");
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
@@ -43,6 +44,7 @@ export function AdminView({ onClose }: { onClose: () => void }) {
     try {
       setData(await api.adminMembers());
       setUnlocked(true);
+      api.cronStatus().then(setCron).catch(() => undefined);
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) setUnlocked(false);
       else setError(err instanceof ApiError ? err.message : String(err));
@@ -210,6 +212,57 @@ export function AdminView({ onClose }: { onClose: () => void }) {
           </tbody>
         </table>
       </section>
+
+      {cron && (
+        <section className="admin-section">
+          <h3>Player history</h3>
+          <p className="muted">
+            The model penalises spiky, blank-prone form using stored per-gameweek
+            data. Without it that signal sits at neutral for everyone.
+          </p>
+          <div className="stat-rows">
+            <div>
+              <span>Last stored gameweek</span>
+              <span>{cron.last_gameweek || "none yet"}</span>
+            </div>
+            <div>
+              <span>Outstanding</span>
+              <span
+                style={{
+                  color: cron.pending_gameweek ? "var(--floodlight)" : "var(--gain)",
+                }}
+              >
+                {cron.pending_gameweek
+                  ? `gameweek ${cron.pending_gameweek}`
+                  : "up to date"}
+              </span>
+            </div>
+            <div>
+              <span>Built-in timer</span>
+              <span>{cron.internal_scheduler ? "on" : "off"}</span>
+            </div>
+            <div>
+              <span>External trigger</span>
+              <span>{cron.configured ? "enabled" : "no CRON_SECRET set"}</span>
+            </div>
+          </div>
+          <div className="admin-actions">
+            <button
+              className="btn quiet small"
+              type="button"
+              onClick={() =>
+                act(async () => {
+                  const r = await api.cronRunNow();
+                  setCron(await api.cronStatus());
+                  return r;
+                }, "Player history updated.")
+              }
+            >
+              Update now
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="admin-section">
         <h3>Who can sign in</h3>

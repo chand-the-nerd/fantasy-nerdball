@@ -50,6 +50,17 @@ def user_workspace(user_id: int, season: str) -> Path:
     return path
 
 
+def maintenance_workspace() -> Path:
+    """Working directory for jobs that belong to nobody in particular.
+
+    Player history is shared across every manager, so it is written from here
+    rather than from whoever happened to trigger the update.
+    """
+    path = settings.data_dir / "maintenance"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def _link_shared_data(workspace: Path) -> None:
     """Point ``<workspace>/data`` at the shared reference directory."""
     target = shared_data_dir()

@@ -68,6 +68,16 @@ class Settings:
 
         self.current_season = os.getenv("CURRENT_SEASON", "2026-27")
 
+        # Authorises the scheduled-maintenance endpoint. Unset means the
+        # endpoint is closed, which is the right default for a public URL.
+        self.cron_secret = os.getenv("CRON_SECRET", "")
+        # Runs the same maintenance from inside the app, so an external
+        # scheduler is optional rather than required.
+        self.history_auto_update = os.getenv(
+            "HISTORY_AUTO_UPDATE", "true"
+        ).lower() in {"1", "true", "yes"}
+        self.history_check_minutes = int(os.getenv("HISTORY_CHECK_MINUTES", "60"))
+
         # Gates the admin page. Unset means the admin page stays locked for
         # everyone, which is a safer default than leaving it open.
         self.admin_password = os.getenv("ADMIN_PASSWORD", "")
