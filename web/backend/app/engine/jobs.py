@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from ..config import settings
 from ..db import session_scope
-from ..models import Run, Squad, User, utcnow
+from ..models import PlayerScores, Run, Squad, User, utcnow
 from .pipeline import run_optimisation
 
 _queue: "queue.Queue[int]" = queue.Queue()
@@ -201,6 +201,26 @@ def _store_result(run_id: int, context: dict[str, Any], result: dict) -> None:
         squad.payload = squad_data
         squad.engine_rows = result.get("engine_rows", [])
         session.flush()
+
+        # The scored pool feeds the Players tab. Stored per season and
+        # replaced each run, so it always reflects the current settings.
+        scored = result.get("scored_players") or []
+        if scored:
+            cache = session.scalar(
+                select(PlayerScores).where(
+                    PlayerScores.user_id == context["user_id"],
+                    PlayerScores.season == context["season"],
+                )
+            )
+            if cache is None:
+                cache = PlayerScores(
+                    user_id=context["user_id"], season=context["season"]
+                )
+                session.add(cache)
+            cache.gameweek = context["gameweek"]
+            cache.look_ahead = int(result.get("look_ahead") or 1)
+            cache.players = scored
+            cache.created_at = utcnow()
 
         run.status = "complete"
         run.squad_id = squad.id

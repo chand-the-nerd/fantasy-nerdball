@@ -69,6 +69,11 @@ export const api = {
   gameweek: () => request<GameweekInfo>("/api/gameweek"),
   reference: () => request<Reference>("/api/me/reference"),
   players: () => request<PlayerPool>("/api/players"),
+  bestPlayers: () => request<any>("/api/players/best"),
+  differentialPlayers: () => request<any>("/api/players/differentials"),
+  playerDetail: (id: number) => request<any>(`/api/players/${id}`),
+  teams: (refresh = false) =>
+    request<any>(`/api/teams${refresh ? "?refresh=true" : ""}`),
   sync: () => request<{ gameweeks_synced: number }>("/api/sync", { method: "POST" }),
 
   startRun: (gameweek?: number) =>

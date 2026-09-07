@@ -151,6 +151,29 @@ class Run(Base):
     finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class PlayerScores(Base):
+    """The scored player pool from a manager's most recent run.
+
+    Scoring every player is the expensive half of an optimisation, so the
+    Players tab reads what the run already produced rather than recomputing
+    it. That also means the rankings shown are exactly the ones the model
+    used, not a second opinion.
+    """
+
+    __tablename__ = "player_scores"
+    __table_args__ = (
+        UniqueConstraint("user_id", "season", name="uq_player_scores"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    season: Mapped[str] = mapped_column(String(16), index=True)
+    gameweek: Mapped[int] = mapped_column(Integer)
+    look_ahead: Mapped[int] = mapped_column(Integer, default=1)
+    players: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class GameweekStat(Base):
     """Global FPL benchmarks for a gameweek, cached from bootstrap-static."""
 

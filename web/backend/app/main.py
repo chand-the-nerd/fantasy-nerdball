@@ -17,7 +17,7 @@ from .config import settings
 from .db import get_session, init_db
 from .engine import jobs
 from .models import User
-from .routers import admin, auth, me, performance, players, runs, squads
+from .routers import admin, auth, me, performance, players, runs, squads, teams
 from .services import fpl
 
 # The optimiser imports matplotlib for its performance plots. Without a
@@ -65,6 +65,7 @@ app.include_router(me.router)
 app.include_router(runs.router)
 app.include_router(squads.router)
 app.include_router(players.router)
+app.include_router(teams.router)
 app.include_router(performance.router)
 app.include_router(admin.router)
 

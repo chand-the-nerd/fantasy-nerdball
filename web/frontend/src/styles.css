@@ -1687,3 +1687,92 @@ tr.you td {
   color: var(--fade);
   font-weight: 500;
 }
+
+/* ── Segmented control ───────────────────────────────────────────────── */
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.segmented button {
+  background: none;
+  border: 0;
+  border-right: 1px solid var(--line);
+  color: var(--fade);
+  padding: 7px 14px;
+  font-size: 13.5px;
+}
+
+.segmented button:last-child {
+  border-right: 0;
+}
+
+.segmented button:hover {
+  color: var(--chalk);
+  background: var(--panel);
+}
+
+.segmented button.is-active {
+  background: var(--panel-lift);
+  color: var(--chalk);
+  font-weight: 600;
+}
+
+.rank-table {
+  min-width: 0;
+}
+
+.calc-table td.accent {
+  color: var(--floodlight);
+  font-weight: 600;
+}
+
+/* ── Fixture difficulty ──────────────────────────────────────────────── */
+
+.fdr {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+  min-width: 22px;
+  text-align: center;
+}
+
+.fdr-1,
+.fdr-2 {
+  background: rgba(93, 211, 158, 0.22);
+  color: #7fe3b8;
+}
+
+.fdr-3 {
+  background: rgba(124, 151, 141, 0.2);
+  color: var(--fade);
+}
+
+.fdr-4 {
+  background: rgba(242, 193, 78, 0.2);
+  color: var(--floodlight);
+}
+
+.fdr-5 {
+  background: rgba(229, 72, 77, 0.22);
+  color: #ff9ea1;
+}
+
+.fdr-run {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.teams-table {
+  min-width: 940px;
+}
+
+.teams-table td,
+.teams-table th {
+  padding-right: 10px;
+}

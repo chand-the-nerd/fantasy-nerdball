@@ -130,6 +130,72 @@ def _serialise_squad(starting_df: pd.DataFrame, bench_df: pd.DataFrame) -> dict:
     return {"starting": starting, "bench": bench, "formation": _formation(starting)}
 
 
+SCORE_FIELDS = [
+    ("id", "id"),
+    ("player_code", "code"),
+    ("display_name", "name"),
+    ("position", "position"),
+    ("team", "team"),
+    ("now_cost_m", "price"),
+    ("fpl_score", "score"),
+    ("projected_points", "projected_points"),
+    ("form", "form"),
+    ("historic_ppg", "historic_ppg"),
+    ("avg_ppg_past2", "historic_ppg"),
+    ("fixture_diff", "fixture_difficulty"),
+    ("fixture_multiplier", "fixture_multiplier"),
+    ("reliability", "start_rate"),
+    ("minspg", "minutes_per_game"),
+    ("xConsistency", "xg_modifier"),
+    ("team_modifier", "team_modifier"),
+    ("selected_by_percent", "ownership"),
+    ("status", "status"),
+    ("news", "news"),
+]
+
+
+def _serialise_scores(scored: pd.DataFrame, per_position: int = 40) -> list[dict]:
+    """Keep the best few dozen per position, not the whole pool.
+
+    Six hundred players is a lot of JSON for a page that only ever shows the
+    top of each list, and the tail is players nobody would pick anyway.
+    """
+    if scored is None or scored.empty or "fpl_score" not in scored.columns:
+        return []
+
+    frame = scored.copy()
+    if "id" in frame.columns:
+        frame = frame.drop_duplicates(subset=["id"])
+
+    kept = []
+    for position in ("GK", "DEF", "MID", "FWD"):
+        subset = frame[frame["position"] == position]
+        if subset.empty:
+            continue
+        kept.append(subset.nlargest(per_position, "fpl_score"))
+
+    if not kept:
+        return []
+
+    rows = []
+    for _, row in pd.concat(kept).iterrows():
+        record: dict = {}
+        for source, target in SCORE_FIELDS:
+            if source in row.index and record.get(target) is None:
+                record[target] = _clean(row[source])
+        # FPL hands ownership back as a string. Coerce once here rather than
+        # leaving every consumer to remember to.
+        raw_ownership = record.get("ownership")
+        if raw_ownership is not None:
+            try:
+                record["ownership"] = round(float(raw_ownership), 1)
+            except (TypeError, ValueError):
+                record["ownership"] = None
+
+        rows.append(record)
+    return rows
+
+
 def _active_chip(config: Any) -> str:
     if getattr(config, "WILDCARD", False):
         return "Wildcard"
@@ -194,6 +260,8 @@ def run_optimisation(
 
         say("Checking form, fixtures and expected goals")
         players, scored, available_budget = nerdball.process_player_data(components, config)
+
+        scored_players = _serialise_scores(scored)
 
         say("Sketching out my ideal side")
         theoretical_starting, theoretical_points, theoretical_cost = (
@@ -321,4 +389,9 @@ def run_optimisation(
             ],
         }
     )
-    return {"squad": squad, "engine_rows": engine_rows}
+    return {
+        "squad": squad,
+        "engine_rows": engine_rows,
+        "scored_players": scored_players,
+        "look_ahead": int(getattr(config, "FIRST_N_GAMEWEEKS", 1)),
+    }
