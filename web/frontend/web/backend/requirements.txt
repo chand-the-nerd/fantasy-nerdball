@@ -1,0 +1,23 @@
+# Web layer
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+starlette==0.41.3
+pydantic==2.10.4
+itsdangerous==2.2.0
+python-multipart==0.0.20
+
+# Google sign-in
+Authlib==1.4.0
+httpx==0.28.1
+
+# Storage
+SQLAlchemy==2.0.36
+psycopg[binary]==3.2.3
+
+# Needed by the fantasy-nerdball optimiser itself
+pandas==2.2.3
+numpy==2.0.2
+PuLP==2.9.0
+requests==2.32.3
+matplotlib==3.9.4
+scikit-learn==1.6.0
