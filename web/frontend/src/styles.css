@@ -1811,7 +1811,62 @@ tr.is-clickable:focus-visible {
 }
 
 .teams-table {
-  min-width: 940px;
+  min-width: 1010px;
+}
+
+/* Sorting and options sit with the table rather than in the page header, so
+   the controls are next to the thing they change. */
+.table-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+/* ── Column glossary ─────────────────────────────────────────────────── */
+
+.glossary {
+  margin-top: 16px;
+}
+
+.glossary dl {
+  margin: 12px 0 0;
+  display: grid;
+  gap: 10px;
+}
+
+.glossary dl > div {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.glossary dl > div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.glossary dt {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--floodlight);
+}
+
+.glossary dd {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--fade);
+}
+
+@media (max-width: 620px) {
+  .glossary dl > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
 }
 
 .teams-table td,

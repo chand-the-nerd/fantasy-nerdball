@@ -18,6 +18,34 @@ from . import fpl
 # shots many times over.
 GK_TYPE = 1
 
+# How hard an opponent's own numbers pull their FPL difficulty around. The CLI
+# optimiser uses the same 1.5 for the position that cares, and the same 0.3
+# home discount, so the two stay comparable.
+SWING = 1.5
+HOME_DISCOUNT = 0.3
+# Ratings are ratios against the league average, clamped so that one freak
+# scoreline in August can't send a fixture to 1.0 or 5.0 on its own.
+RATING_FLOOR = 0.5
+RATING_CEILING = 2.0
+
+
+def _clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(high, value))
+
+
+def _adjusted(base, swing_rating: float, at_home: bool) -> float | None:
+    """FPL's difficulty, pulled towards what the opponent actually does.
+
+    A rating of 1.00 is league average and leaves the fixture where FPL put
+    it. Above average makes it harder, below makes it easier.
+    """
+    if base in (None, ""):
+        return None
+    adjustment = (swing_rating - 1.0) * SWING
+    if at_home:
+        adjustment -= HOME_DISCOUNT
+    return round(_clamp(float(base) + adjustment, 1.0, 5.0), 1)
+
 
 def _number(raw, default: float = 0.0) -> float:
     if raw in (None, ""):
@@ -87,10 +115,68 @@ def build_ratings(look_ahead: int = 5) -> dict:
                         {
                             "gameweek": fixture.get("event"),
                             "opponent": teams[opponent_id].get("short_name", ""),
+                            "opponent_id": opponent_id,
                             "venue": "Home" if at_home else "Away",
                             "difficulty": fixture.get(key),
                         }
                     )
+
+    # League averages, over the sides that have actually played. Everything
+    # below is measured against these rather than against an absolute.
+    per_game_xg = {
+        tid: xg_for[tid] / played[tid] for tid in teams if played[tid]
+    }
+    per_game_xgc = {
+        tid: xgc_by_gk[tid] / played[tid] for tid in teams if played[tid]
+    }
+    mean_xg = (
+        sum(per_game_xg.values()) / len(per_game_xg) if per_game_xg else 0.0
+    )
+    mean_xgc = (
+        sum(per_game_xgc.values()) / len(per_game_xgc) if per_game_xgc else 0.0
+    )
+
+    # Above 1.00 attacking means creating more than the league average does.
+    # Above 1.00 defensively means allowing less — so a high defence rating is
+    # a good defence, matching the CLI ratings file.
+    attack_rating: dict[int, float] = {}
+    defence_rating: dict[int, float] = {}
+    for team_id in teams:
+        own_xg = per_game_xg.get(team_id)
+        own_xgc = per_game_xgc.get(team_id)
+        attack_rating[team_id] = (
+            round(_clamp(own_xg / mean_xg, RATING_FLOOR, RATING_CEILING), 2)
+            if own_xg is not None and mean_xg > 0
+            else 1.0
+        )
+        if own_xgc is None or mean_xgc <= 0:
+            defence_rating[team_id] = 1.0
+        elif own_xgc <= 0:
+            defence_rating[team_id] = RATING_CEILING
+        else:
+            defence_rating[team_id] = round(
+                _clamp(mean_xgc / own_xgc, RATING_FLOOR, RATING_CEILING), 2
+            )
+
+    # One fixture, two difficulties. Your attackers care about the opponent's
+    # defence; your defenders and keeper care about their attack. Chelsea can
+    # be a hard fixture on FPL's rating and still a soft one for a striker.
+    for team_id, fixture_list in upcoming.items():
+        for fixture in fixture_list:
+            opponent_id = fixture.pop("opponent_id")
+            at_home = fixture["venue"] == "Home"
+            fixture["attack_difficulty"] = _adjusted(
+                fixture["difficulty"], defence_rating.get(opponent_id, 1.0), at_home
+            )
+            fixture["defence_difficulty"] = _adjusted(
+                fixture["difficulty"], attack_rating.get(opponent_id, 1.0), at_home
+            )
+            fixture["opponent_attack_rating"] = attack_rating.get(opponent_id, 1.0)
+            fixture["opponent_defence_rating"] = defence_rating.get(opponent_id, 1.0)
+
+    def _mean(values: list) -> float | None:
+        real = [v for v in values if v is not None]
+        return round(sum(real) / len(real), 2) if real else None
 
     rows = []
     for team_id, team in teams.items():
@@ -126,6 +212,11 @@ def build_ratings(look_ahead: int = 5) -> dict:
                 "xgc_per_game": round(xgc / games, 2) if games else None,
                 "goal_difference": goals_for[team_id] - goals_against[team_id],
                 "xg_difference": round(xg - xgc, 2),
+                "xg_difference_per_game": (
+                    round((xg - xgc) / games, 2) if games else None
+                ),
+                "attack_rating": attack_rating[team_id],
+                "defence_rating": defence_rating[team_id],
                 "attack_overperformance": attack_ratio,
                 "defence_overperformance": defence_ratio,
                 "fpl_strength": team.get("strength"),
@@ -135,6 +226,8 @@ def build_ratings(look_ahead: int = 5) -> dict:
                 "defence_strength_away": team.get("strength_defence_away"),
                 "next_fixtures": fixture_list,
                 "fixture_difficulty": fixture_score,
+                "attack_fdr": _mean([f["attack_difficulty"] for f in fixture_list]),
+                "defence_fdr": _mean([f["defence_difficulty"] for f in fixture_list]),
             }
         )
 
