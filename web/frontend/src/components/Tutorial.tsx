@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useSettings } from "../lib/settingsStore";
 
-export type TourTab = "squad" | "players" | "teams" | "setup";
+export type TourTab = "squad" | "planner" | "players" | "teams" | "setup";
 
 /* ── Illustrations ───────────────────────────────────────────────────────
    Drawn here rather than screenshotted: they follow the theme, stay sharp
@@ -82,6 +82,39 @@ function ArtTransfers() {
       </g>
       <text x="173" y="112" textAnchor="middle" className="ink-cap">
         Why
+      </text>
+    </svg>
+  );
+}
+
+function ArtPlan() {
+  return (
+    <svg viewBox="0 0 220 120" aria-hidden="true">
+      {[0, 1, 2, 3, 4].map((c) => (
+        <text key={c} x={54 + c * 34} y="16" textAnchor="middle" className="ink-cap">
+          GW{c + 1}
+        </text>
+      ))}
+      {[
+        [0, 5],
+        [0, 3],
+        [2, 5],
+        [0, 2],
+      ].map(([from, to], r) => (
+        <g key={r}>
+          <rect x="10" y={26 + r * 22} width="30" height="10" rx="2" className="ink-fill" />
+          <rect
+            x={40 + from * 34}
+            y={24 + r * 22}
+            width={(to - from) * 34 - 6}
+            height="14"
+            rx="3"
+            className={r === 1 ? "ink-fill-accent" : "ink-fill-gain"}
+          />
+        </g>
+      ))}
+      <text x="110" y="114" textAnchor="middle" className="ink-cap">
+        who you keep, and for how long
       </text>
     </svg>
   );
@@ -300,6 +333,29 @@ const STEPS: Step[] = [
         <p>
           Under the pitch, every player's score is broken down line by line, so
           you can see why someone was picked rather than take it on trust.
+        </p>
+      </>
+    ),
+  },
+  {
+    title: "Planner — the next few weeks",
+    tab: "planner",
+    art: ArtPlan,
+    body: (
+      <>
+        <p>
+          Runs the optimiser forward for three to eight gameweeks, feeding each
+          week's squad into the next. Free transfers roll over exactly as they
+          do in the real game, so it can tell you to hold this week and make a
+          double move next.
+        </p>
+        <p>
+          Say which gameweek you mean to play each chip in and it plans around
+          them.
+        </p>
+        <p className="tour-tip">
+          It can't see price rises or a player losing form, so trust the first
+          week or two and treat the rest as a sketch.
         </p>
       </>
     ),

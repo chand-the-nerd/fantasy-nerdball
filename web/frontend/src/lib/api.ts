@@ -81,6 +81,11 @@ export const api = {
       body: JSON.stringify({ name }),
     }),
 
+  startPlan: (body: { weeks: number; chips: Record<string, string> }) =>
+    request<any>("/api/plans", { method: "POST", body: JSON.stringify(body) }),
+  plan: (id: number) => request<any>(`/api/plans/${id}`),
+  latestPlan: () => request<any>("/api/plans/latest"),
+
   manualSquad: (body: {
     gameweek?: number;
     player_ids: number[];

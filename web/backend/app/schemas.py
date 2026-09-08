@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -91,6 +92,33 @@ class ManualSquadIn(BaseModel):
     starting_ids: list[int] = Field(min_length=11, max_length=11)
     bank: float = Field(default=0.0, ge=0, le=100)
     apply_budget: bool = True
+
+
+class PlanIn(BaseModel):
+    """A request to run the optimiser forward over several gameweeks."""
+
+    weeks: int = Field(default=5, ge=3, le=8)
+    start_gameweek: int | None = Field(default=None, ge=1, le=38)
+    season: str | None = None
+    # {"7": "wildcard"} — gameweek number to chip name.
+    chips: dict[str, str] = Field(default_factory=dict)
+
+
+class PlanOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    season: str
+    start_gameweek: int
+    weeks: int
+    chips: dict
+    status: str
+    progress: int
+    log: str
+    error: str
+    payload: list
+    created_at: dt.datetime
+    finished_at: dt.datetime | None
 
 
 class RunIn(BaseModel):

@@ -19,7 +19,18 @@ from .config import settings
 from .db import get_session, init_db
 from .engine import jobs
 from .models import User
-from .routers import admin, auth, cron, me, performance, players, runs, squads, teams
+from .routers import (
+    admin,
+    auth,
+    cron,
+    me,
+    performance,
+    plans,
+    players,
+    runs,
+    squads,
+    teams,
+)
 from .services import fpl
 
 # The optimiser imports matplotlib for its performance plots. Without a
@@ -66,6 +77,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(me.router)
 app.include_router(runs.router)
+app.include_router(plans.router)
 app.include_router(squads.router)
 app.include_router(players.router)
 app.include_router(teams.router)

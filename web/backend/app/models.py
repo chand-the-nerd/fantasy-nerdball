@@ -171,6 +171,40 @@ class Run(Base):
     finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class Plan(Base):
+    """A multi-gameweek plan: the optimiser run forward, week after week.
+
+    Kept apart from Run and Squad on purpose. A plan is speculative — it
+    assumes today's prices and today's form hold for two months — so it must
+    never be mistaken for the squad you actually have.
+    """
+
+    __tablename__ = "plans"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    season: Mapped[str] = mapped_column(String(9))
+    start_gameweek: Mapped[int] = mapped_column(Integer)
+    weeks: Mapped[int] = mapped_column(Integer)
+    # {"7": "wildcard"} — which chip is meant to be played in which gameweek.
+    chips: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    status: Mapped[str] = mapped_column(String(16), default="queued")
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    log: Mapped[str] = mapped_column(Text, default="")
+    error: Mapped[str] = mapped_column(Text, default="")
+    # One entry per planned gameweek.
+    payload: Mapped[list] = mapped_column(JSON, default=list)
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
+    started_at: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
+
+    user: Mapped["User"] = relationship()
+
+
 class PlayerScores(Base):
     """The scored player pool from a manager's most recent run.
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import shutil
 import threading
 from collections.abc import Iterator
 from pathlib import Path
@@ -35,9 +36,18 @@ def shared_data_dir() -> Path:
     return path
 
 
-def user_workspace(user_id: int, season: str) -> Path:
-    """Directory the engine will treat as its project root."""
+def user_workspace(user_id: int, season: str, scratch: str | None = None) -> Path:
+    """Directory the engine will treat as its project root.
+
+    ``scratch`` gives speculative work its own root. The engine writes every
+    squad it picks to ``squads/gw{n}/`` and reads last week's back from the
+    same place, so a plan for gameweeks 5 to 12 run in the live directory
+    would leave eight imaginary squads on disk where a later real run could
+    read one as fact.
+    """
     path = settings.data_dir / "managers" / str(user_id) / season
+    if scratch:
+        path = path / "scratch" / scratch
     try:
         (path / "squads").mkdir(parents=True, exist_ok=True)
     except PermissionError as error:
@@ -113,6 +123,14 @@ def read_saved_squad(workspace: Path, gameweek: int) -> list[dict]:
         return []
     frame = pd.read_csv(path)
     return frame.where(pd.notnull(frame), None).to_dict(orient="records")
+
+
+def clear_saved_squads(workspace: Path) -> None:
+    """Empty a scratch workspace's squads, so one plan can't read another's."""
+    squads = workspace / "squads"
+    if squads.exists():
+        shutil.rmtree(squads, ignore_errors=True)
+    squads.mkdir(parents=True, exist_ok=True)
 
 
 @contextlib.contextmanager

@@ -285,6 +285,7 @@ def run_optimisation(
     settings_row: Any,
     previous_squads: dict[int, list[dict]],
     on_progress: Callable[[str], None] | None = None,
+    scratch: str | None = None,
 ) -> dict:
     """Optimise one gameweek for one manager.
 
@@ -302,7 +303,7 @@ def run_optimisation(
         if on_progress:
             on_progress(message)
 
-    workspace = user_workspace(user_id, season)
+    workspace = user_workspace(user_id, season, scratch=scratch)
     for gw, rows in previous_squads.items():
         seed_previous_squad(workspace, gw, rows)
 

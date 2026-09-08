@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AdminView } from "./components/AdminView";
+import { PlannerView } from "./components/PlannerView";
 import { PlayersView } from "./components/PlayersView";
 import { SetupView } from "./components/SetupView";
 import { TeamsView } from "./components/TeamsView";
@@ -13,10 +14,11 @@ import type { Me } from "./lib/types";
 // Form and League are built and working, but hidden for now. To bring either
 // back, add it to TABS and render it below — the components and their API
 // routes are untouched.
-type Tab = "squad" | "players" | "teams" | "setup";
+type Tab = "squad" | "planner" | "players" | "teams" | "setup";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "squad", label: "Squad" },
+  { id: "planner", label: "Planner" },
   { id: "players", label: "Players" },
   { id: "teams", label: "Teams" },
   { id: "setup", label: "Setup" },
@@ -88,6 +90,7 @@ export function App() {
 
       <main className="main">
         {tab === "squad" && <SquadView me={me} onMeChange={setMe} />}
+        {tab === "planner" && <PlannerView />}
         {tab === "players" && <PlayersView />}
         {tab === "teams" && <TeamsView />}
         {tab === "setup" && <SetupView me={me} onMeChange={setMe} />}
