@@ -574,9 +574,9 @@ button {
 
 .transfer-list li {
   display: grid;
-  grid-template-columns: 18px 1fr;
-  gap: 9px;
-  align-items: baseline;
+  grid-template-columns: 16px 1fr;
+  gap: 10px;
+  align-items: center;
   font-size: 14px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--line);
@@ -588,8 +588,13 @@ button {
 }
 
 .transfer-list .dir {
-  font-size: 12px;
-  font-weight: 700;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .transfer-list .dir.out {

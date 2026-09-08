@@ -71,6 +71,24 @@ function Scoreline({ squad }: { squad: Squad }) {
   );
 }
 
+/* Direction reads faster as an arrow than as a word, and the word was wider
+   than the column it sat in. Colour carries the same meaning, so the label
+   stays on for screen readers. */
+function TransferArrow({ direction }: { direction: "in" | "out" }) {
+  const up = direction === "in";
+  return (
+    <svg
+      className={`dir ${direction}`}
+      viewBox="0 0 16 16"
+      role="img"
+      aria-label={up ? "In" : "Out"}
+    >
+      <path d="M8 2.6v10.8" />
+      <path d={up ? "M3.6 7 8 2.6 12.4 7" : "M3.6 9 8 13.4 12.4 9"} />
+    </svg>
+  );
+}
+
 function TransferPanel({ squad }: { squad: Squad }) {
   const payload = squad.payload;
   const { in: incoming, out: outgoing } = payload.transfers;
@@ -93,13 +111,13 @@ function TransferPanel({ squad }: { squad: Squad }) {
       <ul className="transfer-list">
         {outgoing.map((name, i) => (
           <li key={`out-${i}`}>
-            <span className="dir out">OUT</span>
+            <TransferArrow direction="out" />
             <span>{name}</span>
           </li>
         ))}
         {incoming.map((name, i) => (
           <li key={`in-${i}`}>
-            <span className="dir in">IN</span>
+            <TransferArrow direction="in" />
             <span>{name}</span>
           </li>
         ))}
