@@ -395,6 +395,9 @@ button {
   --pitch-line: rgba(234, 242, 238, 0.13);
   --pitch-bench: rgba(4, 12, 10, 0.55);
   --pitch-glow: rgba(93, 211, 158, 0.07);
+  /* Mown stripes. Barely there on the night pitch by design; a daylight one
+     needs several times the alpha to read at all. */
+  --pitch-stripe: rgba(255, 255, 255, 0.018);
 
   border: 1px solid var(--line);
   border-radius: 0 0 var(--radius) var(--radius);
@@ -416,6 +419,7 @@ button {
   --pitch-line: rgba(255, 255, 255, 0.45);
   --pitch-bench: rgba(255, 255, 255, 0.5);
   --pitch-glow: rgba(255, 255, 255, 0.16);
+  --pitch-stripe: rgba(255, 255, 255, 0.11);
 }
 
 .pitch {
@@ -425,7 +429,7 @@ button {
     linear-gradient(180deg, var(--pitch-glow), rgba(255, 255, 255, 0) 62%),
     repeating-linear-gradient(
       90deg,
-      rgba(255, 255, 255, 0.018) 0 7.14%,
+      var(--pitch-stripe) 0 7.14%,
       rgba(255, 255, 255, 0) 7.14% 14.28%
     );
 }
