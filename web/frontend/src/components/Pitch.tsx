@@ -1,4 +1,5 @@
 import { PlayerShirt } from "./PlayerShirt";
+import { normalise } from "../lib/text";
 import type { Player, Position } from "../lib/types";
 
 const LINES: Position[] = ["GK", "DEF", "MID", "FWD"];
@@ -32,9 +33,17 @@ interface Props {
   bench: Player[];
   benchBoost?: boolean;
   onSelect?: (player: Player) => void;
+  /** Normalised names on the forced-picks list, for the padlock badge. */
+  forced?: Set<string>;
 }
 
-export function Pitch({ starting, bench, benchBoost = false, onSelect }: Props) {
+export function Pitch({
+  starting,
+  bench,
+  benchBoost = false,
+  onSelect,
+  forced,
+}: Props) {
   const rows = LINES.map((position) =>
     starting
       .filter((player) => player.position === position)
@@ -61,6 +70,7 @@ export function Pitch({ starting, bench, benchBoost = false, onSelect }: Props) 
                     player={player}
                     delay={delay}
                     onSelect={onSelect}
+                    forced={forced?.has(normalise(player.name))}
                   />
                 );
               })}
@@ -85,6 +95,7 @@ export function Pitch({ starting, bench, benchBoost = false, onSelect }: Props) 
               player={player}
               delay={rows.length * 90 + i * 20}
               onSelect={onSelect}
+              forced={forced?.has(normalise(player.name))}
             />
           ))}
         </div>

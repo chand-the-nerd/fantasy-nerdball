@@ -503,6 +503,19 @@ button {
   color: var(--fade);
 }
 
+.lock-mark {
+  flex: none;
+  width: 9px;
+  height: 10.5px;
+  opacity: 0.85;
+}
+
+/* A forced pick is there because you said so, not because it scored well.
+   The border says as much without competing with the captain's ring. */
+.shirt.is-forced:not(.is-captain):not(.is-doubtful) {
+  border-color: var(--fade);
+}
+
 .dgw-mark {
   font-size: 9px;
   letter-spacing: -1px;

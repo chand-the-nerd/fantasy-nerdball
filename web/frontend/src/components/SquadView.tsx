@@ -5,6 +5,8 @@ import { RunConsole } from "./RunConsole";
 import { RunSettings } from "./RunSettings";
 import { ExploredTransfers, SquadCalculations } from "./SquadCalculations";
 import { api, ApiError } from "../lib/api";
+import { useSettings } from "../lib/settingsStore";
+import { normalise } from "../lib/text";
 import type { GameweekInfo, Player, Run, Squad } from "../lib/types";
 
 /**
@@ -207,6 +209,7 @@ function PlayerDetail({ player, onClose }: { player: Player; onClose: () => void
 }
 
 export function SquadView() {
+  const { settings } = useSettings();
   const [squad, setSquad] = useState<Squad | null>(null);
   const [history, setHistory] = useState<Squad[]>([]);
   const [run, setRun] = useState<Run | null>(null);
@@ -273,6 +276,15 @@ export function SquadView() {
       setError(err instanceof ApiError ? err.message : String(err));
     }
   };
+
+  // Forced picks are stored per position; the pitch only needs the names.
+  const forcedNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const list of Object.values(settings?.forced_selections ?? {})) {
+      for (const name of list ?? []) names.add(normalise(name));
+    }
+    return names;
+  }, [settings]);
 
   const gameweekOptions = useMemo(
     () => history.map((s) => s.gameweek).sort((a, b) => b - a),
@@ -342,6 +354,7 @@ export function SquadView() {
                 bench={squad.payload.bench}
                 benchBoost={squad.chip === "Bench Boost"}
                 onSelect={setSelected}
+                forced={forcedNames}
               />
             </>
           ) : (
