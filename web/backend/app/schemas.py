@@ -26,6 +26,7 @@ class SettingsOut(BaseModel):
     accept_transfer_penalty: bool
     exclude_unavailable: bool
     wildcard: bool
+    free_hit: bool = False
     free_hit_prev_gw: bool
     bench_boost: bool
     triple_captain: bool
@@ -46,6 +47,7 @@ class SettingsIn(BaseModel):
     accept_transfer_penalty: bool | None = None
     exclude_unavailable: bool | None = None
     wildcard: bool | None = None
+    free_hit: bool | None = None
     free_hit_prev_gw: bool | None = None
     bench_boost: bool | None = None
     triple_captain: bool | None = None

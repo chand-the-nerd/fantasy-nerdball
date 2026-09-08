@@ -133,7 +133,7 @@ def update_settings(
         if value is not None:
             setattr(row, field, value)
 
-    chips = [row.wildcard, row.bench_boost, row.triple_captain]
+    chips = [row.wildcard, row.free_hit, row.bench_boost, row.triple_captain]
     if sum(1 for chip in chips if chip) > 1:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,

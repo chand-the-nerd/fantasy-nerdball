@@ -14,6 +14,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    false,
     UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -77,6 +78,13 @@ class UserSettings(Base):
     exclude_unavailable: Mapped[bool] = mapped_column(Boolean, default=True)
 
     wildcard: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Playing a Free Hit this week. Unlimited transfers like a Wildcard, but
+    # the side reverts afterwards, so only this gameweek is worth planning for.
+    free_hit: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
+    # Having played one last week, which is a different thing: the squad the
+    # optimiser should transfer from is the one from two gameweeks ago.
     free_hit_prev_gw: Mapped[bool] = mapped_column(Boolean, default=False)
     bench_boost: Mapped[bool] = mapped_column(Boolean, default=False)
     triple_captain: Mapped[bool] = mapped_column(Boolean, default=False)

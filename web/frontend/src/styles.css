@@ -2082,11 +2082,14 @@ tr.is-clickable:focus-visible {
 
 .chip-strip {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .chip-tile {
-  flex: 1 1 0;
+  /* Five tiles fit one row on a desktop and wrap to two on a phone rather
+     than squeezing to illegible. */
+  flex: 1 1 84px;
   min-width: 0;
   display: flex;
   flex-direction: column;

@@ -241,6 +241,10 @@ def _serialise_scores(
 
 
 def _active_chip(config: Any) -> str:
+    # Free Hit is checked first: it sets WILDCARD too, and it's the one that
+    # was actually played.
+    if getattr(config, "FREE_HIT", False):
+        return "Free Hit"
     if getattr(config, "WILDCARD", False):
         return "Wildcard"
     if getattr(config, "BENCH_BOOST", False):

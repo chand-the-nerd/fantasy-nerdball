@@ -107,6 +107,12 @@ export function RunSettings({ disabled = false }: { disabled?: boolean }) {
             onChange={(changes) => void save(changes)}
             disabled={disabled}
           />
+          {settings.free_hit && (
+            <span className="hint">
+              Free Hit: transfers are unlimited and the look-ahead is fixed to
+              this gameweek, since the squad reverts next week.
+            </span>
+          )}
         </div>
       </div>
 

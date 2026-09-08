@@ -87,6 +87,7 @@ export interface Settings {
   accept_transfer_penalty: boolean;
   exclude_unavailable: boolean;
   wildcard: boolean;
+  free_hit: boolean;
   free_hit_prev_gw: boolean;
   bench_boost: boolean;
   triple_captain: boolean;

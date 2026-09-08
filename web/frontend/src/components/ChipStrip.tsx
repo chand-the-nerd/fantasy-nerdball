@@ -40,6 +40,15 @@ function TripleCaptainIcon() {
 function FreeHitIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3.5 14.2 8l5 .7-3.6 3.5.9 4.9-4.5-2.4-4.5 2.4.9-4.9L4.8 8.7l5-.7z" />
+      <path d="M12 17.5V21" />
+    </svg>
+  );
+}
+
+function FreeHitPrevIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1" />
       <path d="M3.5 4v4.5H8" />
       <path d="M12 8v4.5l3 1.8" />
@@ -65,6 +74,13 @@ const CHIPS: Chip[] = [
     exclusive: true,
   },
   {
+    id: "free_hit",
+    label: "Free Hit",
+    hint: "Unlimited transfers for this gameweek only. The squad reverts afterwards, so the look-ahead is fixed to one gameweek.",
+    icon: FreeHitIcon,
+    exclusive: true,
+  },
+  {
     id: "bench_boost",
     label: "Bench Boost",
     hint: "All fifteen players score, so the bench is optimised properly.",
@@ -82,7 +98,7 @@ const CHIPS: Chip[] = [
     id: "free_hit_prev_gw",
     label: "Free Hit last week",
     hint: "Loads the squad from two gameweeks ago, since the Free Hit side has reverted.",
-    icon: FreeHitIcon,
+    icon: FreeHitPrevIcon,
     exclusive: false,
   },
 ];
@@ -100,10 +116,11 @@ export function ChipStrip({ settings, onChange, disabled = false }: Props) {
       onChange({ [chip.id]: next } as Partial<Settings>);
       return;
     }
-    // Only one of the three can be on, and the server rejects two anyway, so
-    // the others are cleared in the same save rather than in a second one.
+    // Only one chip can be played in a gameweek, and the server rejects two
+    // anyway, so the others are cleared in the same save rather than a second.
     onChange({
       wildcard: chip.id === "wildcard" ? next : false,
+      free_hit: chip.id === "free_hit" ? next : false,
       bench_boost: chip.id === "bench_boost" ? next : false,
       triple_captain: chip.id === "triple_captain" ? next : false,
     });
