@@ -1,0 +1,112 @@
+"""Request and response shapes."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: str
+    name: str
+    avatar_url: str
+    is_admin: bool
+    fpl_entry_id: int | None = None
+
+
+class SettingsOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    budget: float
+    free_transfers: int
+    accept_transfer_penalty: bool
+    exclude_unavailable: bool
+    wildcard: bool
+    free_hit_prev_gw: bool
+    bench_boost: bool
+    triple_captain: bool
+    use_ml_weights: bool
+    first_n_gameweeks: int
+    min_transfer_value: float
+    transfer_horizon_gws: int
+    overrides: dict[str, Any] = Field(default_factory=dict)
+    team_modifiers: dict[str, float] = Field(default_factory=dict)
+    forced_selections: dict[str, list[str]] = Field(default_factory=dict)
+    blacklist_players: list[str] = Field(default_factory=list)
+
+
+class SettingsIn(BaseModel):
+    budget: float | None = Field(default=None, ge=50, le=200)
+    free_transfers: int | None = Field(default=None, ge=0, le=15)
+    accept_transfer_penalty: bool | None = None
+    exclude_unavailable: bool | None = None
+    wildcard: bool | None = None
+    free_hit_prev_gw: bool | None = None
+    bench_boost: bool | None = None
+    triple_captain: bool | None = None
+    use_ml_weights: bool | None = None
+    first_n_gameweeks: int | None = Field(default=None, ge=1, le=10)
+    min_transfer_value: float | None = Field(default=None, ge=0, le=20)
+    transfer_horizon_gws: int | None = Field(default=None, ge=1, le=15)
+    overrides: dict[str, Any] | None = None
+    team_modifiers: dict[str, float] | None = None
+    forced_selections: dict[str, list[str]] | None = None
+    blacklist_players: list[str] | None = None
+
+
+class EntryLinkIn(BaseModel):
+    fpl_entry_id: int | None = Field(default=None, ge=1)
+
+
+class ImportSquadIn(BaseModel):
+    gameweek: int | None = Field(default=None, ge=1, le=38)
+    apply_budget: bool = True
+    apply_free_transfers: bool = True
+
+
+class RunIn(BaseModel):
+    gameweek: int | None = Field(default=None, ge=1, le=38)
+    season: str | None = None
+
+
+class RunOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    gameweek: int
+    season: str
+    status: str
+    log: str
+    error: str
+    squad_id: int | None
+    result: dict[str, Any]
+
+
+class SquadOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    gameweek: int
+    season: str
+    formation: str
+    projected_points: float
+    squad_value: float
+    bank: float
+    transfers_made: int
+    penalty_points: int
+    chip: str
+    payload: dict[str, Any]
+
+
+class ResultIn(BaseModel):
+    gameweek: int = Field(ge=1, le=38)
+    actual_points: float | None = Field(default=None, ge=0, le=300)
+    season: str | None = None
+
+
+class InviteIn(BaseModel):
+    email: str

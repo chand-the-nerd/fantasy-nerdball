@@ -14,8 +14,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -213,3 +213,11 @@ __marimo__/
 /squads/
 /config.py
 .DS_Store
+
+# Web app
+web/frontend/node_modules/
+web/frontend/dist/
+web/frontend/tsconfig.tsbuildinfo
+.env
+*.db
+localdata/
