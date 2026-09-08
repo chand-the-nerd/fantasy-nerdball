@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 import re
 from pathlib import Path
+import sys
 import time
 from typing import Any, Callable
 
@@ -318,12 +319,23 @@ def run_optimisation(
     def say_timings() -> None:
         if stage["name"] is not None:
             timings.append((stage["name"], time.monotonic() - stage["at"]))
-        if not on_progress or not timings:
+        if not timings:
             return
         slowest = sorted(timings, key=lambda pair: pair[1], reverse=True)[:3]
         total = sum(seconds for _name, seconds in timings)
         parts = ", ".join(f"{name.rstrip('.…')} {seconds:.0f}s" for name, seconds in slowest)
-        on_progress(f"Done in {total:.0f}s. Slowest: {parts}.")
+        summary = f"Done in {total:.0f}s. Slowest: {parts}."
+        if on_progress:
+            on_progress(summary)
+        # Deliberately stderr: the worker runs the whole optimisation inside
+        # redirect_stdout, which swallows the engine's chatter — and would
+        # swallow this with it. stderr is left alone and Railway captures it
+        # just the same.
+        print(
+            f"[timings] gw{gameweek} user{user_id} {summary}",
+            file=sys.stderr,
+            flush=True,
+        )
 
     workspace = user_workspace(user_id, season, scratch=scratch)
     for gw, rows in previous_squads.items():
@@ -457,7 +469,6 @@ def run_optimisation(
 
         FileUtils.save_squad_data(config.GAMEWEEK, starting_display, bench_display)
         engine_rows = read_saved_squad(workspace, config.GAMEWEEK)
-        say_timings()
 
     say("Finalising my thoughts")
 
@@ -498,6 +509,7 @@ def run_optimisation(
             ],
         }
     )
+    say_timings()
     return {
         "squad": squad,
         "engine_rows": engine_rows,
