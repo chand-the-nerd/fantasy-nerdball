@@ -188,12 +188,6 @@ export function TeamsView() {
         </button>
       </div>
 
-      <div className="notice">
-        Ratings are built from expected goals rather than results. A side winning
-        on 0.6 xG a game is being flattered; one losing on 2.1 xG is better than
-        the table says. The overperformance columns show which is which.
-      </div>
-
       <div className="panel">
         <div className="table-controls">
           <p className="muted" style={{ margin: 0 }}>
