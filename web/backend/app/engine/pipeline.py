@@ -10,6 +10,8 @@ from __future__ import annotations
 import math
 import re
 from pathlib import Path
+import sys
+import time
 from typing import Any, Callable
 
 import pandas as pd
@@ -299,9 +301,41 @@ def run_optimisation(
     import main as nerdball  # type: ignore
     from src.utils.token_manager import TokenManager  # type: ignore
 
+    # Each stage is timed, and the breakdown is logged when the run finishes.
+    # Guessing which part of a four-minute run is the slow one is how you end
+    # up optimising the wrong thing.
+    stage: dict = {"name": None, "at": time.monotonic()}
+    timings: list[tuple[str, float]] = []
+
     def say(message: str) -> None:
+        now = time.monotonic()
+        if stage["name"] is not None:
+            timings.append((stage["name"], now - stage["at"]))
+        stage["name"] = message
+        stage["at"] = now
         if on_progress:
             on_progress(message)
+
+    def say_timings() -> None:
+        if stage["name"] is not None:
+            timings.append((stage["name"], time.monotonic() - stage["at"]))
+        if not timings:
+            return
+        slowest = sorted(timings, key=lambda pair: pair[1], reverse=True)[:3]
+        total = sum(seconds for _name, seconds in timings)
+        parts = ", ".join(f"{name.rstrip('.…')} {seconds:.0f}s" for name, seconds in slowest)
+        summary = f"Done in {total:.0f}s. Slowest: {parts}."
+        if on_progress:
+            on_progress(summary)
+        # Deliberately stderr: the worker runs the whole optimisation inside
+        # redirect_stdout, which swallows the engine's chatter — and would
+        # swallow this with it. stderr is left alone and Railway captures it
+        # just the same.
+        print(
+            f"[timings] gw{gameweek} user{user_id} {summary}",
+            file=sys.stderr,
+            flush=True,
+        )
 
     workspace = user_workspace(user_id, season, scratch=scratch)
     for gw, rows in previous_squads.items():
@@ -475,6 +509,7 @@ def run_optimisation(
             ],
         }
     )
+    say_timings()
     return {
         "squad": squad,
         "engine_rows": engine_rows,
