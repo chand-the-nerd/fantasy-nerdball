@@ -1,9 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pitch } from "./Pitch";
+import { PlayerActions } from "./PlayerActions";
 import { RunConsole } from "./RunConsole";
+import { RunSettings } from "./RunSettings";
 import { ExploredTransfers, SquadCalculations } from "./SquadCalculations";
 import { api, ApiError } from "../lib/api";
 import type { GameweekInfo, Player, Run, Squad } from "../lib/types";
+
+/**
+ * The squad to open on: the gameweek FPL is currently on, or the closest one
+ * behind it. Runs can be made for future gameweeks, and the newest squad in
+ * the list is often one of those — which isn't the side you're picking now.
+ */
+function forGameweek(squads: Squad[], gameweek: number | null): Squad | null {
+  if (squads.length === 0) return null;
+  if (gameweek === null) return squads[0];
+  const exact = squads.find((squad) => squad.gameweek === gameweek);
+  if (exact) return exact;
+  // squads arrive newest first, so the first one at or below is the closest.
+  return squads.find((squad) => squad.gameweek < gameweek) ?? squads[0];
+}
 
 function deadlineText(iso: string | null): string {
   if (!iso) return "";
@@ -177,6 +193,7 @@ function PlayerDetail({ player, onClose }: { player: Player; onClose: () => void
         </div>
       </div>
       {player.news && <div className="notice bad" style={{ marginTop: 14 }}>{player.news}</div>}
+      <PlayerActions name={player.name} position={player.position} />
       <button
         className="link-button"
         style={{ marginTop: 14 }}
@@ -214,7 +231,7 @@ export function SquadView() {
         ]);
         if (cancelled) return;
         setHistory(squads);
-        setSquad(squads[0] ?? null);
+        setSquad(forGameweek(squads, gw?.gameweek ?? null));
         setRun(latestRun);
         setInfo(gw);
         if (gw) setTargetGw(gw.gameweek);
@@ -312,6 +329,8 @@ export function SquadView() {
       </div>
 
       {error && <div className="notice bad">{error}</div>}
+
+      <RunSettings disabled={busy} />
 
       <div className="squad-layout">
         <div>

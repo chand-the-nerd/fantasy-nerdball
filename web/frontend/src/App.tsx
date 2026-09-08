@@ -91,13 +91,15 @@ export function App() {
 
         <footer className="app-foot">
           <span>Fantasy Nerdball</span>
-          <button
-            className="admin-link"
-            type="button"
-            onClick={() => setAdminOpen(true)}
-          >
-            Admin
-          </button>
+          {me.is_admin && (
+            <button
+              className="admin-link"
+              type="button"
+              onClick={() => setAdminOpen(true)}
+            >
+              Admin
+            </button>
+          )}
         </footer>
       </main>
 

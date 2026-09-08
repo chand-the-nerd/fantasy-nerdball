@@ -5,6 +5,7 @@ import { WeightBar, type Weights } from "./WeightBar";
 import { FplTeamPanel } from "./FplTeamPanel";
 import { checkConstraints } from "./constraints";
 import { api, ApiError } from "../lib/api";
+import { publishSettings } from "../lib/settingsStore";
 import type { Me, Reference, Settings } from "../lib/types";
 
 const POSITIONS = ["GK", "DEF", "MID", "FWD"];
@@ -75,7 +76,13 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
   }, []);
 
   const reloadSettings = () => {
-    api.settings().then(setSettings).catch(() => undefined);
+    api
+      .settings()
+      .then((fresh) => {
+        setSettings(fresh);
+        publishSettings(fresh);
+      })
+      .catch(() => undefined);
   };
 
   const patch = (changes: Partial<Settings>) =>
@@ -129,7 +136,9 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
     setError("");
     setStatus("");
     try {
-      setSettings(await api.saveSettings(settings));
+      const saved = await api.saveSettings(settings);
+      setSettings(saved);
+      publishSettings(saved);
       setStatus("Settings saved. They apply on your next run.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
@@ -173,82 +182,6 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
           </ul>
         </div>
       )}
-
-      <Section
-        title="Gameweek"
-        blurb="What's true of your squad right now. Worth checking every week."
-      >
-        <div className="panel col-half">
-          <h3>This gameweek</h3>
-          <div className="grid-2">
-            <div className="field">
-              <label htmlFor="budget">Budget</label>
-              <input
-                id="budget"
-                type="number"
-                step="0.1"
-                value={settings.budget}
-                onChange={(e) => patch({ budget: Number(e.target.value) })}
-              />
-              <span className="hint">Squad value plus whatever's in the bank.</span>
-            </div>
-            <div className="field">
-              <label htmlFor="fts">Free transfers</label>
-              <input
-                id="fts"
-                type="number"
-                min={0}
-                max={15}
-                value={settings.free_transfers}
-                onChange={(e) => patch({ free_transfers: Number(e.target.value) })}
-              />
-            </div>
-          </div>
-          <Toggle
-            checked={settings.accept_transfer_penalty}
-            onChange={(v) => patch({ accept_transfer_penalty: v })}
-            title="Consider taking a hit"
-            hint="Lets the model spend 4 points on an extra transfer when the gain covers it."
-          />
-          <Toggle
-            checked={settings.exclude_unavailable}
-            onChange={(v) => patch({ exclude_unavailable: v })}
-            title="Skip injured and suspended players"
-            hint="Turn off to see what the model would do if everyone were fit."
-          />
-        </div>
-
-        <div className="panel col-half">
-          <h3>Chips</h3>
-          <p className="muted" style={{ marginTop: -6 }}>
-            One at a time, and turn it off again after the deadline.
-          </p>
-          <Toggle
-            checked={settings.wildcard}
-            onChange={(v) => patch({ wildcard: v, bench_boost: false, triple_captain: false })}
-            title="Wildcard"
-            hint="Removes the transfer limit and rebuilds the squad from scratch."
-          />
-          <Toggle
-            checked={settings.bench_boost}
-            onChange={(v) => patch({ bench_boost: v, wildcard: false, triple_captain: false })}
-            title="Bench Boost"
-            hint="All fifteen players score, so the bench is optimised properly."
-          />
-          <Toggle
-            checked={settings.triple_captain}
-            onChange={(v) => patch({ triple_captain: v, wildcard: false, bench_boost: false })}
-            title="Triple Captain"
-            hint="Your captain returns three times their points."
-          />
-          <Toggle
-            checked={settings.free_hit_prev_gw}
-            onChange={(v) => patch({ free_hit_prev_gw: v })}
-            title="Free Hit last week"
-            hint="Loads the squad from two gameweeks ago, since the Free Hit side has reverted."
-          />
-        </div>
-      </Section>
 
       <Section
         title="Model tuning"
@@ -297,6 +230,22 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
             />
             <span className="hint">A hit is a one-off cost spread across this many weeks.</span>
           </div>
+          <Toggle
+            checked={settings.accept_transfer_penalty}
+            onChange={(v) => patch({ accept_transfer_penalty: v })}
+            title="Consider taking a hit"
+            hint="Lets the model spend 4 points on an extra transfer when the gain covers it."
+          />
+          <Toggle
+            checked={settings.exclude_unavailable}
+            onChange={(v) => patch({ exclude_unavailable: v })}
+            title="Skip injured and suspended players"
+            hint="Turn off to see what the model would do if everyone were fit."
+          />
+          <p className="hint" style={{ marginTop: 10 }}>
+            Budget, free transfers and chips changed to the Squad page, next to
+            the Run button, since they change every week.
+          </p>
         </div>
 
         <div className="panel col-half">

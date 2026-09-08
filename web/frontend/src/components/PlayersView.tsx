@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PlayerActions, PlayerActionsDialog } from "./PlayerActions";
 import { PlayerPicker, type PoolPlayer, availability } from "./PlayerPicker";
 import { api, ApiError } from "../lib/api";
 
@@ -25,7 +26,13 @@ interface Ranked {
   status: string;
 }
 
-function RankTable({ rows }: { rows: Ranked[] }) {
+function RankTable({
+  rows,
+  onPick,
+}: {
+  rows: Ranked[];
+  onPick: (row: Ranked) => void;
+}) {
   if (rows.length === 0) {
     return <p className="muted">Nothing clears the filter here.</p>;
   }
@@ -51,7 +58,20 @@ function RankTable({ rows }: { rows: Ranked[] }) {
         {rows.map((row) => {
           const state = availability(row.status);
           return (
-            <tr key={row.id}>
+            <tr
+              key={row.id}
+              className="is-clickable"
+              tabIndex={0}
+              role="button"
+              title={`Force ${row.name} in, or add them to your avoid list`}
+              onClick={() => onPick(row)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onPick(row);
+                }
+              }}
+            >
               <td>
                 <span className="calc-name">
                   <span className={`dot tone-${state.tone}`} />
@@ -76,6 +96,7 @@ function RankTable({ rows }: { rows: Ranked[] }) {
 function Ranked({ mode }: { mode: "best" | "differentials" }) {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState("");
+  const [picked, setPicked] = useState<Ranked | null>(null);
 
   useEffect(() => {
     const call = mode === "best" ? api.bestPlayers() : api.differentialPlayers();
@@ -125,11 +146,25 @@ function Ranked({ mode }: { mode: "best" | "differentials" }) {
           <div className="panel col-half" key={position}>
             <h3>{POSITION_LABELS[position]}</h3>
             <div className="calc-scroll">
-              <RankTable rows={data.positions[position] ?? []} />
+              <RankTable
+                rows={data.positions[position] ?? []}
+                onPick={setPicked}
+              />
             </div>
           </div>
         ))}
       </div>
+
+      {picked && (
+        <PlayerActionsDialog
+          name={picked.name}
+          position={picked.position}
+          subtitle={`${picked.position} · ${picked.team} · £${picked.price?.toFixed(
+            1,
+          )}m · score ${picked.score?.toFixed(2) ?? "—"}`}
+          onClose={() => setPicked(null)}
+        />
+      )}
     </>
   );
 }
@@ -183,6 +218,9 @@ function Lookup() {
           onChange={(names) => setSelected(names.slice(-1))}
           placeholder="Search any player"
         />
+        {detail && (
+          <PlayerActions name={detail.name} position={detail.position} />
+        )}
       </div>
 
       {error && <div className="notice bad">{error}</div>}
@@ -247,7 +285,7 @@ function Lookup() {
             {detail.fixtures.length === 0 ? (
               <p className="muted">No upcoming fixtures listed.</p>
             ) : (
-              <table className="calc-table">
+              <table className="calc-table fixtures-table">
                 <thead>
                   <tr>
                     <th>GW</th>

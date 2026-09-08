@@ -66,8 +66,8 @@ def _build() -> dict:
     return {"season": fpl.settings.current_season, "players": players}
 
 
-@router.get("")
-def list_players(refresh: bool = False, user: User = Depends(current_user)) -> dict:
+def pool(refresh: bool = False) -> dict:
+    """The cached player pool. Never raises: an empty list beats a 500."""
     with _lock:
         cached = _cache.get("data")
         fetched = _cache.get("at")
@@ -87,6 +87,11 @@ def list_players(refresh: bool = False, user: User = Depends(current_user)) -> d
         _cache["data"] = built
         _cache["at"] = utcnow()
     return built
+
+
+@router.get("")
+def list_players(refresh: bool = False, user: User = Depends(current_user)) -> dict:
+    return pool(refresh)
 
 
 def _ranked(rows: list[dict], limit: int, max_ownership: float | None) -> dict:

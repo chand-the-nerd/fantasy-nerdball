@@ -58,6 +58,15 @@ class SettingsIn(BaseModel):
     blacklist_players: list[str] | None = None
 
 
+class PlayerRefIn(BaseModel):
+    """One player, as named by whichever table or panel the button sat in."""
+
+    name: str = Field(min_length=1, max_length=80)
+    # Only needed for forced picks, and only when the caller knows it. When
+    # it's missing the server resolves it from the FPL pool.
+    position: str | None = None
+
+
 class EntryLinkIn(BaseModel):
     fpl_entry_id: int | None = Field(default=None, ge=1)
 

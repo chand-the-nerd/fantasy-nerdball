@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import unicodedata
+
 import requests
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -11,7 +13,14 @@ from ..auth import current_user
 from ..config import settings
 from ..db import get_session
 from ..models import Squad, User, UserSettings
-from ..schemas import EntryLinkIn, ImportSquadIn, SettingsIn, SettingsOut, UserOut
+from ..schemas import (
+    EntryLinkIn,
+    ImportSquadIn,
+    PlayerRefIn,
+    SettingsIn,
+    SettingsOut,
+    UserOut,
+)
 from ..services import fpl, fpl_import
 
 router = APIRouter(prefix="/api/me", tags=["me"])
@@ -124,6 +133,202 @@ def update_settings(
             "Only one chip can be active in a gameweek.",
         )
 
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+# ── Forced picks and the avoid list ──────────────────────────────────────
+#
+# Both lists are editable in bulk from the Setup page. These endpoints exist
+# so a single player can be added from wherever you happen to be looking at
+# them — the pitch, the rankings, the lookup page — and so the reason an add
+# is refused comes back as a sentence rather than as a run that fails an hour
+# later with "No valid solution found".
+
+SQUAD_LIMITS = {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3}
+POSITION_WORDS = {
+    "GK": "goalkeepers",
+    "DEF": "defenders",
+    "MID": "midfielders",
+    "FWD": "forwards",
+}
+MAX_PER_CLUB = 3
+
+_ACCENT_MAP = str.maketrans(
+    {"ø": "o", "æ": "ae", "å": "a", "œ": "oe", "ß": "ss", "đ": "d", "ð": "d",
+     "þ": "th", "ł": "l", "ı": "i"}
+)
+
+
+def _key(name: str) -> str:
+    """Match the frontend's comparison: case- and accent-insensitive."""
+    lowered = (name or "").strip().lower().translate(_ACCENT_MAP)
+    decomposed = unicodedata.normalize("NFD", lowered)
+    return "".join(c for c in decomposed if not unicodedata.combining(c))
+
+
+def _pool_by_name() -> dict[str, dict]:
+    from .players import pool
+
+    return {_key(p["name"]): p for p in pool().get("players", [])}
+
+
+def _forced_pairs(row: UserSettings) -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
+    for position, names in (row.forced_selections or {}).items():
+        for name in names or []:
+            out.append((position, name))
+    return out
+
+
+def _conflict(detail: str) -> HTTPException:
+    return HTTPException(status.HTTP_409_CONFLICT, detail)
+
+
+@router.post("/lists/force", response_model=SettingsOut)
+def force_player(
+    payload: PlayerRefIn,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> UserSettings:
+    """Add one player to the forced picks, or explain why they can't go in."""
+    row = _settings_row(session, user)
+    name = payload.name.strip()
+    key = _key(name)
+
+    for position, existing in _forced_pairs(row):
+        if _key(existing) == key:
+            raise _conflict(
+                f"{existing} is already a forced pick"
+                + (f" ({POSITION_WORDS.get(position, position)})." if position else ".")
+            )
+
+    for existing in row.blacklist_players or []:
+        if _key(existing) == key:
+            raise _conflict(
+                f"{existing} is on your avoid list. Take them off it first, "
+                "or the optimiser has been told two opposite things."
+            )
+
+    known = _pool_by_name()
+    entry = known.get(key)
+
+    position = (payload.position or "").upper() or (entry or {}).get("position", "")
+    if position not in SQUAD_LIMITS:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Couldn't work out what position {name} plays, so there's nowhere "
+            "to force them into. Add them from the Setup page instead.",
+        )
+
+    forced = {pos: list(names or []) for pos, names in (row.forced_selections or {}).items()}
+    current = forced.get(position, [])
+    limit = SQUAD_LIMITS[position]
+    if len(current) >= limit:
+        raise _conflict(
+            f"You've already forced {len(current)} {POSITION_WORDS[position]}, "
+            f"and a squad only has {limit}. Drop one first: {', '.join(current)}."
+        )
+
+    # Four forced from one club can never solve, so it's worth stopping here
+    # rather than at the end of a run.
+    if entry and entry.get("team"):
+        club = entry["team"]
+        same_club = [
+            existing
+            for _, existing in _forced_pairs(row)
+            if (known.get(_key(existing)) or {}).get("team") == club
+        ]
+        if len(same_club) >= MAX_PER_CLUB:
+            raise _conflict(
+                f"You've already forced {len(same_club)} players from {club} "
+                f"({', '.join(same_club)}), and FPL allows {MAX_PER_CLUB} per club."
+            )
+
+    forced[position] = current + [entry["name"] if entry else name]
+    row.forced_selections = forced
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+@router.post("/lists/unforce", response_model=SettingsOut)
+def unforce_player(
+    payload: PlayerRefIn,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> UserSettings:
+    row = _settings_row(session, user)
+    key = _key(payload.name)
+
+    forced = {pos: list(names or []) for pos, names in (row.forced_selections or {}).items()}
+    removed = False
+    for position, names in forced.items():
+        kept = [n for n in names if _key(n) != key]
+        if len(kept) != len(names):
+            removed = True
+        forced[position] = kept
+
+    if not removed:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, f"{payload.name} isn't a forced pick."
+        )
+
+    row.forced_selections = forced
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+@router.post("/lists/blacklist", response_model=SettingsOut)
+def blacklist_player(
+    payload: PlayerRefIn,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> UserSettings:
+    """Add one player to the avoid list, or explain why they can't go on it."""
+    row = _settings_row(session, user)
+    name = payload.name.strip()
+    key = _key(name)
+
+    for existing in row.blacklist_players or []:
+        if _key(existing) == key:
+            raise _conflict(f"{existing} is already on your avoid list.")
+
+    for position, existing in _forced_pairs(row):
+        if _key(existing) == key:
+            raise _conflict(
+                f"{existing} is a forced pick"
+                + (f" ({POSITION_WORDS.get(position, position)})" if position else "")
+                + ". Remove them from your forced picks first."
+            )
+
+    entry = _pool_by_name().get(key)
+    row.blacklist_players = list(row.blacklist_players or []) + [
+        entry["name"] if entry else name
+    ]
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+@router.post("/lists/unblacklist", response_model=SettingsOut)
+def unblacklist_player(
+    payload: PlayerRefIn,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> UserSettings:
+    row = _settings_row(session, user)
+    key = _key(payload.name)
+
+    kept = [n for n in (row.blacklist_players or []) if _key(n) != key]
+    if len(kept) == len(row.blacklist_players or []):
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, f"{payload.name} isn't on your avoid list."
+        )
+
+    row.blacklist_players = kept
     session.commit()
     session.refresh(row)
     return row

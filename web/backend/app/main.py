@@ -117,7 +117,7 @@ def health() -> dict:
         # Railway sets this to the deployed commit. Lets you confirm which
         # build is actually live rather than inferring it from behaviour.
         "commit": os.getenv("RAILWAY_GIT_COMMIT_SHA", "unknown")[:8],
-        "admin_configured": settings.admin_configured,
+        "admin_emails": len(settings.admin_emails) + bool(settings.owner_email),
         # If this says sqlite, no Postgres is attached. Data still persists
         # (the file is on the volume), but Postgres is the intended setup.
         "database": settings.database_backend,
