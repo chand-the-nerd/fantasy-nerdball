@@ -60,6 +60,8 @@ async def lifespan(app: FastAPI):
             "Optimiser not found at %s. Runs will fail until it's cloned.",
             settings.engine_dir,
         )
+    else:
+        warm_engine()
     yield
 
 
@@ -84,6 +86,53 @@ app.include_router(teams.router)
 app.include_router(cron.router)
 app.include_router(performance.router)
 app.include_router(admin.router)
+
+
+def warm_engine() -> None:
+    """Import the optimiser and prime the FPL cache at boot.
+
+    The engine is imported lazily inside the pipeline, so the first run
+    after a deploy paid for the whole import tree and a cold
+    bootstrap-static download on top of its own work. None of that is
+    per-user, so it happens here instead and nobody waits for it.
+
+    In a thread, because it costs a few seconds and the health check
+    should not wait on it. A run that starts mid-warm blocks on the
+    import lock, which is the same work it would have done itself.
+    """
+
+    def warm() -> None:
+        try:
+            from .engine.runtime_config import ensure_engine_on_path
+
+            ensure_engine_on_path(settings.engine_dir)
+            import main  # noqa: F401
+        except Exception:
+            # A failure here costs nothing: the pipeline imports the
+            # engine itself and will surface the real error there.
+            log.warning("Could not pre-import the optimiser", exc_info=True)
+            return
+
+        try:
+            fpl.bootstrap()
+        except Exception:
+            log.warning("Could not pre-fetch FPL bootstrap data")
+
+        try:
+            # The engine keeps its own shared cache, separate from the
+            # web layer's. It honours FPL_CACHE_SECONDS (600 by
+            # default), so raise that if runs are spread far apart.
+            from src.api.fpl_client import FPLClient
+
+            client = FPLClient()
+            client.get_bootstrap_static()
+            client.get_fixtures()
+        except Exception:
+            log.warning("Could not pre-fetch engine FPL data")
+
+        log.info("Optimiser warmed and FPL data cached")
+
+    threading.Thread(target=warm, name="engine-warm", daemon=True).start()
 
 
 def start_history_scheduler() -> None:

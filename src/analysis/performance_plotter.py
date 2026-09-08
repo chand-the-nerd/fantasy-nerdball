@@ -1,10 +1,23 @@
-"""Module for creating model performance visualisations."""
+"""Module for creating model performance visualisations.
+
+matplotlib is imported inside the plotting call rather than at module
+load. main.py imports this module, so every optimiser run paid for
+pyplot - a couple of seconds on a small container - to draw a chart the
+web app never asks for.
+"""
 
 import os
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 from datetime import datetime
+
+
+def _pyplot():
+    """Import matplotlib on first use and return pyplot."""
+    import matplotlib
+    matplotlib.use("Agg", force=False)
+    import matplotlib.pyplot as plt
+
+    return plt
 
 
 class PerformancePlotter:
@@ -80,6 +93,8 @@ class PerformancePlotter:
                                     (cumulative)
             current_gameweek (int): Current gameweek number
         """
+        plt = _pyplot()
+
         # Create figure and axis
         fig, ax = plt.subplots(figsize=(12, 7))
         

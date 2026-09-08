@@ -309,6 +309,40 @@ def _calculate_dgw_stats(players_df, gameweek):
     return dgw_stats
 
 
+def single_gameweek_scores(components, config, players):
+    """Score the pool over the next gameweek only, once per run.
+
+    Both the model XI and the starting XI want the same frame: the
+    same pool, scored against the same one-gameweek fixture window.
+    They were each fetching the fixture difficulty and rebuilding a
+    ScoringEngine to produce it, which is a full pass over every
+    player twice for an identical answer.
+    """
+    cached = components.get('_single_gw_scores')
+
+    if (cached is not None
+            and cached['gameweek'] == config.GAMEWEEK
+            and cached['players'] is players):
+        return cached['scored'].copy()
+
+    fixture_scores = (
+        components['fixture_manager']
+        .fetch_player_fixture_difficulty(1, players, config.GAMEWEEK)
+    )
+
+    scored = ScoringEngine(config).build_scores(
+        players, fixture_scores
+    )[0]  # Take only the dataframe, ignore stats
+
+    components['_single_gw_scores'] = {
+        'gameweek': config.GAMEWEEK,
+        'players': players,
+        'scored': scored,
+    }
+
+    return scored.copy()
+
+
 def generate_theoretical_squad(components, config, players, 
                               available_budget):
     """Generate theoretical best squad for comparison."""
@@ -316,17 +350,10 @@ def generate_theoretical_squad(components, config, players,
     if config.GRANULAR_OUTPUT:
         print(f"\n=== NERDBALL PICKS GW{config.GAMEWEEK} ===")
         print("Limitless pick for the week (within budget)")
-    
-    # Get single gameweek fixture scores for comparison
-    fixture_scores_comparison = (
-        components['fixture_manager']
-        .fetch_player_fixture_difficulty(1, players, config.GAMEWEEK)
+
+    scored_comparison = single_gameweek_scores(
+        components, config, players
     )
-    
-    scoring_engine_comparison = ScoringEngine(config)
-    scored_comparison = scoring_engine_comparison.build_scores(
-        players, fixture_scores_comparison
-    )[0]  # Take only the dataframe, ignore stats
     
     # Always use the fixed budget from config instead of calculated budget
     budget_for_comparison = config.BUDGET
@@ -593,16 +620,7 @@ def optimise_starting_xi(components, config, starting, bench, players,
     if config.GRANULAR_OUTPUT:
         print(f"Optimising Starting XI for GW{config.GAMEWEEK}...")
     
-    fixture_scores_next = (
-        components['fixture_manager']
-        .fetch_player_fixture_difficulty(1, players, config.GAMEWEEK)
-    )
-    
-    scoring_engine_next = ScoringEngine(config)
-    scored_next = scoring_engine_next.build_scores(
-        players,
-        fixture_scores_next
-        )[0]  # Take only the dataframe, ignore stats
+    scored_next = single_gameweek_scores(components, config, players)
 
     # Create forced selections from current squad
     updated_forced_selections = (

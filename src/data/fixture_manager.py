@@ -114,6 +114,13 @@ class FixtureManager:
         self.enhanced_calculator = EnhancedFixtureDifficultyCalculator(
             config
         )
+        # A run asks for the same window three times: once over
+        # FIRST_N_GAMEWEEKS for the squad, then twice over a single
+        # gameweek for the model XI and the starting XI. The last two
+        # are the same call, and with FIRST_N_GAMEWEEKS at 1 all three
+        # are. Each one walks every fixture against every player, so
+        # the repeats are worth holding on to.
+        self._difficulty_cache = {}
 
     def _drop_started_fixtures(self, fixtures: pd.DataFrame,
                                label: str) -> tuple:
@@ -203,6 +210,15 @@ class FixtureManager:
                 "difficulty must be keyed on the permanent player code."
             )
 
+        cache_key = (first_n_gws, starting_gameweek)
+        cached = self._difficulty_cache.get(cache_key)
+
+        # Identity, not equality: the pool is passed straight through a
+        # run, so a matching key with a different frame means something
+        # upstream has changed and the answer has to be recomputed.
+        if cached is not None and cached["players"] is players:
+            return cached["result"].copy()
+
         fixtures = pd.DataFrame(self.fpl_client.get_fixtures())
 
         teams_data = self.fpl_client.get_bootstrap_static()
@@ -221,10 +237,17 @@ class FixtureManager:
             fixtures, f"GW{starting_gameweek}-{end_gameweek}"
         )
 
-        return self._calculate_player_difficulties(
+        result = self._calculate_player_difficulties(
             fixtures, players, teams_df, starting_gameweek,
             end_gameweek, first_n_gws
         )
+
+        self._difficulty_cache[cache_key] = {
+            "players": players,
+            "result": result,
+        }
+
+        return result.copy()
 
     def _save_fixture_data(self, fixtures: pd.DataFrame,
                            teams_df: pd.DataFrame):
