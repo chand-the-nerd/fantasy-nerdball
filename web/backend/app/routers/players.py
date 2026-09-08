@@ -111,6 +111,13 @@ def _ranked(rows: list[dict], limit: int, max_ownership: float | None) -> dict:
     return out
 
 
+def _current_gameweek() -> int | None:
+    try:
+        return fpl.current_gameweek()
+    except Exception:
+        return None
+
+
 def _load_scores(session: Session, user: User) -> PlayerScores | None:
     return session.scalar(
         select(PlayerScores).where(
@@ -135,9 +142,14 @@ def best_players(
                       "player is the slow part of a run, so this reuses what "
                       "the run already worked out rather than doing it twice.",
         }
+    current = _current_gameweek()
     return {
         "available": True,
         "gameweek": cache.gameweek,
+        "current_gameweek": current,
+        # The scores look ahead from the gameweek they were produced for, so
+        # one produced for a different gameweek is ranking the wrong fixtures.
+        "stale": current is not None and cache.gameweek != current,
         "look_ahead": cache.look_ahead,
         "computed_at": cache.created_at,
         "positions": _ranked(cache.players or [], limit, None),
@@ -158,9 +170,13 @@ def differential_players(
 
     ranked = _ranked(cache.players or [], limit, max_ownership)
     empty = [pos for pos, rows in ranked.items() if not rows]
+    current = _current_gameweek()
     return {
         "available": True,
         "gameweek": cache.gameweek,
+        "current_gameweek": current,
+        "stale": current is not None and cache.gameweek != current,
+        "look_ahead": cache.look_ahead,
         "max_ownership": max_ownership,
         "positions": ranked,
         "thin_positions": empty,

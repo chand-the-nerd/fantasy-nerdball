@@ -93,6 +93,14 @@ function RankTable({
   );
 }
 
+/** "(GW4–GW7)", so the window is stated rather than worked out. */
+function fixtureWindow(data: any): string {
+  const from = Number(data.gameweek);
+  const span = Number(data.look_ahead);
+  if (!from || !span || span < 2) return "";
+  return ` (GW${from}–GW${from + span - 1})`;
+}
+
 function Ranked({ mode }: { mode: "best" | "differentials" }) {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState("");
@@ -122,8 +130,10 @@ function Ranked({ mode }: { mode: "best" | "differentials" }) {
       <p className="muted">
         {mode === "best" ? (
           <>
-            Ranked by your own weights, over a {data.look_ahead}-gameweek
-            look-ahead, as of the gameweek {data.gameweek} run.
+            Ranked by your own weights, looking ahead from gameweek{" "}
+            {data.gameweek} over {data.look_ahead} gameweek
+            {data.look_ahead === 1 ? "" : "s"}
+            {fixtureWindow(data)}.
           </>
         ) : (
           <>
@@ -132,6 +142,16 @@ function Ranked({ mode }: { mode: "best" | "differentials" }) {
           </>
         )}
       </p>
+
+      {data.stale && (
+        <div className="notice">
+          These scores come from your gameweek {data.gameweek} run, so the
+          fixtures behind them start at gameweek {data.gameweek} rather than at
+          gameweek {data.current_gameweek}, which is the one you're picking for.
+          Run the optimiser for gameweek {data.current_gameweek} to rank on the
+          right window.
+        </div>
+      )}
 
       {mode === "differentials" && data.thin_positions?.length > 0 && (
         <div className="notice">

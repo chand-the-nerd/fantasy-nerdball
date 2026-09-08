@@ -19,11 +19,36 @@ from sqlalchemy import select
 from ..config import settings
 from ..db import session_scope
 from ..models import PlayerScores, Run, Squad, User, utcnow
+from ..services import fpl
 from .pipeline import run_optimisation
 
 _queue: "queue.Queue[int]" = queue.Queue()
 _worker: threading.Thread | None = None
 _worker_lock = threading.Lock()
+
+
+def _should_store_scores(cache: PlayerScores | None, gameweek: int) -> bool:
+    """Whether this run's scored pool should become the Players tab's data.
+
+    Runs for the gameweek being played always do. A run for a future gameweek
+    only does so when there is nothing better to show, or when what is stored
+    is older still — otherwise planning three weeks ahead would quietly
+    replace the rankings for the week whose deadline is next.
+    """
+    if cache is None:
+        return True
+    try:
+        current = fpl.current_gameweek()
+    except Exception:
+        # No way to tell which of the two is the live one; the newer run is
+        # the better guess, which is what this did before.
+        return True
+    if gameweek == current:
+        return True
+    if cache.gameweek == current:
+        return False
+    # Neither is the live gameweek: prefer whichever is closer to it.
+    return abs(gameweek - current) < abs(cache.gameweek - current)
 
 
 class _LogStream(io.TextIOBase):
@@ -204,6 +229,11 @@ def _store_result(run_id: int, context: dict[str, Any], result: dict) -> None:
 
         # The scored pool feeds the Players tab. Stored per season and
         # replaced each run, so it always reflects the current settings.
+        #
+        # A run for a future gameweek does not replace it. Those scores look
+        # ahead from the gameweek that was run, so a plan for gameweek 5 would
+        # have the rankings skipping over the fixtures you are actually
+        # picking for this week.
         scored = result.get("scored_players") or []
         if scored:
             cache = session.scalar(
@@ -212,15 +242,16 @@ def _store_result(run_id: int, context: dict[str, Any], result: dict) -> None:
                     PlayerScores.season == context["season"],
                 )
             )
-            if cache is None:
-                cache = PlayerScores(
-                    user_id=context["user_id"], season=context["season"]
-                )
-                session.add(cache)
-            cache.gameweek = context["gameweek"]
-            cache.look_ahead = int(result.get("look_ahead") or 1)
-            cache.players = scored
-            cache.created_at = utcnow()
+            if _should_store_scores(cache, context["gameweek"]):
+                if cache is None:
+                    cache = PlayerScores(
+                        user_id=context["user_id"], season=context["season"]
+                    )
+                    session.add(cache)
+                cache.gameweek = context["gameweek"]
+                cache.look_ahead = int(result.get("look_ahead") or 1)
+                cache.players = scored
+                cache.created_at = utcnow()
 
         run.status = "complete"
         run.squad_id = squad.id
