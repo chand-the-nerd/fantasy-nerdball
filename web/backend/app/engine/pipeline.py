@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 import re
 from pathlib import Path
+import time
 from typing import Any, Callable
 
 import pandas as pd
@@ -299,9 +300,30 @@ def run_optimisation(
     import main as nerdball  # type: ignore
     from src.utils.token_manager import TokenManager  # type: ignore
 
+    # Each stage is timed, and the breakdown is logged when the run finishes.
+    # Guessing which part of a four-minute run is the slow one is how you end
+    # up optimising the wrong thing.
+    stage: dict = {"name": None, "at": time.monotonic()}
+    timings: list[tuple[str, float]] = []
+
     def say(message: str) -> None:
+        now = time.monotonic()
+        if stage["name"] is not None:
+            timings.append((stage["name"], now - stage["at"]))
+        stage["name"] = message
+        stage["at"] = now
         if on_progress:
             on_progress(message)
+
+    def say_timings() -> None:
+        if stage["name"] is not None:
+            timings.append((stage["name"], time.monotonic() - stage["at"]))
+        if not on_progress or not timings:
+            return
+        slowest = sorted(timings, key=lambda pair: pair[1], reverse=True)[:3]
+        total = sum(seconds for _name, seconds in timings)
+        parts = ", ".join(f"{name.rstrip('.…')} {seconds:.0f}s" for name, seconds in slowest)
+        on_progress(f"Done in {total:.0f}s. Slowest: {parts}.")
 
     workspace = user_workspace(user_id, season, scratch=scratch)
     for gw, rows in previous_squads.items():
@@ -435,6 +457,7 @@ def run_optimisation(
 
         FileUtils.save_squad_data(config.GAMEWEEK, starting_display, bench_display)
         engine_rows = read_saved_squad(workspace, config.GAMEWEEK)
+        say_timings()
 
     say("Finalising my thoughts")
 
