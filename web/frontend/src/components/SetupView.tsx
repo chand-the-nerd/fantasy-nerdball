@@ -201,7 +201,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
                 onChange={(e) => patch({ first_n_gameweeks: Number(e.target.value) })}
               />
               <span className="hint">
-                How many fixtures the optimiser looks ahead for.
+                How far fixture difficulty looks. Raise it for wildcard planning.
               </span>
             </div>
             <div className="field">
@@ -214,8 +214,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
                 onChange={(e) => patch({ min_transfer_value: Number(e.target.value) })}
               />
               <span className="hint">
-                How many points each future gameweek must improve by before a transfer is recommended. 
-                Setting to zero is the ultimate knee-jerk setting. Setting to 5 is highly conservative.
+                Improvement a transfer must clear before it's worth making.
               </span>
             </div>
           </div>
@@ -229,7 +228,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
               value={settings.transfer_horizon_gws}
               onChange={(e) => patch({ transfer_horizon_gws: Number(e.target.value) })}
             />
-            <span className="hint">When taking a -4 hit, how many gameweeks to ammortise the -4 cost against.</span>
+            <span className="hint">A hit is a one-off cost spread across this many weeks.</span>
           </div>
           <Toggle
             checked={settings.accept_transfer_penalty}
@@ -243,12 +242,18 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
             title="Skip injured and suspended players"
             hint="Turn off to see what the model would do if everyone were fit."
           />
+          <p className="hint" style={{ marginTop: 10 }}>
+            Budget, free transfers and chips changed to the Squad page, next to
+            the Run button, since they change every week.
+          </p>
         </div>
 
         <div className="panel col-half">
           <h3>Model weighting</h3>
           <p className="muted" style={{ marginTop: -6 }}>
-            How to prioritise form, points from previous seasons, and upcoming fixture difficulty.
+            Drag the handles to divide each position's score between recent form,
+            historic points per game and upcoming fixture difficulty. The three
+            always total 100%.
           </p>
           {settings.use_ml_weights && (
             <div className="notice" style={{ margin: "14px 0 0" }}>
@@ -277,7 +282,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
         <div className="panel col-half">
           <h3>Forced picks</h3>
           <p className="muted" style={{ marginTop: -6 }}>
-            Any players you must have? Add them here. I'll build the squad around them.
+            Players the squad is always built around.
           </p>
           {POSITIONS.map((position) => {
             const limit = reference?.squad_limits?.[position] ?? 5;
@@ -306,7 +311,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
         <div className="panel col-half">
           <h3>Players to avoid</h3>
           <p className="muted" style={{ marginTop: -6 }}>
-            Players to omit from your squad, no matter how much the model likes them.
+            Removed from the pool entirely, whatever the numbers say.
           </p>
           <div className="field">
             <PlayerPicker
@@ -341,7 +346,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
         </div>
       </Section>
 
-      <Section title="User" blurb="Link your FPL side (recommended).">
+      <Section title="Users" blurb="Your FPL side. Access is managed from the admin page.">
         <FplTeamPanel
           me={me}
           onMeChange={onMeChange}

@@ -359,7 +359,7 @@ export function PlayersView() {
       <div className="topbar">
         <div>
           <h1>Players</h1>
-          <span className="when">The model's player database. Click a player to add or remove them from your squad.</span>
+          <span className="when">Who the model rates, and why</span>
         </div>
         <div className="segmented">
           {(

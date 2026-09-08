@@ -175,7 +175,7 @@ export function TeamsView() {
         <div>
           <h1>Teams</h1>
           <span className="when">
-            Teams as the model sees them.
+            Strength from the underlying numbers, not just results
           </span>
         </div>
         <button
