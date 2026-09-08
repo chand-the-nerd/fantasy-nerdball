@@ -11,6 +11,10 @@ class TransferEvaluator:
 
     def __init__(self, config):
         self.config = config
+        # The held-squad comparison is asked for up to three times in a
+        # run - by evaluate_transfer_strategy, by its optimised variant
+        # and again by the web pipeline - always with the same inputs.
+        self._no_transfer_cache = None
 
     @property
     def horizon(self) -> int:
@@ -441,7 +445,15 @@ class TransferEvaluator:
                                      free_transfers: int,
                                      available_budget: float,
                                      squad_selector) -> list:
-        """Evaluate transfer scenarios and return the results."""
+        """
+        Evaluate transfer scenarios and return the results.
+
+        Every scenario is the same model with a different bound on how
+        many of last week's players must be kept, so it is built once
+        and re-solved. Rebuilding it per scenario was the single
+        largest cost in a run: five builds at roughly 4 seconds each,
+        against 0.13 seconds to solve.
+        """
         scenarios = []
 
         min_transfers_needed = self._calculate_minimum_transfers_needed(
@@ -455,12 +467,26 @@ class TransferEvaluator:
             print(f"Forced selections require minimum "
                   f"{min_transfers_needed} transfer(s)")
 
-        for max_transfers_allowed in range(start_transfers,
-                                           max_transfers_to_test + 1):
-            scenario = self._evaluate_single_scenario(
-                df, forced_selections, prev_squad_ids,
-                max_transfers_allowed, available_budget,
-                squad_selector, free_transfers
+        limits = range(start_transfers, max_transfers_to_test + 1)
+
+        model = squad_selector.build_model(
+            df,
+            forced_selections,
+            prev_squad_ids=prev_squad_ids,
+            free_transfers=start_transfers,
+            available_budget=available_budget,
+            use_projected_points=False,
+        )
+
+        if model is None:
+            return scenarios
+
+        solved = squad_selector.solve_scenarios(model, limits)
+
+        for max_transfers_allowed, squad in solved:
+            scenario = self._scenario_from_squad(
+                squad_selector, model, squad, df, prev_squad_ids,
+                max_transfers_allowed, free_transfers
             )
 
             if scenario:
@@ -477,7 +503,13 @@ class TransferEvaluator:
                                   available_budget: float,
                                   squad_selector,
                                   free_transfers: int) -> dict:
-        """Evaluate a single transfer scenario."""
+        """
+        Evaluate a single transfer scenario from scratch.
+
+        Kept for one-off use. The scenario sweep goes through
+        ``_evaluate_transfer_scenarios`` instead, which shares one
+        model across every limit.
+        """
         starting, bench, forced_display = (
             squad_selector.select_squad_ilp(
                 df, forced_selections, prev_squad_ids,
@@ -490,6 +522,35 @@ class TransferEvaluator:
         if starting.empty:
             return None
 
+        return self._scenario_fields(
+            starting, bench, forced_display, df, prev_squad_ids,
+            max_transfers_allowed, free_transfers
+        )
+
+    def _scenario_from_squad(self, squad_selector, model, squad,
+                             df: pd.DataFrame, prev_squad_ids: list,
+                             max_transfers_allowed: int,
+                             free_transfers: int) -> dict:
+        """Turn one solved squad into a scenario record."""
+        if squad is None or squad.empty:
+            return None
+
+        starting, bench = squad_selector.split_squad(squad)
+
+        if starting.empty:
+            return None
+
+        return self._scenario_fields(
+            starting, bench, model.forced_display, df, prev_squad_ids,
+            max_transfers_allowed, free_transfers
+        )
+
+    def _scenario_fields(self, starting: pd.DataFrame,
+                         bench: pd.DataFrame, forced_display,
+                         df: pd.DataFrame, prev_squad_ids: list,
+                         max_transfers_allowed: int,
+                         free_transfers: int) -> dict:
+        """Score one candidate squad against the previous one."""
         current_squad_ids = set(
             pd.concat([starting, bench])["id"].tolist()
         )
@@ -805,6 +866,12 @@ class TransferEvaluator:
         if prev_squad_ids is None:
             return pd.DataFrame()
 
+        cache = self._no_transfer_cache
+        cache_key = tuple(prev_squad_ids)
+        if (cache is not None and cache["frame"] is df
+                and cache["key"] == cache_key):
+            return cache["result"].copy()
+
         available_ids = set(df["id"].tolist())
         available_prev_players = [
             pid for pid in prev_squad_ids if pid in available_ids
@@ -820,7 +887,14 @@ class TransferEvaluator:
             df["id"].isin(available_prev_players)
         ].copy().reset_index(drop=True)
 
-        return self._optimise_starting_xi_from_squad(prev_squad_df)
+        result = self._optimise_starting_xi_from_squad(prev_squad_df)
+        self._no_transfer_cache = {
+            "frame": df,
+            "key": cache_key,
+            "result": result,
+        }
+
+        return result.copy()
 
     def _optimise_starting_xi_from_squad(
             self, prev_squad_df: pd.DataFrame) -> pd.DataFrame:

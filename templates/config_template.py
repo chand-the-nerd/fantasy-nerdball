@@ -98,6 +98,15 @@ class Config:
     SQUAD_SIZE = {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3}
     MAX_PER_TEAM = 3
 
+    # Cap the ILP pool to the top N players per position by fpl_score.
+    # None means the whole pool, which is the safe default: a cheap
+    # enabler the budget constraint wants can sit well down the score
+    # order, so trimming is not guaranteed to return the same squad.
+    # Everyone in the previous squad and every forced selection is kept
+    # regardless. Try {"GK": 20, "DEF": 60, "MID": 60, "FWD": 40} only
+    # if solve time is still a problem.
+    POOL_LIMITS = None
+
     # === TEAM ADJUSTMENTS ===
     # Teams that will be considered as newly promoted
     PROMOTED_TEAMS = ["Burnley", "Sunderland", "Leeds"]

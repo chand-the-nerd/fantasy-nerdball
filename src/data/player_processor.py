@@ -13,6 +13,12 @@ class PlayerProcessor:
     def __init__(self, config):
         self.config = config
         self.fpl_client = FPLClient()
+        # The web pipeline asks for the pool once to match last week's
+        # squad and again inside process_player_data. Everything below
+        # is deterministic for a given bootstrap payload, and the
+        # form-consistency pass alone reads a CSV per player, so the
+        # second call is repeated for nothing.
+        self._current_players = None
 
         # Position-based weighting system for xG analysis
         self.position_weights = {
@@ -31,6 +37,9 @@ class PlayerProcessor:
             pd.DataFrame: Current player data with cost, position, team
                           info, join keys and xG metrics.
         """
+        if self._current_players is not None:
+            return self._current_players
+
         data = self.fpl_client.get_bootstrap_static()
         players = pd.DataFrame(data["elements"])
 
@@ -102,7 +111,14 @@ class PlayerProcessor:
         if self.config.GRANULAR_OUTPUT:
             print("Player data saved to data/players.csv")
 
+        self._current_players = players
+
         return players
+
+    def refresh_current_players(self) -> pd.DataFrame:
+        """Rebuild the pool, ignoring anything already held."""
+        self._current_players = None
+        return self.fetch_current_players()
 
     # ------------------------------------------------------------------
     # Configuration validation
