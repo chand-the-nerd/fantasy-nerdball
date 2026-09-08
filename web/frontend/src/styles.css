@@ -2382,3 +2382,277 @@ tr.is-clickable:focus-visible {
 .id-help a {
   color: var(--crowd);
 }
+
+/* ── Guided tour ─────────────────────────────────────────────────────── */
+
+.tour-overlay {
+  align-items: center;
+}
+
+.tour-card {
+  width: min(760px, 94vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.tour-art {
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: var(--panel-lift);
+  border-right: 1px solid var(--line);
+}
+
+.tour-art svg {
+  width: 100%;
+  height: auto;
+}
+
+.tour-body {
+  padding: 18px 20px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.tour-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.tour-count {
+  font-size: 12px;
+  color: var(--fade);
+  font-variant-numeric: tabular-nums;
+}
+
+.tour-body h2 {
+  font-size: 19px;
+  margin: 0 0 8px;
+}
+
+.tour-copy {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--fade);
+}
+
+.tour-copy p {
+  margin: 0 0 10px;
+}
+
+.tour-copy strong {
+  color: var(--chalk);
+  font-weight: 600;
+}
+
+.tour-copy ol {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  display: grid;
+  gap: 7px;
+}
+
+.tour-tip {
+  border-left: 2px solid var(--floodlight);
+  padding-left: 10px;
+  color: var(--chalk);
+}
+
+.tour-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+.tour-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.tour-dots button {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--line);
+  cursor: pointer;
+}
+
+.tour-dots button:hover {
+  background: var(--fade);
+}
+
+.tour-dots button.is-on {
+  background: var(--floodlight);
+  transform: scale(1.35);
+}
+
+.tour-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Illustration palette. Everything follows the theme, so the drawings sit in
+   the same world as the app rather than looking pasted in. */
+.tour-art .ink-line {
+  fill: none;
+  stroke: var(--fade);
+  stroke-width: 1.5;
+}
+
+.tour-art .ink-line.faint {
+  stroke: var(--line);
+}
+
+.tour-art .arrow {
+  stroke-linecap: round;
+}
+
+.tour-art .ink-num {
+  fill: var(--floodlight);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.tour-art .ink-cap {
+  fill: var(--fade);
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.tour-art .ink-turf {
+  fill: var(--turf-night);
+  stroke: var(--line);
+}
+
+.tour-art .ink-fill {
+  fill: var(--fade);
+}
+
+.tour-art .ink-line-fill {
+  fill: var(--line);
+}
+
+.tour-art .ink-fill-accent {
+  fill: var(--floodlight);
+}
+
+.tour-art .ink-fill-gain {
+  fill: var(--gain);
+}
+
+.tour-art .ink-fill-flag {
+  fill: var(--flag);
+}
+
+.tour-art .ink-fill-mid {
+  fill: var(--fade);
+}
+
+.tour-art .ink-panel {
+  fill: var(--panel);
+  stroke: var(--line);
+}
+
+.tour-art .ink-row {
+  fill: transparent;
+}
+
+.tour-art .ink-row-on {
+  fill: var(--tint-accent);
+}
+
+.tour-art .ink-tap {
+  fill: none;
+  stroke: var(--floodlight);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+
+.tour-art .ink-btn {
+  fill: var(--floodlight);
+}
+
+.tour-art .ink-btn-text {
+  fill: var(--on-accent);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.tour-art .ink-btn-text.small {
+  font-weight: 600;
+  font-size: 8px;
+}
+
+.tour-art .ink-out {
+  fill: none;
+  stroke: var(--flag);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tour-art .ink-in {
+  fill: none;
+  stroke: var(--gain);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tour-art .ink-tick {
+  fill: none;
+  stroke: var(--gain);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tour-art .ink-w-form {
+  fill: var(--w-form);
+}
+
+.tour-art .ink-w-history {
+  fill: var(--w-history);
+}
+
+.tour-art .ink-w-fixtures {
+  fill: var(--w-fixtures);
+}
+
+.tour-art .ink-handle {
+  fill: var(--panel);
+  stroke: var(--chalk);
+  stroke-width: 1.5;
+}
+
+@media (max-width: 680px) {
+  .tour-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tour-art {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 14px 24px;
+  }
+
+  .tour-art svg {
+    max-width: 300px;
+  }
+
+  .tour-actions .btn {
+    padding: 7px 14px;
+  }
+}

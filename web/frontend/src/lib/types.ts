@@ -82,6 +82,7 @@ export type Theme = "legacy" | "dark" | "light";
 
 export interface Settings {
   theme: Theme;
+  tutorial_seen: boolean;
   budget: number;
   free_transfers: number;
   accept_transfer_penalty: boolean;

@@ -89,6 +89,12 @@ class UserSettings(Base):
     bench_boost: Mapped[bool] = mapped_column(Boolean, default=False)
     triple_captain: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Set once the guided tour has been finished or skipped, so it opens by
+    # itself exactly once and never again unless asked for.
+    tutorial_seen: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
+
     # Which palette the app renders in. A display preference rather than an
     # engine one, but it belongs to the manager, so it lives with the rest.
     theme: Mapped[str] = mapped_column(

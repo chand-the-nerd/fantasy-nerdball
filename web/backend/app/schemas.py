@@ -31,6 +31,7 @@ class SettingsOut(BaseModel):
     bench_boost: bool
     triple_captain: bool
     theme: str = "legacy"
+    tutorial_seen: bool = False
     use_ml_weights: bool
     first_n_gameweeks: int
     min_transfer_value: float
@@ -52,6 +53,7 @@ class SettingsIn(BaseModel):
     bench_boost: bool | None = None
     triple_captain: bool | None = None
     theme: str | None = None
+    tutorial_seen: bool | None = None
     use_ml_weights: bool | None = None
     first_n_gameweeks: int | None = Field(default=None, ge=1, le=10)
     min_transfer_value: float | None = Field(default=None, ge=0, le=20)

@@ -6,6 +6,7 @@ import { TeamsView } from "./components/TeamsView";
 import { SignIn } from "./components/SignIn";
 import { SquadView } from "./components/SquadView";
 import { ThemePicker } from "./components/ThemePicker";
+import { FirstRunTour, Tutorial } from "./components/Tutorial";
 import { api, ApiError } from "./lib/api";
 import type { Me } from "./lib/types";
 
@@ -26,6 +27,7 @@ export function App() {
   const [checked, setChecked] = useState(false);
   const [tab, setTab] = useState<Tab>("squad");
   const [adminOpen, setAdminOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
 
   useEffect(() => {
     api
@@ -93,6 +95,13 @@ export function App() {
         <footer className="app-foot">
           <span>Fantasy Nerdball</span>
           <div className="foot-actions">
+            <button
+              className="admin-link"
+              type="button"
+              onClick={() => setTourOpen(true)}
+            >
+              Tutorial
+            </button>
             <ThemePicker />
             {me.is_admin && (
               <button
@@ -106,6 +115,15 @@ export function App() {
           </div>
         </footer>
       </main>
+
+      {/* Mounted inside the signed-in tree, so nothing asks the server for
+          settings before there's an account to ask about. */}
+      <FirstRunTour onOpen={() => setTourOpen(true)} />
+      <Tutorial
+        open={tourOpen}
+        onClose={() => setTourOpen(false)}
+        onTab={setTab}
+      />
 
       {adminOpen && (
         <div
