@@ -275,9 +275,9 @@ const STEPS: Step[] = [
     body: (
       <>
         <p>
-          This picks your Fantasy Premier League squad for you. It scores every
-          player in the game, then works out the best fifteen you can afford and
-          which transfers get you there.
+          Welcome to the Fantasy Nerdball optimiser; a tool to let you combine 
+          your gut instinct with data and statistics to give you the edge in FPL.
+          The process is simple:
         </p>
         <ol>
           <li>
@@ -297,38 +297,40 @@ const STEPS: Step[] = [
     ),
   },
   {
-    title: "Squad — where you run it",
+    title: "Squad",
     tab: "squad",
     art: ArtPitch,
     body: (
       <>
         <p>
-          Your side on a pitch: eleven starting, four on the bench in the order
-          they'd come on. A padlock marks anyone you've forced in.
+          The 'Squad' page is the home of the optimiser. This is where you'll see either
+          your squad from last week, or your most recent optimisation for the next gameweek.
+          A padlock on a player means you have a good feeling about them, and you've chosen
+          to lock them in, no matter what the model says.
         </p>
         <p>
           Above it sit the three things that change weekly — budget, free
-          transfers and chips. They save as you change them, so Run always uses
+          transfers and chips. They save as you change them, so the 'Run' button always uses
           what's on screen.
         </p>
         <p className="tour-tip">
-          Tap any player for their numbers, and to force them in or rule them
+          Tap any player for their stats, and to force them in or rule them
           out of future squads.
         </p>
       </>
     ),
   },
   {
-    title: "Squad — the transfers and the why",
+    title: "Squad Transfers",
     tab: "squad",
     art: ArtTransfers,
     body: (
       <>
         <p>
+          After you run the optimiser, the model may suggest some transfers.
           Red arrows are out, green in. Underneath is what the move is worth:
           the extra points a week the new side projects over keeping the old
-          one. If that's small, the honest answer is often to save the
-          transfer.
+          one.
         </p>
         <p>
           Under the pitch, every player's score is broken down line by line, so
@@ -338,7 +340,7 @@ const STEPS: Step[] = [
     ),
   },
   {
-    title: "Planner — the next few weeks",
+    title: "Planner",
     tab: "planner",
     art: ArtPlan,
     body: (
@@ -361,7 +363,7 @@ const STEPS: Step[] = [
     ),
   },
   {
-    title: "Players — who's worth having",
+    title: "Players",
     tab: "players",
     art: ArtTable,
     body: (
@@ -383,7 +385,7 @@ const STEPS: Step[] = [
     ),
   },
   {
-    title: "Teams — which fixtures are actually easy",
+    title: "Teams",
     tab: "teams",
     art: ArtTeams,
     body: (
@@ -394,15 +396,15 @@ const STEPS: Step[] = [
           team really is, before luck has its say.
         </p>
         <p>
-          Fixtures get two difficulty ratings, because one number can't do the
-          job: a team that's hard to beat but leaky is a good fixture for your
-          attackers and a bad one for your defenders.
+          Fixtures get two difficulty ratings for attackers and defenders, because
+          reducing a team to a single difficulty rating doesn't give you the full story.
+          This is how the model sees the teams.
         </p>
       </>
     ),
   },
   {
-    title: "Setup — make it play your way",
+    title: "Setup",
     tab: "setup",
     art: ArtWeights,
     body: (
@@ -427,8 +429,12 @@ const STEPS: Step[] = [
       <>
         <p>
           Every player gets one number, built from how they're playing now, what
-          they've done historically, and who they're about to face. It's roughly
-          "points we'd expect per game", so bigger is better and you can compare
+          they've done historically, and who they're about to face. It's not just
+          their FPL numbers, but it also considers their xG performance - both past
+          and present.
+        </p>
+        <p>
+          It's roughly "points we'd expect per game", so bigger is better and you can compare
           any two players directly.
         </p>
         <p className="tour-tip">
