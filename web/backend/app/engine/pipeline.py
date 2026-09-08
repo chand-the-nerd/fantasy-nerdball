@@ -240,6 +240,27 @@ def _serialise_scores(
     return rows
 
 
+def _held_squad_gain(evaluator, scored, prev_squad_ids, starting_with_transfers):
+    """Projected points of the new eleven, minus keeping last week's.
+
+    Gross of any hit: the penalty is reported separately, and showing it
+    twice in one sentence would be worse than showing it once.
+    """
+    if prev_squad_ids is None or starting_with_transfers is None:
+        return None
+    try:
+        held = evaluator.get_no_transfer_squad(scored, prev_squad_ids)
+        if held is None or held.empty:
+            return None
+        return float(
+            starting_with_transfers["projected_points"].sum()
+            - held["projected_points"].sum()
+        )
+    except Exception:
+        # A missing figure is a hidden line; a raised one is a failed run.
+        return None
+
+
 def _active_chip(config: Any) -> str:
     # Free Hit is checked first: it sets WILDCARD too, and it's the one that
     # was actually played.
@@ -346,6 +367,22 @@ def run_optimisation(
             transfer_analysis = evaluator_analysis
         elif not transfer_analysis:
             transfer_analysis = evaluator_analysis or {}
+
+        # The two routes above measure different things. With hits enabled the
+        # evaluator reports the gain of the chosen scenario over the
+        # free-transfer baseline, which is zero whenever no hit was taken — so
+        # the figure was usually missing on exactly the weeks a transfer was
+        # being recommended. This is the like-for-like number instead: what the
+        # new eleven projects, against keeping last week's.
+        if should_transfer and transfers_made and "no_transfer_ppgw" not in (
+            transfer_analysis or {}
+        ):
+            gain = _held_squad_gain(evaluator, scored, prev_squad_ids, starting_wt)
+            if gain is not None:
+                transfer_analysis = {
+                    **(transfer_analysis or {}),
+                    "points_improvement_ppgw": gain,
+                }
 
         starting, bench = nerdball.finalise_squad_selection(
             components, config, should_transfer, starting_wt, bench_wt,

@@ -124,13 +124,20 @@ function TransferPanel({ squad }: { squad: Squad }) {
           </li>
         ))}
       </ul>
-      {payload.points_gain_per_gw != null && payload.points_gain_per_gw > 0 && (
-        <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
-          Worth about {payload.points_gain_per_gw.toFixed(1)} points a gameweek
+      {payload.points_gain_per_gw != null && payload.points_gain_per_gw > 0 ? (
+        <p className="transfer-gain">
+          Worth about <strong>{payload.points_gain_per_gw.toFixed(1)} points a
+          gameweek</strong> more than holding the squad
           {squad.penalty_points > 0
-            ? `, after the ${squad.penalty_points} point hit.`
+            ? `, before the ${squad.penalty_points} point hit.`
             : "."}
         </p>
+      ) : (
+        payload.transfer_reason && (
+          <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
+            {payload.transfer_reason}
+          </p>
+        )
       )}
     </div>
   );

@@ -292,8 +292,9 @@ const STEPS: Step[] = [
     body: (
       <>
         <p>
-          Red arrows are out, green in. Next to them is the expected points gain
-          per week — if that's small, the honest answer is often to save the
+          Red arrows are out, green in. Underneath is what the move is worth:
+          the extra points a week the new side projects over keeping the old
+          one. If that's small, the honest answer is often to save the
           transfer.
         </p>
         <p>
