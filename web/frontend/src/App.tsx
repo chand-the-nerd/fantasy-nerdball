@@ -5,6 +5,7 @@ import { SetupView } from "./components/SetupView";
 import { TeamsView } from "./components/TeamsView";
 import { SignIn } from "./components/SignIn";
 import { SquadView } from "./components/SquadView";
+import { ThemePicker } from "./components/ThemePicker";
 import { api, ApiError } from "./lib/api";
 import type { Me } from "./lib/types";
 
@@ -91,15 +92,18 @@ export function App() {
 
         <footer className="app-foot">
           <span>Fantasy Nerdball</span>
-          {me.is_admin && (
-            <button
-              className="admin-link"
-              type="button"
-              onClick={() => setAdminOpen(true)}
-            >
-              Admin
-            </button>
-          )}
+          <div className="foot-actions">
+            <ThemePicker />
+            {me.is_admin && (
+              <button
+                className="admin-link"
+                type="button"
+                onClick={() => setAdminOpen(true)}
+              >
+                Admin
+              </button>
+            )}
+          </div>
         </footer>
       </main>
 

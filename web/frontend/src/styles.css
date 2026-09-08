@@ -15,12 +15,87 @@
   --w-history: #56c7e8;
   --w-fixtures: #7f9cf5;
 
+  /* Everything below exists so a theme can move it. Anything hardcoded is
+     something no theme is allowed to change — the pitch, mostly. */
+  --input-bg: #0b1a16;
+  --console-bg: #071411;
+  --on-accent: #14110a;
+  --on-chalk: #101010;
+  --handle-hot: #ffffff;
+  --veil: rgba(4, 10, 8, 0.72);
+  --flag-soft: #ff9ea1;
+  --gain-soft: #7fe3b8;
+  --tint-accent: rgba(242, 193, 78, 0.14);
+  --tint-good: rgba(93, 211, 158, 0.22);
+  --tint-mid: rgba(124, 151, 141, 0.2);
+  --tint-warn: rgba(242, 193, 78, 0.2);
+  --tint-bad: rgba(229, 72, 77, 0.22);
+
   --rail: 208px;
   --radius: 4px;
 
   font-family: "Archivo", system-ui, -apple-system, sans-serif;
   font-feature-settings: "tnum" 1, "lnum" 1;
   color-scheme: dark;
+}
+
+/* ── Themes ──────────────────────────────────────────────────────────────
+   Legacy is the palette above, on :root, so it is what renders before the
+   saved preference has loaded. The two below only restate what changes. The
+   pitch is deliberately absent from all of this: it stays green. */
+
+[data-theme="dark"] {
+  --turf-night: #151515;
+  --panel: #1e1e1e;
+  --panel-lift: #292929;
+  --line: #343434;
+  --chalk: #ededed;
+  --fade: #9a9a9a;
+
+  --input-bg: #262626;
+  --console-bg: #101010;
+  --veil: rgba(0, 0, 0, 0.72);
+}
+
+[data-theme="light"] {
+  --turf-night: #ffffff;
+  /* Panels a shade off the white page, so they read as surfaces and a hover
+     has somewhere to go. Inputs go back to pure white on top of them. */
+  --panel: #f7faf9;
+  --panel-lift: #e9efec;
+  --line: #d7e0dc;
+  --chalk: #101a16;
+  --fade: #5d706a;
+
+  /* Brighter and more saturated than the night palette, which would wash
+     out to nothing on white. */
+  --floodlight: #d18a00;
+  --crowd: #0f8fbb;
+  --flag: #d92d33;
+  --gain: #0f9e68;
+
+  --w-form: #e0a100;
+  --w-history: #0f8fbb;
+  --w-fixtures: #4a5fe0;
+
+  --input-bg: #ffffff;
+  --console-bg: #eef3f1;
+  --on-accent: #1c1400;
+  --on-chalk: #ffffff;
+  --handle-hot: #55635e;
+  --veil: rgba(16, 26, 22, 0.45);
+  --flag-soft: #b0242a;
+  --gain-soft: #0b7a51;
+  --tint-accent: rgba(209, 138, 0, 0.16);
+  --tint-good: rgba(15, 158, 104, 0.16);
+  --tint-mid: rgba(93, 112, 106, 0.14);
+  --tint-warn: rgba(209, 138, 0, 0.2);
+  --tint-bad: rgba(217, 45, 51, 0.15);
+}
+
+[data-theme="light"] .panel,
+[data-theme="light"] .notice {
+  box-shadow: 0 1px 2px rgba(16, 26, 22, 0.05);
 }
 
 * {
@@ -207,7 +282,7 @@ button {
 
 .btn {
   background: var(--floodlight);
-  color: #14110a;
+  color: var(--on-accent);
   border: 1px solid var(--floodlight);
   border-radius: var(--radius);
   padding: 9px 18px;
@@ -306,6 +381,15 @@ button {
 /* ── Pitch ───────────────────────────────────────────────────────────── */
 
 .pitch-frame {
+  /* Redeclared locally, so the shirts and the bench inside stay exactly as
+     they are under every theme. A pitch is green. */
+  --panel: #10241e;
+  --panel-lift: #143029;
+  --line: #1e3b33;
+  --chalk: #eaf2ee;
+  --fade: #7c978d;
+  --input-bg: #0b1a16;
+
   border: 1px solid var(--line);
   border-radius: 0 0 var(--radius) var(--radius);
   overflow: hidden;
@@ -636,7 +720,7 @@ button {
 /* ── Run console ─────────────────────────────────────────────────────── */
 
 .console {
-  background: #071411;
+  background: var(--console-bg);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 14px 16px;
@@ -734,7 +818,7 @@ tr.you td {
 .field input[type="number"],
 .field select,
 .field textarea {
-  background: var(--turf-night);
+  background: var(--input-bg);
   border: 1px solid var(--line);
   color: var(--chalk);
   border-radius: var(--radius);
@@ -840,7 +924,7 @@ tr.you td {
   align-items: center;
   gap: 10px;
   background: var(--chalk);
-  color: #101010;
+  color: var(--on-chalk);
   border: 0;
   border-radius: var(--radius);
   padding: 11px 20px;
@@ -965,7 +1049,7 @@ tr.you td {
 
 /* Compact numeric inputs used inside settings tables. */
 .cell-input {
-  background: var(--turf-night);
+  background: var(--input-bg);
   border: 1px solid var(--line);
   color: var(--chalk);
   border-radius: var(--radius);
@@ -1136,7 +1220,7 @@ tr.you td {
   position: relative;
   height: 16px;
   border-radius: 3px;
-  background: var(--turf-night);
+  background: var(--input-bg);
   border: 1px solid var(--line);
   touch-action: none;
 }
@@ -1164,7 +1248,7 @@ tr.you td {
 
 .weight-handle:hover,
 .weight-handle.is-dragging {
-  background: #ffffff;
+  background: var(--handle-hot);
 }
 
 .weight-handle:focus-visible {
@@ -1180,7 +1264,7 @@ tr.you td {
 
 .picker input[type="text"] {
   width: 100%;
-  background: var(--turf-night);
+  background: var(--input-bg);
   border: 1px solid var(--line);
   color: var(--chalk);
   border-radius: var(--radius);
@@ -1218,15 +1302,15 @@ tr.you td {
 
 .chip.tone-doubt {
   border-color: var(--floodlight);
-  background: rgba(242, 193, 78, 0.14);
+  background: var(--tint-accent);
   color: var(--floodlight);
 }
 
 .chip.tone-out,
 .chip.tone-unknown {
   border-color: var(--flag);
-  background: rgba(229, 72, 77, 0.15);
-  color: #ff9ea1;
+  background: var(--tint-bad);
+  color: var(--flag-soft);
 }
 
 .chip button {
@@ -1433,6 +1517,30 @@ tr.you td {
   opacity: 0.75;
 }
 
+.foot-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.theme-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--fade);
+}
+
+.theme-picker select {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--chalk);
+  border-radius: var(--radius);
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 12.5px;
+}
+
 .admin-link {
   background: none;
   border: 0;
@@ -1451,7 +1559,7 @@ tr.you td {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(4, 10, 8, 0.72);
+  background: var(--veil);
   display: grid;
   place-items: start center;
   padding: 8vh 20px 40px;
@@ -1543,14 +1651,14 @@ tr.you td {
 }
 
 .link-button.danger:hover {
-  color: #ff9ea1;
+  color: var(--flag-soft);
 }
 
 .admin-panel code {
   font-family: inherit;
   font-weight: 600;
   color: var(--chalk);
-  background: var(--turf-night);
+  background: var(--input-bg);
   border: 1px solid var(--line);
   border-radius: 3px;
   padding: 0 4px;
@@ -1693,7 +1801,7 @@ tr.you td {
   padding: 1px 5px;
   border-radius: 999px;
   background: var(--floodlight);
-  color: #14110a;
+  color: var(--on-accent);
 }
 
 .calc-tag.vice {
@@ -1786,23 +1894,23 @@ tr.is-clickable:focus-visible {
 
 .fdr-1,
 .fdr-2 {
-  background: rgba(93, 211, 158, 0.22);
-  color: #7fe3b8;
+  background: var(--tint-good);
+  color: var(--gain-soft);
 }
 
 .fdr-3 {
-  background: rgba(124, 151, 141, 0.2);
+  background: var(--tint-mid);
   color: var(--fade);
 }
 
 .fdr-4 {
-  background: rgba(242, 193, 78, 0.2);
+  background: var(--tint-warn);
   color: var(--floodlight);
 }
 
 .fdr-5 {
-  background: rgba(229, 72, 77, 0.22);
-  color: #ff9ea1;
+  background: var(--tint-bad);
+  color: var(--flag-soft);
 }
 
 .fdr-run {
@@ -1894,8 +2002,8 @@ tr.is-clickable:focus-visible {
 }
 
 .btn.quiet.danger {
-  color: #ff9ea1;
-  border-color: rgba(229, 72, 77, 0.45);
+  color: var(--flag-soft);
+  border-color: var(--flag);
 }
 
 .btn.quiet.danger:hover:not(:disabled) {
@@ -1987,7 +2095,7 @@ tr.is-clickable:focus-visible {
 .chip-tile.is-on {
   color: var(--floodlight);
   border-color: var(--floodlight);
-  background: rgba(242, 193, 78, 0.1);
+  background: var(--tint-accent);
   font-weight: 600;
 }
 

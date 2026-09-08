@@ -47,6 +47,7 @@ def read_settings(
 
 
 POSITIONS = ("GK", "DEF", "MID", "FWD")
+THEMES = ("legacy", "dark", "light")
 WEIGHT_KEYS = ("form", "historic", "difficulty")
 
 
@@ -121,6 +122,11 @@ def update_settings(
         _validate_position_weights(changes["overrides"])
     if changes.get("forced_selections") is not None:
         _validate_forced(changes["forced_selections"])
+    if changes.get("theme") is not None and changes["theme"] not in THEMES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"{changes['theme']} isn't one of the styles ({', '.join(THEMES)}).",
+        )
 
     for field, value in changes.items():
         if value is not None:

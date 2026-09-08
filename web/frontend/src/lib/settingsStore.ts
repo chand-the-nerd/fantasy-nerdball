@@ -8,7 +8,39 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "./api";
-import type { Settings } from "./types";
+import type { Settings, Theme } from "./types";
+
+const THEME_KEY = "nerdball-theme";
+export const THEMES: { id: Theme; label: string }[] = [
+  { id: "legacy", label: "Legacy" },
+  { id: "dark", label: "Dark" },
+  { id: "light", label: "Light" },
+];
+
+/**
+ * Legacy is what the stylesheet renders without an attribute, so it is set
+ * rather than removed — otherwise a saved Legacy would look like no
+ * preference at all and the last theme would linger for a frame.
+ */
+export function applyTheme(theme: Theme | undefined): void {
+  document.documentElement.dataset.theme = theme ?? "legacy";
+  try {
+    if (theme) window.localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    /* private browsing: the account copy is the one that matters */
+  }
+}
+
+/** Applied before the first paint, so the page doesn't flash the old palette
+    while the saved preference is still being fetched. */
+export function applyStoredTheme(): void {
+  try {
+    const saved = window.localStorage.getItem(THEME_KEY) as Theme | null;
+    if (saved) document.documentElement.dataset.theme = saved;
+  } catch {
+    /* nothing stored, nothing to do */
+  }
+}
 
 let cached: Settings | null = null;
 let inflight: Promise<Settings> | null = null;
@@ -16,6 +48,7 @@ const listeners = new Set<(settings: Settings) => void>();
 
 export function publishSettings(next: Settings): void {
   cached = next;
+  applyTheme(next.theme);
   for (const listener of listeners) listener(next);
 }
 

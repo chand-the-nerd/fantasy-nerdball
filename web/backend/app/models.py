@@ -81,6 +81,12 @@ class UserSettings(Base):
     bench_boost: Mapped[bool] = mapped_column(Boolean, default=False)
     triple_captain: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Which palette the app renders in. A display preference rather than an
+    # engine one, but it belongs to the manager, so it lives with the rest.
+    theme: Mapped[str] = mapped_column(
+        String(16), default="legacy", server_default="legacy"
+    )
+
     use_ml_weights: Mapped[bool] = mapped_column(Boolean, default=False)
     first_n_gameweeks: Mapped[int] = mapped_column(Integer, default=1)
     min_transfer_value: Mapped[float] = mapped_column(Float, default=2.0)

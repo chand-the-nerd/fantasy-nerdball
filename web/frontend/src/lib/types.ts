@@ -78,7 +78,10 @@ export interface Me {
   fpl_entry_id: number | null;
 }
 
+export type Theme = "legacy" | "dark" | "light";
+
 export interface Settings {
+  theme: Theme;
   budget: number;
   free_transfers: number;
   accept_transfer_penalty: boolean;

@@ -29,6 +29,7 @@ class SettingsOut(BaseModel):
     free_hit_prev_gw: bool
     bench_boost: bool
     triple_captain: bool
+    theme: str = "legacy"
     use_ml_weights: bool
     first_n_gameweeks: int
     min_transfer_value: float
@@ -48,6 +49,7 @@ class SettingsIn(BaseModel):
     free_hit_prev_gw: bool | None = None
     bench_boost: bool | None = None
     triple_captain: bool | None = None
+    theme: str | None = None
     use_ml_weights: bool | None = None
     first_n_gameweeks: int | None = Field(default=None, ge=1, le=10)
     min_transfer_value: float | None = Field(default=None, ge=0, le=20)
