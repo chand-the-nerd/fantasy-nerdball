@@ -170,8 +170,7 @@ function ModelXiPanel({ squad }: { squad: Squad }) {
         </div>
       </div>
       <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
-        What the model would pick with a free hand and the same budget. A small gap
-        means your transfer constraints aren't costing you much.
+        Your squad against the model's squad as if it had a Free hit.
       </p>
     </div>
   );

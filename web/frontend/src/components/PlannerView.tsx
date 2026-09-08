@@ -278,16 +278,14 @@ export function PlannerView() {
         <div>
           <h1>Planner</h1>
           <span className="when">
-            The optimiser run forward, week after week
+            Running the optimiser for multiple weeks at a time.
           </span>
         </div>
       </div>
 
       <div className="notice">
         A plan assumes today's prices and today's form hold for the whole run.
-        It can't see price changes, injuries, or a player finding form — so
-        treat the first week or two as advice and the rest as a sketch of the
-        shape.
+        It can't see price changes, injuries, or a player finding form.
       </div>
 
       {error && <div className="notice bad">{error}</div>}
@@ -309,7 +307,7 @@ export function PlannerView() {
               ))}
             </select>
             <span className="hint">
-              Each one is a full optimisation, so eight takes a while.
+              Please note each gameweek runs a full optimisation.
             </span>
           </div>
 
