@@ -2335,3 +2335,50 @@ tr.is-clickable:focus-visible {
     flex: 1;
   }
 }
+
+/* ── "Where do I find this?" ─────────────────────────────────────────── */
+
+.id-help {
+  margin: -4px 0 12px;
+  font-size: 13px;
+  color: var(--fade);
+}
+
+.id-help summary {
+  cursor: pointer;
+  color: var(--crowd);
+  width: fit-content;
+}
+
+.id-help summary:hover {
+  text-decoration: underline;
+}
+
+.id-help ol {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.id-help li {
+  line-height: 1.45;
+}
+
+.id-help code {
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.id-help p.hint {
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+.id-help a {
+  color: var(--crowd);
+}

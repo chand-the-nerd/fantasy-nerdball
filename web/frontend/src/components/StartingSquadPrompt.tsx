@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FplIdHelp } from "./FplIdHelp";
 import { api, ApiError } from "../lib/api";
 import type { Me } from "../lib/types";
 
@@ -120,6 +121,7 @@ export function StartingSquadPrompt({
                   The number in your team's URL on the FPL site.
                 </span>
               </div>
+              <FplIdHelp />
               <button
                 className="btn"
                 type="button"
