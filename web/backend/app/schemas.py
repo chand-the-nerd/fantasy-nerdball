@@ -79,6 +79,16 @@ class ImportSquadIn(BaseModel):
     apply_free_transfers: bool = True
 
 
+class ManualSquadIn(BaseModel):
+    """Fifteen players entered by hand, saved as a past gameweek's squad."""
+
+    gameweek: int | None = Field(default=None, ge=1, le=38)
+    player_ids: list[int] = Field(min_length=15, max_length=15)
+    starting_ids: list[int] = Field(min_length=11, max_length=11)
+    bank: float = Field(default=0.0, ge=0, le=100)
+    apply_budget: bool = True
+
+
 class RunIn(BaseModel):
     gameweek: int | None = Field(default=None, ge=1, le=38)
     season: str | None = None

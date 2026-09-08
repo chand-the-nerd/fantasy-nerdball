@@ -85,7 +85,7 @@ export function App() {
       </aside>
 
       <main className="main">
-        {tab === "squad" && <SquadView />}
+        {tab === "squad" && <SquadView me={me} onMeChange={setMe} />}
         {tab === "players" && <PlayersView />}
         {tab === "teams" && <TeamsView />}
         {tab === "setup" && <SetupView me={me} onMeChange={setMe} />}

@@ -216,3 +216,159 @@ def import_summary(entry_id: int, gameweek: int, upcoming: int) -> dict[str, Any
     # told to look one gameweek further back.
     squad["free_hit_used"] = squad["active_chip"] == "freehit"
     return squad
+
+
+# ── Manual squad entry ───────────────────────────────────────────────────
+
+SQUAD_SHAPE = {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3}
+MAX_PER_CLUB = 3
+
+
+def build_from_ids(
+    player_ids: list[int], starting_ids: list[int], gameweek: int, bank: float = 0.0
+) -> dict:
+    """The same squad shape, from fifteen players picked by hand.
+
+    For anyone whose FPL account isn't linked, or who wants the side they
+    actually intend to start rather than whatever the API last recorded.
+    Validation happens here rather than in the browser because an invalid
+    squad saved as last week's makes every transfer suggestion afterwards
+    wrong, and that failure is silent.
+    """
+    if len(set(player_ids)) != len(player_ids):
+        raise SquadImportError("The same player is in the squad twice.")
+    if len(player_ids) != 15:
+        raise SquadImportError(
+            f"A squad is fifteen players; {len(player_ids)} were sent."
+        )
+    if len(starting_ids) != 11:
+        raise SquadImportError(
+            f"A starting eleven is eleven players; {len(starting_ids)} were sent."
+        )
+    if not set(starting_ids).issubset(set(player_ids)):
+        raise SquadImportError("Someone in the starting eleven isn't in the squad.")
+
+    bootstrap = fpl.bootstrap()
+    elements = {int(e["id"]): e for e in bootstrap.get("elements", [])}
+    teams = {int(t["id"]): t["name"] for t in bootstrap.get("teams", [])}
+
+    missing = [pid for pid in player_ids if pid not in elements]
+    if missing:
+        raise SquadImportError(
+            "Some of those players aren't in this season's FPL pool. Reload "
+            "the page and pick them again."
+        )
+
+    by_position: dict[str, int] = {"GK": 0, "DEF": 0, "MID": 0, "FWD": 0}
+    by_club: dict[str, int] = {}
+    for pid in player_ids:
+        element = elements[pid]
+        position = POSITIONS.get(element.get("element_type"), "MID")
+        by_position[position] += 1
+        club = teams.get(element.get("team"), "")
+        by_club[club] = by_club.get(club, 0) + 1
+
+    for position, wanted in SQUAD_SHAPE.items():
+        if by_position[position] != wanted:
+            raise SquadImportError(
+                f"A squad needs {wanted} {position} players; this one has "
+                f"{by_position[position]}."
+            )
+    for club, count in by_club.items():
+        if count > MAX_PER_CLUB:
+            raise SquadImportError(
+                f"{count} players from {club}. FPL allows {MAX_PER_CLUB} per club."
+            )
+
+    starting: list[dict] = []
+    bench: list[dict] = []
+    engine_rows: list[dict] = []
+    bench_slot = 0
+    squad_value = 0.0
+
+    for pid in player_ids:
+        element = elements[pid]
+        position = POSITIONS.get(element.get("element_type"), "MID")
+        price = round(element.get("now_cost", 0) / 10, 1)
+        squad_value += price
+        on_bench = pid not in set(starting_ids)
+        if on_bench:
+            bench_slot += 1
+
+        player = {
+            "id": element["id"],
+            "code": element.get("code"),
+            "name": element["web_name"],
+            "position": position,
+            "team": teams.get(element.get("team"), ""),
+            "team_short": "",
+            "price": price,
+            "projected_points": 0.0,
+            "form": float(element.get("form") or 0),
+            "historic_ppg": None,
+            "fixture_difficulty": None,
+            "start_rate": None,
+            "minutes_per_game": None,
+            "xg_modifier": None,
+            "next_opponent": "",
+            "venue": "",
+            "status": element.get("status", "a"),
+            "news": element.get("news", "") or "",
+            "is_captain": False,
+            "is_vice": False,
+            "is_double_gameweek": False,
+            "on_bench": on_bench,
+            # Goalkeepers sit outside the numbered bench order, as in FPL.
+            "bench_order": (bench_slot + 1) if on_bench else None,
+        }
+        (bench if on_bench else starting).append(player)
+
+        engine_rows.append(
+            {
+                "id": element["id"],
+                "player_code": element.get("code"),
+                "display_name": element["web_name"],
+                "position": position,
+                "team": teams.get(element.get("team"), ""),
+                "now_cost_m": price,
+                "projected_points": 0.0,
+                "squad_role": "Bench" if on_bench else "Starting XI",
+            }
+        )
+
+    counts = {"DEF": 0, "MID": 0, "FWD": 0}
+    for player in starting:
+        if player["position"] in counts:
+            counts[player["position"]] += 1
+
+    squad_value = round(squad_value, 1)
+    bank = round(float(bank or 0.0), 1)
+
+    payload = {
+        "starting": starting,
+        "bench": bench,
+        "formation": f"{counts['DEF']}-{counts['MID']}-{counts['FWD']}",
+        "gameweek": gameweek,
+        "season": settings.current_season,
+        "projected_points": 0.0,
+        "squad_value": squad_value,
+        "bank": bank,
+        "chip": "",
+        "transfers_made": 0,
+        "penalty_points": 0,
+        "made_transfers": False,
+        "transfer_reason": "",
+        "points_gain_per_gw": None,
+        "transfers": {"out": [], "in": []},
+        "model_xi": None,
+        "imported": False,
+        "entered_by_hand": True,
+    }
+
+    return {
+        "payload": payload,
+        "engine_rows": engine_rows,
+        "squad_value": squad_value,
+        "bank": bank,
+        "budget": round(squad_value + bank, 1),
+    }

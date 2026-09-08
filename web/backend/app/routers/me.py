@@ -16,6 +16,7 @@ from ..models import Squad, User, UserSettings
 from ..schemas import (
     EntryLinkIn,
     ImportSquadIn,
+    ManualSquadIn,
     PlayerRefIn,
     SettingsIn,
     SettingsOut,
@@ -379,6 +380,94 @@ def link_entry(
 
     session.refresh(user)
     return user
+
+
+@router.post("/manual-squad")
+def manual_squad(
+    payload: ManualSquadIn,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Save a hand-picked squad as a past gameweek.
+
+    The same job as importing from FPL, for anyone who hasn't linked their
+    team or whose real side isn't what they want the optimiser to transfer
+    from.
+    """
+    try:
+        upcoming = fpl.current_gameweek()
+    except Exception:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "The FPL API isn't responding. Try again shortly.",
+        )
+
+    gameweek = payload.gameweek or (upcoming - 1)
+    if gameweek < 1:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "There's no gameweek before the first one to save a squad for.",
+        )
+    if gameweek >= upcoming:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Gameweek {gameweek} hasn't been played yet. The latest you can "
+            f"enter is gameweek {upcoming - 1}.",
+        )
+
+    try:
+        result = fpl_import.build_from_ids(
+            payload.player_ids, payload.starting_ids, gameweek, payload.bank
+        )
+    except fpl_import.SquadImportError as error:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error))
+    except requests.RequestException:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "The FPL API isn't responding. Try again shortly.",
+        )
+
+    squad = session.scalar(
+        select(Squad).where(
+            Squad.user_id == user.id,
+            Squad.season == settings.current_season,
+            Squad.gameweek == gameweek,
+        )
+    )
+    if squad is None:
+        squad = Squad(
+            user_id=user.id, season=settings.current_season, gameweek=gameweek
+        )
+        session.add(squad)
+
+    data = result["payload"]
+    squad.formation = data["formation"]
+    squad.projected_points = 0.0
+    squad.squad_value = result["squad_value"]
+    squad.bank = result["bank"]
+    squad.transfers_made = 0
+    squad.penalty_points = 0
+    squad.chip = ""
+    squad.payload = data
+    squad.engine_rows = result["engine_rows"]
+
+    applied = []
+    if payload.apply_budget:
+        row = _settings_row(session, user)
+        row.budget = result["budget"]
+        applied.append(f"budget set to £{result['budget']}m")
+
+    session.commit()
+
+    return {
+        "gameweek": gameweek,
+        "formation": data["formation"],
+        "players": len(result["engine_rows"]),
+        "squad_value": result["squad_value"],
+        "bank": result["bank"],
+        "budget": result["budget"],
+        "applied": applied,
+    }
 
 
 @router.get("/reference")

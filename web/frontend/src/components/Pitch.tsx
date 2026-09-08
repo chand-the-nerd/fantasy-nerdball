@@ -4,7 +4,7 @@ import type { Player, Position } from "../lib/types";
 
 const LINES: Position[] = ["GK", "DEF", "MID", "FWD"];
 
-function PitchMarkings() {
+export function PitchMarkings() {
   return (
     <svg
       className="pitch-lines"

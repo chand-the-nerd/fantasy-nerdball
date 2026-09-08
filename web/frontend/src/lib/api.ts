@@ -81,6 +81,18 @@ export const api = {
       body: JSON.stringify({ name }),
     }),
 
+  manualSquad: (body: {
+    gameweek?: number;
+    player_ids: number[];
+    starting_ids: number[];
+    bank: number;
+    apply_budget: boolean;
+  }) =>
+    request<any>("/api/me/manual-squad", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
   linkEntry: (fpl_entry_id: number | null) =>
     request<Me>("/api/me/fpl-entry", {
       method: "POST",

@@ -2175,3 +2175,160 @@ tr.is-clickable:focus-visible {
     padding-right: 8px;
   }
 }
+
+/* ── Starting squad prompt and builder ───────────────────────────────── */
+
+.start-prompt {
+  margin-bottom: 16px;
+  border-left: 2px solid var(--floodlight);
+}
+
+.start-prompt-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.start-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.start-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 14px;
+  background: var(--turf-night);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.start-option p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.start-option .field {
+  width: 100%;
+  margin: 4px 0 2px;
+}
+
+.start-option .btn {
+  margin-top: auto;
+}
+
+.builder-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+/* An empty slot is a shirt outline: same footprint as the filled one, so the
+   pitch doesn't reflow as it fills up. */
+.shirt.is-empty {
+  border-style: dashed;
+  border-color: var(--line);
+  background: transparent;
+  min-height: 78px;
+}
+
+.shirt.is-empty .band {
+  background: transparent;
+  color: var(--fade);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  height: 20px;
+}
+
+.shirt.is-empty .plus {
+  display: block;
+  font-size: 24px;
+  font-weight: 300;
+  line-height: 1;
+  padding: 10px 0 6px;
+  color: var(--fade);
+}
+
+.shirt.is-empty:hover {
+  border-color: var(--floodlight);
+}
+
+.shirt.is-empty:hover .plus,
+.shirt.is-empty:hover .band {
+  color: var(--floodlight);
+}
+
+.shirt.is-filled .band {
+  background: var(--panel-lift);
+  color: var(--chalk);
+}
+
+.shirt.is-filled .meta {
+  padding-top: 8px;
+}
+
+.slot-clear {
+  position: absolute;
+  top: 24px;
+  right: 3px;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--fade);
+  background: var(--panel);
+}
+
+.slot-clear:hover {
+  color: var(--flag);
+}
+
+.builder-foot {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+}
+
+.builder-foot .field,
+.builder-foot .toggle {
+  margin-bottom: 0;
+  border-bottom: 0;
+  padding: 0;
+}
+
+.builder-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* The picker list inside a dialog scrolls rather than floating over the page. */
+.picker-list.is-static {
+  position: static;
+  max-height: 46vh;
+  overflow-y: auto;
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .builder-foot {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .builder-actions .btn {
+    flex: 1;
+  }
+}

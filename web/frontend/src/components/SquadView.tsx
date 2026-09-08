@@ -3,11 +3,13 @@ import { Pitch } from "./Pitch";
 import { PlayerActions } from "./PlayerActions";
 import { RunConsole } from "./RunConsole";
 import { RunSettings } from "./RunSettings";
+import { SquadBuilder } from "./SquadBuilder";
+import { StartingSquadPrompt } from "./StartingSquadPrompt";
 import { ExploredTransfers, SquadCalculations } from "./SquadCalculations";
 import { api, ApiError } from "../lib/api";
 import { useSettings } from "../lib/settingsStore";
 import { normalise } from "../lib/text";
-import type { GameweekInfo, Player, Run, Squad } from "../lib/types";
+import type { GameweekInfo, Me, Player, Run, Squad } from "../lib/types";
 
 /**
  * The squad to open on: the gameweek FPL is currently on, or the closest one
@@ -226,7 +228,13 @@ function PlayerDetail({ player, onClose }: { player: Player; onClose: () => void
   );
 }
 
-export function SquadView() {
+export function SquadView({
+  me,
+  onMeChange,
+}: {
+  me: Me;
+  onMeChange: (me: Me) => void;
+}) {
   const { settings } = useSettings();
   const [squad, setSquad] = useState<Squad | null>(null);
   const [history, setHistory] = useState<Squad[]>([]);
@@ -238,6 +246,8 @@ export function SquadView() {
   // Defaults to the gameweek FPL says is next; overridable for back-testing
   // or for planning ahead of the deadline.
   const [targetGw, setTargetGw] = useState<number | null>(null);
+  const [building, setBuilding] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   const busy = run?.status === "queued" || run?.status === "running";
 
@@ -286,6 +296,13 @@ export function SquadView() {
     return () => clearInterval(timer);
   }, [busy, run?.id]);
 
+  const reloadSquads = async () => {
+    const squads = await api.squads();
+    setHistory(squads);
+    setSquad(forGameweek(squads, info?.gameweek ?? null));
+    setBuilding(false);
+  };
+
   const optimise = async () => {
     setError("");
     try {
@@ -303,6 +320,12 @@ export function SquadView() {
     }
     return names;
   }, [settings]);
+
+  // The gameweek before the one being planned for. Null until FPL answers,
+  // since guessing it would mean prompting for the wrong week.
+  const previousGw = info?.gameweek ? Math.max(0, info.gameweek - 1) || null : null;
+  const hasPrevious =
+    previousGw !== null && history.some((entry) => entry.gameweek === previousGw);
 
   const gameweekOptions = useMemo(
     () => history.map((s) => s.gameweek).sort((a, b) => b - a),
@@ -360,6 +383,27 @@ export function SquadView() {
 
       {error && <div className="notice bad">{error}</div>}
 
+      {/* The gameweek just gone is what a run transfers from, so a gap there
+          is worth resolving before anything else on the page. */}
+      {previousGw !== null && !hasPrevious && !building && !dismissed && (
+        <StartingSquadPrompt
+          gameweek={previousGw}
+          me={me}
+          onMeChange={onMeChange}
+          onImported={() => void reloadSquads()}
+          onBuild={() => setBuilding(true)}
+          onDismiss={() => setDismissed(true)}
+        />
+      )}
+
+      {building && previousGw !== null ? (
+        <SquadBuilder
+          gameweek={previousGw}
+          onSaved={() => void reloadSquads()}
+          onCancel={() => setBuilding(false)}
+        />
+      ) : (
+        <>
       <RunSettings disabled={busy} />
 
       <div className="squad-layout">
@@ -399,6 +443,8 @@ export function SquadView() {
       </div>
 
       {squad && <SquadCalculations squad={squad} />}
+        </>
+      )}
     </>
   );
 }
