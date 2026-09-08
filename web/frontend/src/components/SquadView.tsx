@@ -170,7 +170,7 @@ function ModelXiPanel({ squad }: { squad: Squad }) {
         </div>
       </div>
       <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
-        Your squad against the model's squad as if it had a Free hit.
+        Your squad against the model's squad as if it had a Free Hit.
       </p>
     </div>
   );

@@ -214,7 +214,8 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
                 onChange={(e) => patch({ min_transfer_value: Number(e.target.value) })}
               />
               <span className="hint">
-                How many points per gameweek a transfer must improve by for a transfer to be recommended.
+                How many points each future gameweek must improve by before a transfer is recommended. 
+                Setting to zero is the ultimate knee-jerk setting. Setting to 5 is highly conservative.
               </span>
             </div>
           </div>
