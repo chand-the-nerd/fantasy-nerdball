@@ -37,7 +37,7 @@ export function RunConsole({ run }: Props) {
 
       <div className="console">
         {lines.length === 0 ? (
-          <p>Fetching the latest player data. This usually takes a couple of minutes.</p>
+          <p>Fetching the latest player data.</p>
         ) : (
           lines.map((line, i) => <p key={i}>{line}</p>)
         )}
