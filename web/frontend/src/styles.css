@@ -15,12 +15,87 @@
   --w-history: #56c7e8;
   --w-fixtures: #7f9cf5;
 
+  /* Everything below exists so a theme can move it. Anything hardcoded is
+     something no theme is allowed to change — the pitch, mostly. */
+  --input-bg: #0b1a16;
+  --console-bg: #071411;
+  --on-accent: #14110a;
+  --on-chalk: #101010;
+  --handle-hot: #ffffff;
+  --veil: rgba(4, 10, 8, 0.72);
+  --flag-soft: #ff9ea1;
+  --gain-soft: #7fe3b8;
+  --tint-accent: rgba(242, 193, 78, 0.14);
+  --tint-good: rgba(93, 211, 158, 0.22);
+  --tint-mid: rgba(124, 151, 141, 0.2);
+  --tint-warn: rgba(242, 193, 78, 0.2);
+  --tint-bad: rgba(229, 72, 77, 0.22);
+
   --rail: 208px;
   --radius: 4px;
 
   font-family: "Archivo", system-ui, -apple-system, sans-serif;
   font-feature-settings: "tnum" 1, "lnum" 1;
   color-scheme: dark;
+}
+
+/* ── Themes ──────────────────────────────────────────────────────────────
+   Legacy is the palette above, on :root, so it is what renders before the
+   saved preference has loaded. The two below only restate what changes. The
+   pitch is deliberately absent from all of this: it stays green. */
+
+[data-theme="dark"] {
+  --turf-night: #151515;
+  --panel: #1e1e1e;
+  --panel-lift: #292929;
+  --line: #343434;
+  --chalk: #ededed;
+  --fade: #9a9a9a;
+
+  --input-bg: #262626;
+  --console-bg: #101010;
+  --veil: rgba(0, 0, 0, 0.72);
+}
+
+[data-theme="light"] {
+  --turf-night: #ffffff;
+  /* Panels a shade off the white page, so they read as surfaces and a hover
+     has somewhere to go. Inputs go back to pure white on top of them. */
+  --panel: #f7faf9;
+  --panel-lift: #e9efec;
+  --line: #d7e0dc;
+  --chalk: #101a16;
+  --fade: #5d706a;
+
+  /* Brighter and more saturated than the night palette, which would wash
+     out to nothing on white. */
+  --floodlight: #d18a00;
+  --crowd: #0f8fbb;
+  --flag: #d92d33;
+  --gain: #0f9e68;
+
+  --w-form: #e0a100;
+  --w-history: #0f8fbb;
+  --w-fixtures: #4a5fe0;
+
+  --input-bg: #ffffff;
+  --console-bg: #eef3f1;
+  --on-accent: #1c1400;
+  --on-chalk: #ffffff;
+  --handle-hot: #55635e;
+  --veil: rgba(16, 26, 22, 0.45);
+  --flag-soft: #b0242a;
+  --gain-soft: #0b7a51;
+  --tint-accent: rgba(209, 138, 0, 0.16);
+  --tint-good: rgba(15, 158, 104, 0.16);
+  --tint-mid: rgba(93, 112, 106, 0.14);
+  --tint-warn: rgba(209, 138, 0, 0.2);
+  --tint-bad: rgba(217, 45, 51, 0.15);
+}
+
+[data-theme="light"] .panel,
+[data-theme="light"] .notice {
+  box-shadow: 0 1px 2px rgba(16, 26, 22, 0.05);
 }
 
 * {
@@ -207,7 +282,7 @@ button {
 
 .btn {
   background: var(--floodlight);
-  color: #14110a;
+  color: var(--on-accent);
   border: 1px solid var(--floodlight);
   border-radius: var(--radius);
   padding: 9px 18px;
@@ -306,20 +381,55 @@ button {
 /* ── Pitch ───────────────────────────────────────────────────────────── */
 
 .pitch-frame {
+  /* Redeclared locally, so the shirts and the bench inside follow the pitch
+     rather than the page. A pitch is green under every theme; how light that
+     green is, and what the cards on it look like, is the part that moves. */
+  --panel: #10241e;
+  --panel-lift: #143029;
+  --line: #1e3b33;
+  --chalk: #eaf2ee;
+  --fade: #7c978d;
+  --input-bg: #0b1a16;
+
+  --pitch-turf: #0d211b;
+  --pitch-line: rgba(234, 242, 238, 0.13);
+  --pitch-bench: rgba(4, 12, 10, 0.55);
+  --pitch-glow: rgba(93, 211, 158, 0.07);
+  /* Mown stripes. Barely there on the night pitch by design; a daylight one
+     needs several times the alpha to read at all. */
+  --pitch-stripe: rgba(255, 255, 255, 0.018);
+
   border: 1px solid var(--line);
   border-radius: 0 0 var(--radius) var(--radius);
   overflow: hidden;
-  background: #0d211b;
+  background: var(--pitch-turf);
+}
+
+/* Light mode gets a daylight pitch, with white cards on it rather than the
+   night palette's dark ones. */
+[data-theme="light"] .pitch-frame {
+  --panel: #ffffff;
+  --panel-lift: #eef3f0;
+  --line: #cfdcd5;
+  --chalk: #101a16;
+  --fade: #5b6d67;
+  --input-bg: #ffffff;
+
+  --pitch-turf: #3f9a68;
+  --pitch-line: rgba(255, 255, 255, 0.45);
+  --pitch-bench: rgba(255, 255, 255, 0.5);
+  --pitch-glow: rgba(255, 255, 255, 0.16);
+  --pitch-stripe: rgba(255, 255, 255, 0.11);
 }
 
 .pitch {
   position: relative;
   padding: 40px 18px 34px;
   background-image:
-    linear-gradient(180deg, rgba(93, 211, 158, 0.07), rgba(93, 211, 158, 0) 62%),
+    linear-gradient(180deg, var(--pitch-glow), rgba(255, 255, 255, 0) 62%),
     repeating-linear-gradient(
       90deg,
-      rgba(255, 255, 255, 0.018) 0 7.14%,
+      var(--pitch-stripe) 0 7.14%,
       rgba(255, 255, 255, 0) 7.14% 14.28%
     );
 }
@@ -337,7 +447,7 @@ button {
 .pitch-lines rect,
 .pitch-lines line {
   fill: none;
-  stroke: rgba(234, 242, 238, 0.13);
+  stroke: var(--pitch-line);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
@@ -360,7 +470,7 @@ button {
 
 .bench {
   border-top: 1px solid var(--line);
-  background: rgba(4, 12, 10, 0.55);
+  background: var(--pitch-bench);
   padding: 16px 18px 20px;
 }
 
@@ -503,6 +613,19 @@ button {
   color: var(--fade);
 }
 
+.lock-mark {
+  flex: none;
+  width: 9px;
+  height: 10.5px;
+  opacity: 0.85;
+}
+
+/* A forced pick is there because you said so, not because it scored well.
+   The border says as much without competing with the captain's ring. */
+.shirt.is-forced:not(.is-captain):not(.is-doubtful) {
+  border-color: var(--fade);
+}
+
 .dgw-mark {
   font-size: 9px;
   letter-spacing: -1px;
@@ -561,9 +684,9 @@ button {
 
 .transfer-list li {
   display: grid;
-  grid-template-columns: 18px 1fr;
-  gap: 9px;
-  align-items: baseline;
+  grid-template-columns: 16px 1fr;
+  gap: 10px;
+  align-items: center;
   font-size: 14px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--line);
@@ -575,8 +698,13 @@ button {
 }
 
 .transfer-list .dir {
-  font-size: 12px;
-  font-weight: 700;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .transfer-list .dir.out {
@@ -618,7 +746,7 @@ button {
 /* ── Run console ─────────────────────────────────────────────────────── */
 
 .console {
-  background: #071411;
+  background: var(--console-bg);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 14px 16px;
@@ -688,7 +816,10 @@ td {
 td.num,
 th.num {
   text-align: right;
+  /* Right padding is zero so the column sits flush with the table edge; the
+     gap between two numeric columns has to come from the left instead. */
   padding-right: 0;
+  padding-left: 14px;
 }
 
 tr.you td {
@@ -713,7 +844,7 @@ tr.you td {
 .field input[type="number"],
 .field select,
 .field textarea {
-  background: var(--turf-night);
+  background: var(--input-bg);
   border: 1px solid var(--line);
   color: var(--chalk);
   border-radius: var(--radius);
@@ -819,7 +950,7 @@ tr.you td {
   align-items: center;
   gap: 10px;
   background: var(--chalk);
-  color: #101010;
+  color: var(--on-chalk);
   border: 0;
   border-radius: var(--radius);
   padding: 11px 20px;
@@ -944,7 +1075,7 @@ tr.you td {
 
 /* Compact numeric inputs used inside settings tables. */
 .cell-input {
-  background: var(--turf-night);
+  background: var(--input-bg);
   border: 1px solid var(--line);
   color: var(--chalk);
   border-radius: var(--radius);
@@ -1115,7 +1246,7 @@ tr.you td {
   position: relative;
   height: 16px;
   border-radius: 3px;
-  background: var(--turf-night);
+  background: var(--input-bg);
   border: 1px solid var(--line);
   touch-action: none;
 }
@@ -1143,7 +1274,7 @@ tr.you td {
 
 .weight-handle:hover,
 .weight-handle.is-dragging {
-  background: #ffffff;
+  background: var(--handle-hot);
 }
 
 .weight-handle:focus-visible {
@@ -1159,7 +1290,7 @@ tr.you td {
 
 .picker input[type="text"] {
   width: 100%;
-  background: var(--turf-night);
+  background: var(--input-bg);
   border: 1px solid var(--line);
   color: var(--chalk);
   border-radius: var(--radius);
@@ -1197,15 +1328,15 @@ tr.you td {
 
 .chip.tone-doubt {
   border-color: var(--floodlight);
-  background: rgba(242, 193, 78, 0.14);
+  background: var(--tint-accent);
   color: var(--floodlight);
 }
 
 .chip.tone-out,
 .chip.tone-unknown {
   border-color: var(--flag);
-  background: rgba(229, 72, 77, 0.15);
-  color: #ff9ea1;
+  background: var(--tint-bad);
+  color: var(--flag-soft);
 }
 
 .chip button {
@@ -1412,6 +1543,30 @@ tr.you td {
   opacity: 0.75;
 }
 
+.foot-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.theme-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--fade);
+}
+
+.theme-picker select {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--chalk);
+  border-radius: var(--radius);
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 12.5px;
+}
+
 .admin-link {
   background: none;
   border: 0;
@@ -1430,7 +1585,7 @@ tr.you td {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(4, 10, 8, 0.72);
+  background: var(--veil);
   display: grid;
   place-items: start center;
   padding: 8vh 20px 40px;
@@ -1522,14 +1677,14 @@ tr.you td {
 }
 
 .link-button.danger:hover {
-  color: #ff9ea1;
+  color: var(--flag-soft);
 }
 
 .admin-panel code {
   font-family: inherit;
   font-weight: 600;
   color: var(--chalk);
-  background: var(--turf-night);
+  background: var(--input-bg);
   border: 1px solid var(--line);
   border-radius: 3px;
   padding: 0 4px;
@@ -1672,7 +1827,7 @@ tr.you td {
   padding: 1px 5px;
   border-radius: 999px;
   background: var(--floodlight);
-  color: #14110a;
+  color: var(--on-accent);
 }
 
 .calc-tag.vice {
@@ -1721,8 +1876,29 @@ tr.you td {
   font-weight: 600;
 }
 
-.rank-table {
+.rank-table,
+.fixtures-table {
   min-width: 0;
+}
+
+.fixtures-table td,
+.fixtures-table th {
+  white-space: nowrap;
+}
+
+/* Clicking a row opens the force / avoid actions for that player. */
+tr.is-clickable {
+  cursor: pointer;
+}
+
+tr.is-clickable:hover td,
+tr.is-clickable:focus-visible td {
+  background: var(--panel-lift);
+}
+
+tr.is-clickable:focus-visible {
+  outline: 1px solid var(--floodlight);
+  outline-offset: -1px;
 }
 
 .calc-table td.accent {
@@ -1744,23 +1920,23 @@ tr.you td {
 
 .fdr-1,
 .fdr-2 {
-  background: rgba(93, 211, 158, 0.22);
-  color: #7fe3b8;
+  background: var(--tint-good);
+  color: var(--gain-soft);
 }
 
 .fdr-3 {
-  background: rgba(124, 151, 141, 0.2);
+  background: var(--tint-mid);
   color: var(--fade);
 }
 
 .fdr-4 {
-  background: rgba(242, 193, 78, 0.2);
+  background: var(--tint-warn);
   color: var(--floodlight);
 }
 
 .fdr-5 {
-  background: rgba(229, 72, 77, 0.22);
-  color: #ff9ea1;
+  background: var(--tint-bad);
+  color: var(--flag-soft);
 }
 
 .fdr-run {
@@ -1769,10 +1945,987 @@ tr.you td {
 }
 
 .teams-table {
-  min-width: 940px;
+  min-width: 1010px;
+}
+
+/* Sorting and options sit with the table rather than in the page header, so
+   the controls are next to the thing they change. */
+.table-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+/* ── Column glossary ─────────────────────────────────────────────────── */
+
+.glossary {
+  margin-top: 16px;
+}
+
+.glossary dl {
+  margin: 12px 0 0;
+  display: grid;
+  gap: 10px;
+}
+
+.glossary dl > div {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.glossary dl > div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.glossary dt {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--floodlight);
+}
+
+.glossary dd {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--fade);
+}
+
+@media (max-width: 620px) {
+  .glossary dl > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
 }
 
 .teams-table td,
 .teams-table th {
   padding-right: 10px;
+}
+
+
+/* ── Player list actions ─────────────────────────────────────────────── */
+
+.player-actions {
+  margin-top: 14px;
+}
+
+.player-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.player-action-row .btn {
+  flex: 1 1 auto;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.btn.quiet.danger {
+  color: var(--flag-soft);
+  border-color: var(--flag);
+}
+
+.btn.quiet.danger:hover:not(:disabled) {
+  background: rgba(229, 72, 77, 0.12);
+}
+
+.action-note {
+  margin: 9px 0 0;
+  font-size: 13px;
+}
+
+.action-note.good {
+  color: var(--gain);
+}
+
+.action-note.bad {
+  color: var(--flag);
+}
+
+.player-dialog {
+  max-width: 460px;
+}
+
+.player-dialog h2 {
+  margin-bottom: 2px;
+}
+
+/* ── Gameweek settings on the optimiser page ─────────────────────────── */
+
+.run-settings {
+  margin-bottom: 16px;
+}
+
+.run-settings-grid {
+  display: grid;
+  grid-template-columns: 150px 150px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.run-settings .field {
+  margin-bottom: 0;
+}
+
+.saved-flash {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--gain);
+}
+
+.chip-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip-tile {
+  /* Five tiles fit one row on a desktop and wrap to two on a phone rather
+     than squeezing to illegible. */
+  flex: 1 1 84px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 4px 8px;
+  background: var(--turf-night);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--fade);
+  font-size: 11.5px;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+}
+
+.chip-tile svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chip-tile:hover:not(:disabled) {
+  color: var(--chalk);
+  border-color: var(--fade);
+}
+
+.chip-tile.is-on {
+  color: var(--floodlight);
+  border-color: var(--floodlight);
+  background: var(--tint-accent);
+  font-weight: 600;
+}
+
+.chip-tile:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (max-width: 860px) {
+  .run-settings-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .run-settings-grid .chips-field {
+    grid-column: span 2;
+  }
+}
+
+/* ── Ranked tables on a narrow screen ────────────────────────────────── */
+
+@media (max-width: 620px) {
+  .rank-table {
+    font-size: 13px;
+  }
+
+  /* Six columns in about 320px: trim the gaps rather than let the numbers
+     touch, and let the two longest text columns wrap instead of pushing the
+     table wider than its panel. */
+  .rank-table th,
+  .rank-table td {
+    padding-right: 8px;
+  }
+
+  .rank-table th.num,
+  .rank-table td.num {
+    padding-left: 9px;
+    padding-right: 0;
+  }
+
+  .rank-table td,
+  .rank-table th {
+    white-space: normal;
+  }
+
+  .rank-table .calc-name {
+    gap: 5px;
+  }
+
+  .fixtures-table th,
+  .fixtures-table td {
+    padding-right: 8px;
+  }
+}
+
+/* ── Starting squad prompt and builder ───────────────────────────────── */
+
+.start-prompt {
+  margin-bottom: 16px;
+  border-left: 2px solid var(--floodlight);
+}
+
+.start-prompt-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.start-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.start-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 14px;
+  background: var(--turf-night);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.start-option p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.start-option .field {
+  width: 100%;
+  margin: 4px 0 2px;
+}
+
+.start-option .btn {
+  margin-top: auto;
+}
+
+.builder-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+/* An empty slot is a shirt outline: same footprint as the filled one, so the
+   pitch doesn't reflow as it fills up. */
+.shirt.is-empty {
+  border-style: dashed;
+  border-color: var(--line);
+  background: transparent;
+  min-height: 78px;
+}
+
+.shirt.is-empty .band {
+  background: transparent;
+  color: var(--fade);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  height: 20px;
+}
+
+.shirt.is-empty .plus {
+  display: block;
+  font-size: 24px;
+  font-weight: 300;
+  line-height: 1;
+  padding: 10px 0 6px;
+  color: var(--fade);
+}
+
+.shirt.is-empty:hover {
+  border-color: var(--floodlight);
+}
+
+.shirt.is-empty:hover .plus,
+.shirt.is-empty:hover .band {
+  color: var(--floodlight);
+}
+
+.shirt.is-filled .band {
+  background: var(--panel-lift);
+  color: var(--chalk);
+}
+
+.shirt.is-filled .meta {
+  padding-top: 8px;
+}
+
+.slot-clear {
+  position: absolute;
+  top: 24px;
+  right: 3px;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--fade);
+  background: var(--panel);
+}
+
+.slot-clear:hover {
+  color: var(--flag);
+}
+
+.builder-foot {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+}
+
+.builder-foot .field,
+.builder-foot .toggle {
+  margin-bottom: 0;
+  border-bottom: 0;
+  padding: 0;
+}
+
+.builder-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* The picker list inside a dialog scrolls rather than floating over the page. */
+.picker-list.is-static {
+  position: static;
+  max-height: 46vh;
+  overflow-y: auto;
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .builder-foot {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .builder-actions .btn {
+    flex: 1;
+  }
+}
+
+/* ── "Where do I find this?" ─────────────────────────────────────────── */
+
+.id-help {
+  margin: -4px 0 12px;
+  font-size: 13px;
+  color: var(--fade);
+}
+
+.id-help summary {
+  cursor: pointer;
+  color: var(--crowd);
+  width: fit-content;
+}
+
+.id-help summary:hover {
+  text-decoration: underline;
+}
+
+.id-help ol {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.id-help li {
+  line-height: 1.45;
+}
+
+.id-help code {
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.id-help p.hint {
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+.id-help a {
+  color: var(--crowd);
+}
+
+/* ── Guided tour ─────────────────────────────────────────────────────── */
+
+.tour-overlay {
+  align-items: center;
+}
+
+.tour-card {
+  width: min(760px, 94vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.tour-art {
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: var(--panel-lift);
+  border-right: 1px solid var(--line);
+}
+
+.tour-art svg {
+  width: 100%;
+  height: auto;
+}
+
+.tour-body {
+  padding: 18px 20px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.tour-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.tour-count {
+  font-size: 12px;
+  color: var(--fade);
+  font-variant-numeric: tabular-nums;
+}
+
+.tour-body h2 {
+  font-size: 19px;
+  margin: 0 0 8px;
+}
+
+.tour-copy {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--fade);
+}
+
+.tour-copy p {
+  margin: 0 0 10px;
+}
+
+.tour-copy strong {
+  color: var(--chalk);
+  font-weight: 600;
+}
+
+.tour-copy ol {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  display: grid;
+  gap: 7px;
+}
+
+.tour-tip {
+  border-left: 2px solid var(--floodlight);
+  padding-left: 10px;
+  color: var(--chalk);
+}
+
+.tour-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+.tour-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.tour-dots button {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--line);
+  cursor: pointer;
+}
+
+.tour-dots button:hover {
+  background: var(--fade);
+}
+
+.tour-dots button.is-on {
+  background: var(--floodlight);
+  transform: scale(1.35);
+}
+
+.tour-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Illustration palette. Everything follows the theme, so the drawings sit in
+   the same world as the app rather than looking pasted in. */
+.tour-art .ink-line {
+  fill: none;
+  stroke: var(--fade);
+  stroke-width: 1.5;
+}
+
+.tour-art .ink-line.faint {
+  stroke: var(--line);
+}
+
+.tour-art .arrow {
+  stroke-linecap: round;
+}
+
+.tour-art .ink-num {
+  fill: var(--floodlight);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.tour-art .ink-cap {
+  fill: var(--fade);
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.tour-art .ink-turf {
+  fill: var(--turf-night);
+  stroke: var(--line);
+}
+
+.tour-art .ink-fill {
+  fill: var(--fade);
+}
+
+.tour-art .ink-line-fill {
+  fill: var(--line);
+}
+
+.tour-art .ink-fill-accent {
+  fill: var(--floodlight);
+}
+
+.tour-art .ink-fill-gain {
+  fill: var(--gain);
+}
+
+.tour-art .ink-fill-flag {
+  fill: var(--flag);
+}
+
+.tour-art .ink-fill-mid {
+  fill: var(--fade);
+}
+
+.tour-art .ink-panel {
+  fill: var(--panel);
+  stroke: var(--line);
+}
+
+.tour-art .ink-row {
+  fill: transparent;
+}
+
+.tour-art .ink-row-on {
+  fill: var(--tint-accent);
+}
+
+.tour-art .ink-tap {
+  fill: none;
+  stroke: var(--floodlight);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+
+.tour-art .ink-btn {
+  fill: var(--floodlight);
+}
+
+.tour-art .ink-btn-text {
+  fill: var(--on-accent);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.tour-art .ink-btn-text.small {
+  font-weight: 600;
+  font-size: 8px;
+}
+
+.tour-art .ink-out {
+  fill: none;
+  stroke: var(--flag);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tour-art .ink-in {
+  fill: none;
+  stroke: var(--gain);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tour-art .ink-tick {
+  fill: none;
+  stroke: var(--gain);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tour-art .ink-w-form {
+  fill: var(--w-form);
+}
+
+.tour-art .ink-w-history {
+  fill: var(--w-history);
+}
+
+.tour-art .ink-w-fixtures {
+  fill: var(--w-fixtures);
+}
+
+.tour-art .ink-handle {
+  fill: var(--panel);
+  stroke: var(--chalk);
+  stroke-width: 1.5;
+}
+
+@media (max-width: 680px) {
+  .tour-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tour-art {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 14px 24px;
+  }
+
+  .tour-art svg {
+    max-width: 300px;
+  }
+
+  .tour-actions .btn {
+    padding: 7px 14px;
+  }
+}
+
+.transfer-gain {
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+  color: var(--fade);
+}
+
+.transfer-gain strong {
+  color: var(--gain);
+  font-weight: 600;
+}
+
+/* ── Planner ─────────────────────────────────────────────────────────── */
+
+.plan-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.plan-controls .field {
+  margin-bottom: 0;
+  min-width: 180px;
+}
+
+.chip-plan {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.chip-plan-label {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fade);
+  margin-bottom: 8px;
+}
+
+.chip-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.chip-plan-week {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--fade);
+}
+
+.chip-plan-week select {
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  color: var(--chalk);
+  border-radius: var(--radius);
+  padding: 5px 6px;
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.plan-progress .plan-bar {
+  height: 6px;
+  background: var(--input-bg);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 10px 0;
+}
+
+.plan-bar span {
+  display: block;
+  height: 100%;
+  background: var(--floodlight);
+  transition: width 400ms ease;
+}
+
+/* The timeline: one row per player, one column per gameweek. */
+.plan-scroll {
+  overflow-x: auto;
+  margin-top: 12px;
+}
+
+.plan-grid {
+  display: grid;
+  min-width: 420px;
+  gap: 2px 3px;
+  align-items: stretch;
+}
+
+.plan-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  gap: 3px;
+}
+
+.plan-corner,
+.plan-col-head {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 2px 8px;
+  font-size: 11px;
+  color: var(--fade);
+  border-bottom: 1px solid var(--line);
+}
+
+.plan-col-head {
+  align-items: center;
+  text-align: center;
+}
+
+.plan-col-head strong {
+  color: var(--chalk);
+  font-size: 12.5px;
+}
+
+.plan-col-sub {
+  font-size: 10.5px;
+}
+
+.plan-chip {
+  background: var(--tint-accent);
+  color: var(--floodlight);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.plan-group {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fade);
+  padding: 10px 0 2px;
+}
+
+.plan-name {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding-right: 6px;
+  font-size: 12.5px;
+  color: var(--chalk);
+}
+
+.plan-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-team {
+  font-size: 10.5px;
+  color: var(--fade);
+}
+
+.plan-cell {
+  position: relative;
+  min-height: 26px;
+  border-radius: 3px;
+  display: grid;
+  place-items: center;
+}
+
+.plan-cell.is-out {
+  background: var(--input-bg);
+  opacity: 0.55;
+}
+
+.plan-cell.is-start {
+  background: var(--gain);
+}
+
+.plan-cell.is-bench {
+  background: var(--gain);
+  opacity: 0.34;
+}
+
+/* A left edge where someone arrives, a right edge where they're about to go. */
+.plan-cell.is-arriving {
+  border-left: 2px solid var(--floodlight);
+}
+
+.plan-cell.is-leaving {
+  border-right: 2px solid var(--flag);
+}
+
+.plan-captain {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--on-accent);
+}
+
+.plan-mark {
+  position: absolute;
+  font-size: 8px;
+  line-height: 1;
+}
+
+.plan-mark.in {
+  left: 2px;
+  top: 2px;
+  color: var(--floodlight);
+}
+
+.plan-mark.out {
+  right: 2px;
+  bottom: 2px;
+  color: var(--flag);
+}
+
+.plan-weeks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.plan-week {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.plan-week-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.plan-week ul {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.plan-week li {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+}
+
+.plan-week p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.dir-mark {
+  font-weight: 700;
+  width: 10px;
+}
+
+.dir-mark.in {
+  color: var(--gain);
+}
+
+.dir-mark.out {
+  color: var(--flag);
 }

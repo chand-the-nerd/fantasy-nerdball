@@ -1,9 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pitch } from "./Pitch";
+import { PlayerActions } from "./PlayerActions";
 import { RunConsole } from "./RunConsole";
+import { RunSettings } from "./RunSettings";
+import { SquadBuilder } from "./SquadBuilder";
+import { StartingSquadPrompt } from "./StartingSquadPrompt";
 import { ExploredTransfers, SquadCalculations } from "./SquadCalculations";
 import { api, ApiError } from "../lib/api";
-import type { GameweekInfo, Player, Run, Squad } from "../lib/types";
+import { useSettings } from "../lib/settingsStore";
+import { normalise } from "../lib/text";
+import type { GameweekInfo, Me, Player, Run, Squad } from "../lib/types";
+
+/**
+ * The squad to open on: the gameweek FPL is currently on, or the closest one
+ * behind it. Runs can be made for future gameweeks, and the newest squad in
+ * the list is often one of those — which isn't the side you're picking now.
+ */
+function forGameweek(squads: Squad[], gameweek: number | null): Squad | null {
+  if (squads.length === 0) return null;
+  if (gameweek === null) return squads[0];
+  const exact = squads.find((squad) => squad.gameweek === gameweek);
+  if (exact) return exact;
+  // squads arrive newest first, so the first one at or below is the closest.
+  return squads.find((squad) => squad.gameweek < gameweek) ?? squads[0];
+}
 
 function deadlineText(iso: string | null): string {
   if (!iso) return "";
@@ -53,6 +73,24 @@ function Scoreline({ squad }: { squad: Squad }) {
   );
 }
 
+/* Direction reads faster as an arrow than as a word, and the word was wider
+   than the column it sat in. Colour carries the same meaning, so the label
+   stays on for screen readers. */
+function TransferArrow({ direction }: { direction: "in" | "out" }) {
+  const up = direction === "in";
+  return (
+    <svg
+      className={`dir ${direction}`}
+      viewBox="0 0 16 16"
+      role="img"
+      aria-label={up ? "In" : "Out"}
+    >
+      <path d="M8 2.6v10.8" />
+      <path d={up ? "M3.6 7 8 2.6 12.4 7" : "M3.6 9 8 13.4 12.4 9"} />
+    </svg>
+  );
+}
+
 function TransferPanel({ squad }: { squad: Squad }) {
   const payload = squad.payload;
   const { in: incoming, out: outgoing } = payload.transfers;
@@ -75,24 +113,31 @@ function TransferPanel({ squad }: { squad: Squad }) {
       <ul className="transfer-list">
         {outgoing.map((name, i) => (
           <li key={`out-${i}`}>
-            <span className="dir out">OUT</span>
+            <TransferArrow direction="out" />
             <span>{name}</span>
           </li>
         ))}
         {incoming.map((name, i) => (
           <li key={`in-${i}`}>
-            <span className="dir in">IN</span>
+            <TransferArrow direction="in" />
             <span>{name}</span>
           </li>
         ))}
       </ul>
-      {payload.points_gain_per_gw != null && payload.points_gain_per_gw > 0 && (
-        <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
-          Worth about {payload.points_gain_per_gw.toFixed(1)} points a gameweek
+      {payload.points_gain_per_gw != null && payload.points_gain_per_gw > 0 ? (
+        <p className="transfer-gain">
+          Worth about <strong>{payload.points_gain_per_gw.toFixed(1)} points a
+          gameweek</strong> more than holding the squad
           {squad.penalty_points > 0
-            ? `, after the ${squad.penalty_points} point hit.`
+            ? `, before the ${squad.penalty_points} point hit.`
             : "."}
         </p>
+      ) : (
+        payload.transfer_reason && (
+          <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
+            {payload.transfer_reason}
+          </p>
+        )
       )}
     </div>
   );
@@ -125,8 +170,7 @@ function ModelXiPanel({ squad }: { squad: Squad }) {
         </div>
       </div>
       <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
-        What the model would pick with a free hand and the same budget. A small gap
-        means your transfer constraints aren't costing you much.
+        Your squad against the model's squad as if it had a Free Hit.
       </p>
     </div>
   );
@@ -177,6 +221,7 @@ function PlayerDetail({ player, onClose }: { player: Player; onClose: () => void
         </div>
       </div>
       {player.news && <div className="notice bad" style={{ marginTop: 14 }}>{player.news}</div>}
+      <PlayerActions name={player.name} position={player.position} />
       <button
         className="link-button"
         style={{ marginTop: 14 }}
@@ -189,7 +234,14 @@ function PlayerDetail({ player, onClose }: { player: Player; onClose: () => void
   );
 }
 
-export function SquadView() {
+export function SquadView({
+  me,
+  onMeChange,
+}: {
+  me: Me;
+  onMeChange: (me: Me) => void;
+}) {
+  const { settings } = useSettings();
   const [squad, setSquad] = useState<Squad | null>(null);
   const [history, setHistory] = useState<Squad[]>([]);
   const [run, setRun] = useState<Run | null>(null);
@@ -200,6 +252,8 @@ export function SquadView() {
   // Defaults to the gameweek FPL says is next; overridable for back-testing
   // or for planning ahead of the deadline.
   const [targetGw, setTargetGw] = useState<number | null>(null);
+  const [building, setBuilding] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   const busy = run?.status === "queued" || run?.status === "running";
 
@@ -214,7 +268,7 @@ export function SquadView() {
         ]);
         if (cancelled) return;
         setHistory(squads);
-        setSquad(squads[0] ?? null);
+        setSquad(forGameweek(squads, gw?.gameweek ?? null));
         setRun(latestRun);
         setInfo(gw);
         if (gw) setTargetGw(gw.gameweek);
@@ -248,6 +302,13 @@ export function SquadView() {
     return () => clearInterval(timer);
   }, [busy, run?.id]);
 
+  const reloadSquads = async () => {
+    const squads = await api.squads();
+    setHistory(squads);
+    setSquad(forGameweek(squads, info?.gameweek ?? null));
+    setBuilding(false);
+  };
+
   const optimise = async () => {
     setError("");
     try {
@@ -256,6 +317,21 @@ export function SquadView() {
       setError(err instanceof ApiError ? err.message : String(err));
     }
   };
+
+  // Forced picks are stored per position; the pitch only needs the names.
+  const forcedNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const list of Object.values(settings?.forced_selections ?? {})) {
+      for (const name of list ?? []) names.add(normalise(name));
+    }
+    return names;
+  }, [settings]);
+
+  // The gameweek before the one being planned for. Null until FPL answers,
+  // since guessing it would mean prompting for the wrong week.
+  const previousGw = info?.gameweek ? Math.max(0, info.gameweek - 1) || null : null;
+  const hasPrevious =
+    previousGw !== null && history.some((entry) => entry.gameweek === previousGw);
 
   const gameweekOptions = useMemo(
     () => history.map((s) => s.gameweek).sort((a, b) => b - a),
@@ -313,6 +389,29 @@ export function SquadView() {
 
       {error && <div className="notice bad">{error}</div>}
 
+      {/* The gameweek just gone is what a run transfers from, so a gap there
+          is worth resolving before anything else on the page. */}
+      {previousGw !== null && !hasPrevious && !building && !dismissed && (
+        <StartingSquadPrompt
+          gameweek={previousGw}
+          me={me}
+          onMeChange={onMeChange}
+          onImported={() => void reloadSquads()}
+          onBuild={() => setBuilding(true)}
+          onDismiss={() => setDismissed(true)}
+        />
+      )}
+
+      {building && previousGw !== null ? (
+        <SquadBuilder
+          gameweek={previousGw}
+          onSaved={() => void reloadSquads()}
+          onCancel={() => setBuilding(false)}
+        />
+      ) : (
+        <>
+      <RunSettings disabled={busy} />
+
       <div className="squad-layout">
         <div>
           {squad ? (
@@ -323,6 +422,7 @@ export function SquadView() {
                 bench={squad.payload.bench}
                 benchBoost={squad.chip === "Bench Boost"}
                 onSelect={setSelected}
+                forced={forcedNames}
               />
             </>
           ) : (
@@ -349,6 +449,8 @@ export function SquadView() {
       </div>
 
       {squad && <SquadCalculations squad={squad} />}
+        </>
+      )}
     </>
   );
 }

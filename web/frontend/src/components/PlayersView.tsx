@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PlayerActions, PlayerActionsDialog } from "./PlayerActions";
 import { PlayerPicker, type PoolPlayer, availability } from "./PlayerPicker";
 import { api, ApiError } from "../lib/api";
 
@@ -25,7 +26,13 @@ interface Ranked {
   status: string;
 }
 
-function RankTable({ rows }: { rows: Ranked[] }) {
+function RankTable({
+  rows,
+  onPick,
+}: {
+  rows: Ranked[];
+  onPick: (row: Ranked) => void;
+}) {
   if (rows.length === 0) {
     return <p className="muted">Nothing clears the filter here.</p>;
   }
@@ -51,7 +58,20 @@ function RankTable({ rows }: { rows: Ranked[] }) {
         {rows.map((row) => {
           const state = availability(row.status);
           return (
-            <tr key={row.id}>
+            <tr
+              key={row.id}
+              className="is-clickable"
+              tabIndex={0}
+              role="button"
+              title={`Force ${row.name} in, or add them to your avoid list`}
+              onClick={() => onPick(row)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onPick(row);
+                }
+              }}
+            >
               <td>
                 <span className="calc-name">
                   <span className={`dot tone-${state.tone}`} />
@@ -73,9 +93,18 @@ function RankTable({ rows }: { rows: Ranked[] }) {
   );
 }
 
+/** "(GW4–GW7)", so the window is stated rather than worked out. */
+function fixtureWindow(data: any): string {
+  const from = Number(data.gameweek);
+  const span = Number(data.look_ahead);
+  if (!from || !span || span < 2) return "";
+  return ` (GW${from}–GW${from + span - 1})`;
+}
+
 function Ranked({ mode }: { mode: "best" | "differentials" }) {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState("");
+  const [picked, setPicked] = useState<Ranked | null>(null);
 
   useEffect(() => {
     const call = mode === "best" ? api.bestPlayers() : api.differentialPlayers();
@@ -101,8 +130,10 @@ function Ranked({ mode }: { mode: "best" | "differentials" }) {
       <p className="muted">
         {mode === "best" ? (
           <>
-            Ranked by your own weights, over a {data.look_ahead}-gameweek
-            look-ahead, as of the gameweek {data.gameweek} run.
+            Ranked by your own weights, looking ahead from gameweek{" "}
+            {data.gameweek} over {data.look_ahead} gameweek
+            {data.look_ahead === 1 ? "" : "s"}
+            {fixtureWindow(data)}.
           </>
         ) : (
           <>
@@ -111,6 +142,16 @@ function Ranked({ mode }: { mode: "best" | "differentials" }) {
           </>
         )}
       </p>
+
+      {data.stale && (
+        <div className="notice">
+          These scores come from your gameweek {data.gameweek} run, so the
+          fixtures behind them start at gameweek {data.gameweek} rather than at
+          gameweek {data.current_gameweek}, which is the one you're picking for.
+          Run the optimiser for gameweek {data.current_gameweek} to rank on the
+          right window.
+        </div>
+      )}
 
       {mode === "differentials" && data.thin_positions?.length > 0 && (
         <div className="notice">
@@ -125,11 +166,25 @@ function Ranked({ mode }: { mode: "best" | "differentials" }) {
           <div className="panel col-half" key={position}>
             <h3>{POSITION_LABELS[position]}</h3>
             <div className="calc-scroll">
-              <RankTable rows={data.positions[position] ?? []} />
+              <RankTable
+                rows={data.positions[position] ?? []}
+                onPick={setPicked}
+              />
             </div>
           </div>
         ))}
       </div>
+
+      {picked && (
+        <PlayerActionsDialog
+          name={picked.name}
+          position={picked.position}
+          subtitle={`${picked.position} · ${picked.team} · £${picked.price?.toFixed(
+            1,
+          )}m · score ${picked.score?.toFixed(2) ?? "—"}`}
+          onClose={() => setPicked(null)}
+        />
+      )}
     </>
   );
 }
@@ -183,6 +238,9 @@ function Lookup() {
           onChange={(names) => setSelected(names.slice(-1))}
           placeholder="Search any player"
         />
+        {detail && (
+          <PlayerActions name={detail.name} position={detail.position} />
+        )}
       </div>
 
       {error && <div className="notice bad">{error}</div>}
@@ -247,7 +305,7 @@ function Lookup() {
             {detail.fixtures.length === 0 ? (
               <p className="muted">No upcoming fixtures listed.</p>
             ) : (
-              <table className="calc-table">
+              <table className="calc-table fixtures-table">
                 <thead>
                   <tr>
                     <th>GW</th>
@@ -301,7 +359,7 @@ export function PlayersView() {
       <div className="topbar">
         <div>
           <h1>Players</h1>
-          <span className="when">Who the model rates, and why</span>
+          <span className="when">The model's player database. Click a player to add or remove them from your squad.</span>
         </div>
         <div className="segmented">
           {(

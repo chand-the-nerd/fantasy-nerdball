@@ -11,13 +11,31 @@ function readableOn(hex: string): string {
   return luminance > 0.6 ? "#14110a" : "#ffffff";
 }
 
+/* Small enough to sit in the name band without pushing the name out: a solid
+   body reads at 10px where an outlined one turns to mush. */
+function LockIcon() {
+  return (
+    <svg className="lock-mark" viewBox="0 0 12 14" aria-hidden="true">
+      <path
+        d="M3.4 6.2V4.3a2.6 2.6 0 0 1 5.2 0v1.9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <rect x="1.5" y="6.2" width="9" height="6.8" rx="1.4" fill="currentColor" />
+    </svg>
+  );
+}
+
 interface Props {
   player: Player;
   delay?: number;
   onSelect?: (player: Player) => void;
+  /** Whether this name is on the forced-picks list. */
+  forced?: boolean;
 }
 
-export function PlayerShirt({ player, delay = 0, onSelect }: Props) {
+export function PlayerShirt({ player, delay = 0, onSelect, forced = false }: Props) {
   const colours = clubColours(player.team);
   const doubtful = player.status !== "a" && player.status !== "";
   const abbr = clubAbbr(player.team, player.team_short);
@@ -30,6 +48,7 @@ export function PlayerShirt({ player, delay = 0, onSelect }: Props) {
 
   const title = [
     `${player.name} · ${player.team} · ${player.position}`,
+    forced ? "Forced pick — the optimiser has to include them" : "",
     `£${player.price.toFixed(1)}m · ${player.projected_points.toFixed(1)} projected`,
     player.form !== null ? `form ${player.form}` : "",
     player.start_rate !== null ? `starts ${player.start_rate}%` : "",
@@ -42,6 +61,7 @@ export function PlayerShirt({ player, delay = 0, onSelect }: Props) {
   const className = [
     "shirt",
     player.is_captain ? "is-captain" : "",
+    forced ? "is-forced" : "",
     doubtful ? "is-doubtful" : "",
   ]
     .filter(Boolean)
@@ -61,6 +81,7 @@ export function PlayerShirt({ player, delay = 0, onSelect }: Props) {
         className="band"
         style={{ background: colours.band, color: readableOn(colours.band) }}
       >
+        {forced && <LockIcon />}
         <span className="name">{player.name}</span>
         {player.is_double_gameweek && <span className="dgw-mark">••</span>}
       </span>

@@ -19,7 +19,18 @@ from .config import settings
 from .db import get_session, init_db
 from .engine import jobs
 from .models import User
-from .routers import admin, auth, cron, me, performance, players, runs, squads, teams
+from .routers import (
+    admin,
+    auth,
+    cron,
+    me,
+    performance,
+    plans,
+    players,
+    runs,
+    squads,
+    teams,
+)
 from .services import fpl
 
 # The optimiser imports matplotlib for its performance plots. Without a
@@ -66,6 +77,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(me.router)
 app.include_router(runs.router)
+app.include_router(plans.router)
 app.include_router(squads.router)
 app.include_router(players.router)
 app.include_router(teams.router)
@@ -117,7 +129,7 @@ def health() -> dict:
         # Railway sets this to the deployed commit. Lets you confirm which
         # build is actually live rather than inferring it from behaviour.
         "commit": os.getenv("RAILWAY_GIT_COMMIT_SHA", "unknown")[:8],
-        "admin_configured": settings.admin_configured,
+        "admin_emails": len(settings.admin_emails) + bool(settings.owner_email),
         # If this says sqlite, no Postgres is attached. Data still persists
         # (the file is on the volume), but Postgres is the intended setup.
         "database": settings.database_backend,

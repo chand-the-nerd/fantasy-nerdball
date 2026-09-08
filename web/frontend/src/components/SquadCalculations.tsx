@@ -109,9 +109,9 @@ export function SquadCalculations({ squad }: { squad: Squad }) {
 
   return (
     <div className="panel calc-panel">
-      <h3>How each pick was scored</h3>
+      <h3>Calculations</h3>
       <p className="muted" style={{ marginTop: -6 }}>
-        The inputs behind every projection. Hover a heading for what it means;
+        The inputs behind every prediction;
         click to sort.
       </p>
 

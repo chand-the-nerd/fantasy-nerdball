@@ -66,8 +66,8 @@ def _build() -> dict:
     return {"season": fpl.settings.current_season, "players": players}
 
 
-@router.get("")
-def list_players(refresh: bool = False, user: User = Depends(current_user)) -> dict:
+def pool(refresh: bool = False) -> dict:
+    """The cached player pool. Never raises: an empty list beats a 500."""
     with _lock:
         cached = _cache.get("data")
         fetched = _cache.get("at")
@@ -89,6 +89,11 @@ def list_players(refresh: bool = False, user: User = Depends(current_user)) -> d
     return built
 
 
+@router.get("")
+def list_players(refresh: bool = False, user: User = Depends(current_user)) -> dict:
+    return pool(refresh)
+
+
 def _ranked(rows: list[dict], limit: int, max_ownership: float | None) -> dict:
     """Top N per position, optionally filtered to low-owned players."""
     out: dict[str, list[dict]] = {}
@@ -104,6 +109,13 @@ def _ranked(rows: list[dict], limit: int, max_ownership: float | None) -> dict:
         pool.sort(key=lambda r: (r.get("score") or 0), reverse=True)
         out[position] = pool[:limit]
     return out
+
+
+def _current_gameweek() -> int | None:
+    try:
+        return fpl.current_gameweek()
+    except Exception:
+        return None
 
 
 def _load_scores(session: Session, user: User) -> PlayerScores | None:
@@ -130,9 +142,14 @@ def best_players(
                       "player is the slow part of a run, so this reuses what "
                       "the run already worked out rather than doing it twice.",
         }
+    current = _current_gameweek()
     return {
         "available": True,
         "gameweek": cache.gameweek,
+        "current_gameweek": current,
+        # The scores look ahead from the gameweek they were produced for, so
+        # one produced for a different gameweek is ranking the wrong fixtures.
+        "stale": current is not None and cache.gameweek != current,
         "look_ahead": cache.look_ahead,
         "computed_at": cache.created_at,
         "positions": _ranked(cache.players or [], limit, None),
@@ -153,9 +170,13 @@ def differential_players(
 
     ranked = _ranked(cache.players or [], limit, max_ownership)
     empty = [pos for pos, rows in ranked.items() if not rows]
+    current = _current_gameweek()
     return {
         "available": True,
         "gameweek": cache.gameweek,
+        "current_gameweek": current,
+        "stale": current is not None and cache.gameweek != current,
+        "look_ahead": cache.look_ahead,
         "max_ownership": max_ownership,
         "positions": ranked,
         "thin_positions": empty,

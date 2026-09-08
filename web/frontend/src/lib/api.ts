@@ -60,6 +60,44 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  forcePlayer: (name: string, position?: string) =>
+    request<Settings>("/api/me/lists/force", {
+      method: "POST",
+      body: JSON.stringify({ name, position: position ?? null }),
+    }),
+  unforcePlayer: (name: string) =>
+    request<Settings>("/api/me/lists/unforce", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+  blacklistPlayer: (name: string) =>
+    request<Settings>("/api/me/lists/blacklist", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+  unblacklistPlayer: (name: string) =>
+    request<Settings>("/api/me/lists/unblacklist", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
+  startPlan: (body: { weeks: number; chips: Record<string, string> }) =>
+    request<any>("/api/plans", { method: "POST", body: JSON.stringify(body) }),
+  plan: (id: number) => request<any>(`/api/plans/${id}`),
+  latestPlan: () => request<any>("/api/plans/latest"),
+
+  manualSquad: (body: {
+    gameweek?: number;
+    player_ids: number[];
+    starting_ids: number[];
+    bank: number;
+    apply_budget: boolean;
+  }) =>
+    request<any>("/api/me/manual-squad", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
   linkEntry: (fpl_entry_id: number | null) =>
     request<Me>("/api/me/fpl-entry", {
       method: "POST",
@@ -98,15 +136,9 @@ export const api = {
   league: () => request<League>("/api/performance/league"),
 
   adminStatus: () =>
-    request<{ configured: boolean; unlocked: boolean; session_minutes: number }>(
+    request<{ admin: boolean; email: string; owner_email: string }>(
       "/api/admin/status",
     ),
-  adminUnlock: (password: string) =>
-    request<{ unlocked: boolean }>("/api/admin/unlock", {
-      method: "POST",
-      body: JSON.stringify({ password }),
-    }),
-  adminLock: () => request<{ unlocked: boolean }>("/api/admin/lock", { method: "POST" }),
   adminMembers: () => request<any>("/api/admin/members"),
   adminAddInvite: (email: string) =>
     request<{ email: string }>("/api/admin/invites", {

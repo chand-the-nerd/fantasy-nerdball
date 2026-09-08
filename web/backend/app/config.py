@@ -78,11 +78,11 @@ class Settings:
         ).lower() in {"1", "true", "yes"}
         self.history_check_minutes = int(os.getenv("HISTORY_CHECK_MINUTES", "60"))
 
-        # Gates the admin page. Unset means the admin page stays locked for
-        # everyone, which is a safer default than leaving it open.
-        self.admin_password = os.getenv("ADMIN_PASSWORD", "")
-        # How long an unlock lasts before the password is asked for again.
-        self.admin_session_minutes = int(os.getenv("ADMIN_SESSION_MINUTES", "30"))
+        # The admin page belongs to accounts, not to a password. The owner is
+        # the first address in ALLOWED_EMAILS; ADMIN_EMAILS names any others.
+        # Both are re-applied on every sign-in, so adding an address here and
+        # signing in again is all it takes to grant or keep admin rights.
+        self.admin_emails = _csv_env("ADMIN_EMAILS")
 
         # A single optimisation run is CPU-bound and chdir-based, so runs
         # are serialised. This only caps how many can queue up.
@@ -112,8 +112,15 @@ class Settings:
         return "postgres"
 
     @property
-    def admin_configured(self) -> bool:
-        return bool(self.admin_password)
+    def owner_email(self) -> str:
+        """The first allowed address. Always an admin."""
+        return self.allowed_emails[0] if self.allowed_emails else ""
+
+    def is_admin_email(self, email: str) -> bool:
+        email = (email or "").lower().strip()
+        if not email:
+            return False
+        return email == self.owner_email or email in self.admin_emails
 
     @property
     def google_configured(self) -> bool:

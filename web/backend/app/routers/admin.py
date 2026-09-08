@@ -1,31 +1,23 @@
 """The admin area: who can sign in, and who currently has a seat.
 
-Gated by ADMIN_PASSWORD rather than by which account you signed in with, so
-it can be handed to whoever is looking after the deployment without changing
-anyone's account.
+Gated by which Google account you signed in with. The owner address (the
+first entry in ALLOWED_EMAILS) and anything in ADMIN_EMAILS get in; everyone
+else gets a 403. There is no separate password.
 """
 
 from __future__ import annotations
 
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
-from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..auth import (
-    UNLOCK_KEY,
-    admin_unlocked,
-    check_admin_password,
-    current_admin,
-    current_user,
-    seat_count,
-)
+from ..auth import current_admin, current_user, seat_count
 from ..config import settings
 from ..db import get_session
-from ..models import Invite, User, utcnow
+from ..models import Invite, User
 from ..schemas import InviteIn
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -33,33 +25,14 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-class UnlockIn(BaseModel):
-    password: str
-
-
 @router.get("/status")
-def admin_status(request: Request, user: User = Depends(current_user)) -> dict:
-    """Lets the footer button know whether to show a prompt or the page."""
+def admin_status(user: User = Depends(current_user)) -> dict:
+    """Lets the footer know whether to offer the admin page at all."""
     return {
-        "configured": settings.admin_configured,
-        "unlocked": admin_unlocked(request),
-        "session_minutes": settings.admin_session_minutes,
+        "admin": user.is_admin,
+        "email": user.email,
+        "owner_email": settings.owner_email,
     }
-
-
-@router.post("/unlock")
-def unlock(
-    payload: UnlockIn, request: Request, user: User = Depends(current_user)
-) -> dict:
-    check_admin_password(user.id, payload.password)
-    request.session[UNLOCK_KEY] = utcnow().isoformat()
-    return {"unlocked": True, "session_minutes": settings.admin_session_minutes}
-
-
-@router.post("/lock")
-def lock(request: Request, user: User = Depends(current_user)) -> dict:
-    request.session.pop(UNLOCK_KEY, None)
-    return {"unlocked": False}
 
 
 @router.get("/members")

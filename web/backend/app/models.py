@@ -14,6 +14,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    false,
     UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -77,9 +78,28 @@ class UserSettings(Base):
     exclude_unavailable: Mapped[bool] = mapped_column(Boolean, default=True)
 
     wildcard: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Playing a Free Hit this week. Unlimited transfers like a Wildcard, but
+    # the side reverts afterwards, so only this gameweek is worth planning for.
+    free_hit: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
+    # Having played one last week, which is a different thing: the squad the
+    # optimiser should transfer from is the one from two gameweeks ago.
     free_hit_prev_gw: Mapped[bool] = mapped_column(Boolean, default=False)
     bench_boost: Mapped[bool] = mapped_column(Boolean, default=False)
     triple_captain: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Set once the guided tour has been finished or skipped, so it opens by
+    # itself exactly once and never again unless asked for.
+    tutorial_seen: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
+
+    # Which palette the app renders in. A display preference rather than an
+    # engine one, but it belongs to the manager, so it lives with the rest.
+    theme: Mapped[str] = mapped_column(
+        String(16), default="legacy", server_default="legacy"
+    )
 
     use_ml_weights: Mapped[bool] = mapped_column(Boolean, default=False)
     first_n_gameweeks: Mapped[int] = mapped_column(Integer, default=1)
@@ -149,6 +169,40 @@ class Run(Base):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     started_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Plan(Base):
+    """A multi-gameweek plan: the optimiser run forward, week after week.
+
+    Kept apart from Run and Squad on purpose. A plan is speculative — it
+    assumes today's prices and today's form hold for two months — so it must
+    never be mistaken for the squad you actually have.
+    """
+
+    __tablename__ = "plans"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    season: Mapped[str] = mapped_column(String(9))
+    start_gameweek: Mapped[int] = mapped_column(Integer)
+    weeks: Mapped[int] = mapped_column(Integer)
+    # {"7": "wildcard"} — which chip is meant to be played in which gameweek.
+    chips: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    status: Mapped[str] = mapped_column(String(16), default="queued")
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    log: Mapped[str] = mapped_column(Text, default="")
+    error: Mapped[str] = mapped_column(Text, default="")
+    # One entry per planned gameweek.
+    payload: Mapped[list] = mapped_column(JSON, default=list)
+
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=utcnow)
+    started_at: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime, nullable=True)
+
+    user: Mapped["User"] = relationship()
 
 
 class PlayerScores(Base):

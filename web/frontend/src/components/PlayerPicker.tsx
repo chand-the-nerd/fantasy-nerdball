@@ -165,23 +165,27 @@ export function PlayerPicker({
         </div>
       )}
 
-      <input
-        id={inputId}
-        type="text"
-        role="combobox"
-        aria-expanded={open && matches.length > 0}
-        aria-autocomplete="list"
-        autoComplete="off"
-        value={query}
-        disabled={full}
-        placeholder={full ? `Limit of ${limit} reached` : placeholder}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={onKeyDown}
-      />
+      {/* At the limit the box can't do anything, so it goes rather than
+          sitting there greyed out explaining itself. Removing a chip brings
+          it straight back. */}
+      {!full && (
+        <input
+          id={inputId}
+          type="text"
+          role="combobox"
+          aria-expanded={open && matches.length > 0}
+          aria-autocomplete="list"
+          autoComplete="off"
+          value={query}
+          placeholder={placeholder}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={onKeyDown}
+        />
+      )}
 
       {open && matches.length > 0 && (
         <ul className="picker-list" role="listbox">

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { FplIdHelp } from "./FplIdHelp";
 import { api, ApiError } from "../lib/api";
 import type { Me } from "../lib/types";
 
@@ -148,6 +149,7 @@ export function FplTeamPanel({
             /event/.
           </span>
         </div>
+        <FplIdHelp />
         <div className="panel-foot">
           <button
             className="btn small"

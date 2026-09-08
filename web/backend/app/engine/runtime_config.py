@@ -88,12 +88,19 @@ def build_config(
         RunConfig.FREE_TRANSFERS = int(settings_row.free_transfers)
         RunConfig.ACCEPT_TRANSFER_PENALTY = bool(settings_row.accept_transfer_penalty)
         RunConfig.EXCLUDE_UNAVAILABLE = bool(settings_row.exclude_unavailable)
-        RunConfig.WILDCARD = bool(settings_row.wildcard)
+        # A Free Hit is a Wildcard for one week only: transfers are free and
+        # unlimited, but the squad reverts afterwards, so planning beyond this
+        # gameweek would be planning for a side you won't have.
+        free_hit = bool(getattr(settings_row, "free_hit", False))
+        RunConfig.FREE_HIT = free_hit
+        RunConfig.WILDCARD = bool(settings_row.wildcard) or free_hit
         RunConfig.FREE_HIT_PREV_GW = bool(settings_row.free_hit_prev_gw)
         RunConfig.BENCH_BOOST = bool(settings_row.bench_boost)
         RunConfig.TRIPLE_CAPTAIN = bool(settings_row.triple_captain)
         RunConfig.USE_ML_WEIGHTS = bool(settings_row.use_ml_weights)
-        RunConfig.FIRST_N_GAMEWEEKS = int(settings_row.first_n_gameweeks)
+        RunConfig.FIRST_N_GAMEWEEKS = (
+            1 if free_hit else int(settings_row.first_n_gameweeks)
+        )
         RunConfig.MIN_TRANSFER_VALUE = float(settings_row.min_transfer_value)
         RunConfig.TRANSFER_HORIZON_GWS = int(settings_row.transfer_horizon_gws)
 

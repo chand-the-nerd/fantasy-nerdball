@@ -18,12 +18,120 @@ from sqlalchemy import select
 
 from ..config import settings
 from ..db import session_scope
-from ..models import PlayerScores, Run, Squad, User, utcnow
+from ..models import Plan, PlayerScores, Run, Squad, User, utcnow
+from ..services import fpl
 from .pipeline import run_optimisation
+from .planner import run_plan
 
-_queue: "queue.Queue[int]" = queue.Queue()
+# Items are (kind, id): single runs and multi-week plans share one worker, so
+# they can't fight over the engine's working directory.
+_queue: "queue.Queue[tuple[str, int]]" = queue.Queue()
 _worker: threading.Thread | None = None
 _worker_lock = threading.Lock()
+
+
+def _should_store_scores(cache: PlayerScores | None, gameweek: int) -> bool:
+    """Whether this run's scored pool should become the Players tab's data.
+
+    Runs for the gameweek being played always do. A run for a future gameweek
+    only does so when there is nothing better to show, or when what is stored
+    is older still — otherwise planning three weeks ahead would quietly
+    replace the rankings for the week whose deadline is next.
+    """
+    if cache is None:
+        return True
+    try:
+        current = fpl.current_gameweek()
+    except Exception:
+        # No way to tell which of the two is the live one; the newer run is
+        # the better guess, which is what this did before.
+        return True
+    if gameweek == current:
+        return True
+    if cache.gameweek == current:
+        return False
+    # Neither is the live gameweek: prefer whichever is closer to it.
+    return abs(gameweek - current) < abs(cache.gameweek - current)
+
+
+# ── Plans ────────────────────────────────────────────────────────────────
+
+
+def append_plan_log(plan_id: int, line: str) -> None:
+    with session_scope() as session:
+        plan = session.get(Plan, plan_id)
+        if plan is None:
+            return
+        existing = (plan.log or "").splitlines()[-200:]
+        existing.append(line)
+        plan.log = "\n".join(existing)
+
+
+def _execute_plan(plan_id: int) -> None:
+    with session_scope() as session:
+        plan = session.get(Plan, plan_id)
+        if plan is None or plan.status != "queued":
+            return
+        user = session.get(User, plan.user_id)
+        if user is None:
+            return
+        plan.status = "running"
+        plan.started_at = utcnow()
+
+        squads = session.scalars(
+            select(Squad).where(Squad.user_id == user.id, Squad.season == plan.season)
+        ).all()
+        context = {
+            "user_id": user.id,
+            "season": plan.season,
+            "start_gameweek": plan.start_gameweek,
+            "weeks": plan.weeks,
+            "chips": {int(gw): chip for gw, chip in (plan.chips or {}).items()},
+            "settings_row": user.settings,
+            "previous_squads": {s.gameweek: (s.engine_rows or []) for s in squads},
+        }
+
+    stream = _LogStream(plan_id)
+
+    def store_week(done: int, _week: dict) -> None:
+        with session_scope() as session:
+            row = session.get(Plan, plan_id)
+            if row is not None:
+                row.progress = done
+
+    try:
+        with redirect_stdout(stream):
+            weeks = run_plan(
+                user_id=context["user_id"],
+                season=context["season"],
+                start_gameweek=context["start_gameweek"],
+                weeks=context["weeks"],
+                chips=context["chips"],
+                settings_row=context["settings_row"],
+                previous_squads=context["previous_squads"],
+                on_progress=lambda msg: append_plan_log(plan_id, msg),
+                on_week=store_week,
+            )
+        stream.flush()
+    except Exception as error:
+        stream.flush()
+        append_plan_log(plan_id, "That didn't work out. Details below.")
+        with session_scope() as session:
+            row = session.get(Plan, plan_id)
+            if row is not None:
+                row.status = "failed"
+                row.error = f"{type(error).__name__}: {error}\n\n{stream.tail()}".strip()
+                row.finished_at = utcnow()
+        traceback.print_exc()
+        return
+
+    with session_scope() as session:
+        row = session.get(Plan, plan_id)
+        if row is not None:
+            row.payload = weeks
+            row.progress = len(weeks)
+            row.status = "complete"
+            row.finished_at = utcnow()
 
 
 class _LogStream(io.TextIOBase):
@@ -73,17 +181,26 @@ def append_log(run_id: int, line: str) -> None:
 
 
 def enqueue(run_id: int) -> None:
+    _enqueue(("run", run_id))
+
+
+def enqueue_plan(plan_id: int) -> None:
+    _enqueue(("plan", plan_id))
+
+
+def _enqueue(item: tuple[str, int]) -> None:
     if _queue.qsize() >= settings.max_queued_runs:
         raise RuntimeError("The optimiser queue is full. Try again in a few minutes.")
-    _queue.put(run_id)
+    _queue.put(item)
     start_worker()
 
 
-def queue_position(run_id: int) -> int:
+def queue_position(run_id: int, kind: str = "run") -> int:
     """0 means running or next up."""
     with _queue.mutex:
         pending = list(_queue.queue)
-    return pending.index(run_id) if run_id in pending else 0
+    item = (kind, run_id)
+    return pending.index(item) if item in pending else 0
 
 
 def start_worker() -> None:
@@ -97,9 +214,12 @@ def start_worker() -> None:
 
 def _loop() -> None:
     while True:
-        run_id = _queue.get()
+        kind, item_id = _queue.get()
         try:
-            _execute(run_id)
+            if kind == "plan":
+                _execute_plan(item_id)
+            else:
+                _execute(item_id)
         except Exception:  # a worker that dies takes the queue with it
             traceback.print_exc()
         finally:
@@ -204,6 +324,11 @@ def _store_result(run_id: int, context: dict[str, Any], result: dict) -> None:
 
         # The scored pool feeds the Players tab. Stored per season and
         # replaced each run, so it always reflects the current settings.
+        #
+        # A run for a future gameweek does not replace it. Those scores look
+        # ahead from the gameweek that was run, so a plan for gameweek 5 would
+        # have the rankings skipping over the fixtures you are actually
+        # picking for this week.
         scored = result.get("scored_players") or []
         if scored:
             cache = session.scalar(
@@ -212,15 +337,16 @@ def _store_result(run_id: int, context: dict[str, Any], result: dict) -> None:
                     PlayerScores.season == context["season"],
                 )
             )
-            if cache is None:
-                cache = PlayerScores(
-                    user_id=context["user_id"], season=context["season"]
-                )
-                session.add(cache)
-            cache.gameweek = context["gameweek"]
-            cache.look_ahead = int(result.get("look_ahead") or 1)
-            cache.players = scored
-            cache.created_at = utcnow()
+            if _should_store_scores(cache, context["gameweek"]):
+                if cache is None:
+                    cache = PlayerScores(
+                        user_id=context["user_id"], season=context["season"]
+                    )
+                    session.add(cache)
+                cache.gameweek = context["gameweek"]
+                cache.look_ahead = int(result.get("look_ahead") or 1)
+                cache.players = scored
+                cache.created_at = utcnow()
 
         run.status = "complete"
         run.squad_id = squad.id

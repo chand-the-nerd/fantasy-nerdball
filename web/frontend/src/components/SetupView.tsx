@@ -5,6 +5,7 @@ import { WeightBar, type Weights } from "./WeightBar";
 import { FplTeamPanel } from "./FplTeamPanel";
 import { checkConstraints } from "./constraints";
 import { api, ApiError } from "../lib/api";
+import { publishSettings } from "../lib/settingsStore";
 import type { Me, Reference, Settings } from "../lib/types";
 
 const POSITIONS = ["GK", "DEF", "MID", "FWD"];
@@ -75,7 +76,13 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
   }, []);
 
   const reloadSettings = () => {
-    api.settings().then(setSettings).catch(() => undefined);
+    api
+      .settings()
+      .then((fresh) => {
+        setSettings(fresh);
+        publishSettings(fresh);
+      })
+      .catch(() => undefined);
   };
 
   const patch = (changes: Partial<Settings>) =>
@@ -129,7 +136,9 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
     setError("");
     setStatus("");
     try {
-      setSettings(await api.saveSettings(settings));
+      const saved = await api.saveSettings(settings);
+      setSettings(saved);
+      publishSettings(saved);
       setStatus("Settings saved. They apply on your next run.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
@@ -175,82 +184,6 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
       )}
 
       <Section
-        title="Gameweek"
-        blurb="What's true of your squad right now. Worth checking every week."
-      >
-        <div className="panel col-half">
-          <h3>This gameweek</h3>
-          <div className="grid-2">
-            <div className="field">
-              <label htmlFor="budget">Budget</label>
-              <input
-                id="budget"
-                type="number"
-                step="0.1"
-                value={settings.budget}
-                onChange={(e) => patch({ budget: Number(e.target.value) })}
-              />
-              <span className="hint">Squad value plus whatever's in the bank.</span>
-            </div>
-            <div className="field">
-              <label htmlFor="fts">Free transfers</label>
-              <input
-                id="fts"
-                type="number"
-                min={0}
-                max={15}
-                value={settings.free_transfers}
-                onChange={(e) => patch({ free_transfers: Number(e.target.value) })}
-              />
-            </div>
-          </div>
-          <Toggle
-            checked={settings.accept_transfer_penalty}
-            onChange={(v) => patch({ accept_transfer_penalty: v })}
-            title="Consider taking a hit"
-            hint="Lets the model spend 4 points on an extra transfer when the gain covers it."
-          />
-          <Toggle
-            checked={settings.exclude_unavailable}
-            onChange={(v) => patch({ exclude_unavailable: v })}
-            title="Skip injured and suspended players"
-            hint="Turn off to see what the model would do if everyone were fit."
-          />
-        </div>
-
-        <div className="panel col-half">
-          <h3>Chips</h3>
-          <p className="muted" style={{ marginTop: -6 }}>
-            One at a time, and turn it off again after the deadline.
-          </p>
-          <Toggle
-            checked={settings.wildcard}
-            onChange={(v) => patch({ wildcard: v, bench_boost: false, triple_captain: false })}
-            title="Wildcard"
-            hint="Removes the transfer limit and rebuilds the squad from scratch."
-          />
-          <Toggle
-            checked={settings.bench_boost}
-            onChange={(v) => patch({ bench_boost: v, wildcard: false, triple_captain: false })}
-            title="Bench Boost"
-            hint="All fifteen players score, so the bench is optimised properly."
-          />
-          <Toggle
-            checked={settings.triple_captain}
-            onChange={(v) => patch({ triple_captain: v, wildcard: false, bench_boost: false })}
-            title="Triple Captain"
-            hint="Your captain returns three times their points."
-          />
-          <Toggle
-            checked={settings.free_hit_prev_gw}
-            onChange={(v) => patch({ free_hit_prev_gw: v })}
-            title="Free Hit last week"
-            hint="Loads the squad from two gameweeks ago, since the Free Hit side has reverted."
-          />
-        </div>
-      </Section>
-
-      <Section
         title="Model tuning"
         blurb="How the optimiser decides. Set these once and leave them unless something isn't working."
       >
@@ -268,7 +201,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
                 onChange={(e) => patch({ first_n_gameweeks: Number(e.target.value) })}
               />
               <span className="hint">
-                How far fixture difficulty looks. Raise it for wildcard planning.
+                How many fixtures the optimiser looks ahead for.
               </span>
             </div>
             <div className="field">
@@ -281,7 +214,8 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
                 onChange={(e) => patch({ min_transfer_value: Number(e.target.value) })}
               />
               <span className="hint">
-                Improvement a transfer must clear before it's worth making.
+                How many points each future gameweek must improve by before a transfer is recommended. 
+                Setting to zero is the ultimate knee-jerk setting. Setting to 5 is highly conservative.
               </span>
             </div>
           </div>
@@ -295,16 +229,26 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
               value={settings.transfer_horizon_gws}
               onChange={(e) => patch({ transfer_horizon_gws: Number(e.target.value) })}
             />
-            <span className="hint">A hit is a one-off cost spread across this many weeks.</span>
+            <span className="hint">When taking a -4 hit, how many gameweeks to ammortise the -4 cost against.</span>
           </div>
+          <Toggle
+            checked={settings.accept_transfer_penalty}
+            onChange={(v) => patch({ accept_transfer_penalty: v })}
+            title="Consider taking a hit"
+            hint="Lets the model spend 4 points on an extra transfer when the gain covers it."
+          />
+          <Toggle
+            checked={settings.exclude_unavailable}
+            onChange={(v) => patch({ exclude_unavailable: v })}
+            title="Skip injured and suspended players"
+            hint="Turn off to see what the model would do if everyone were fit."
+          />
         </div>
 
         <div className="panel col-half">
           <h3>Model weighting</h3>
           <p className="muted" style={{ marginTop: -6 }}>
-            Drag the handles to divide each position's score between recent form,
-            historic points per game and upcoming fixture difficulty. The three
-            always total 100%.
+            How to prioritise form, points from previous seasons, and upcoming fixture difficulty.
           </p>
           {settings.use_ml_weights && (
             <div className="notice" style={{ margin: "14px 0 0" }}>
@@ -333,7 +277,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
         <div className="panel col-half">
           <h3>Forced picks</h3>
           <p className="muted" style={{ marginTop: -6 }}>
-            Players the squad is always built around.
+            Any players you must have? Add them here. I'll build the squad around them.
           </p>
           {POSITIONS.map((position) => {
             const limit = reference?.squad_limits?.[position] ?? 5;
@@ -362,7 +306,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
         <div className="panel col-half">
           <h3>Players to avoid</h3>
           <p className="muted" style={{ marginTop: -6 }}>
-            Removed from the pool entirely, whatever the numbers say.
+            Players to omit from your squad, no matter how much the model likes them.
           </p>
           <div className="field">
             <PlayerPicker
@@ -397,7 +341,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
         </div>
       </Section>
 
-      <Section title="Users" blurb="Your FPL side. Access is managed from the admin page.">
+      <Section title="User" blurb="Link your FPL side (recommended).">
         <FplTeamPanel
           me={me}
           onMeChange={onMeChange}

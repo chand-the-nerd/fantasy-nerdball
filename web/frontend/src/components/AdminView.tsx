@@ -30,57 +30,29 @@ interface Members {
 }
 
 export function AdminView({ onClose }: { onClose: () => void }) {
-  const [configured, setConfigured] = useState<boolean | null>(null);
-  const [unlocked, setUnlocked] = useState(false);
-  const [password, setPassword] = useState("");
+  const [denied, setDenied] = useState("");
   const [data, setData] = useState<Members | null>(null);
   const [cron, setCron] = useState<any>(null);
   const [newEmail, setNewEmail] = useState("");
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
-  const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
       setData(await api.adminMembers());
-      setUnlocked(true);
+      setDenied("");
       api.cronStatus().then(setCron).catch(() => undefined);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 403) setUnlocked(false);
+      // Admin follows the Google account now, so a 403 is not something you
+      // can type your way past — say whose account would work instead.
+      if (err instanceof ApiError && err.status === 403) setDenied(err.message);
       else setError(err instanceof ApiError ? err.message : String(err));
     }
   }, []);
 
   useEffect(() => {
-    api
-      .adminStatus()
-      .then((s) => {
-        setConfigured(s.configured);
-        if (s.unlocked) void load();
-      })
-      .catch(() => setConfigured(false));
+    void load();
   }, [load]);
-
-  const unlock = async () => {
-    setError("");
-    setBusy(true);
-    try {
-      await api.adminUnlock(password);
-      setPassword("");
-      await load();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const lock = async () => {
-    await api.adminLock().catch(() => undefined);
-    setUnlocked(false);
-    setData(null);
-    onClose();
-  };
 
   const act = async (run: () => Promise<unknown>, message: string) => {
     setError("");
@@ -94,54 +66,33 @@ export function AdminView({ onClose }: { onClose: () => void }) {
     }
   };
 
-  if (configured === false) {
+  if (denied) {
     return (
       <div className="admin-panel">
         <h2>Admin</h2>
-        <div className="notice bad">
-          The admin area is switched off. Set <code>ADMIN_PASSWORD</code> on the
-          Railway service and redeploy to enable it.
-        </div>
-        <button className="btn quiet small" onClick={onClose} type="button">
-          Close
-        </button>
-      </div>
-    );
-  }
-
-  if (configured === null) return <div className="admin-panel" />;
-
-  if (!unlocked) {
-    return (
-      <div className="admin-panel">
-        <h2>Admin</h2>
-        <p className="muted">Enter the admin password to manage access.</p>
-        {error && <div className="notice bad">{error}</div>}
-        <div className="field">
-          <label htmlFor="admin-password">Password</label>
-          <input
-            id="admin-password"
-            type="password"
-            autoFocus
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            onKeyDown={(event) => event.key === "Enter" && unlock()}
-          />
-        </div>
+        <div className="notice bad">{denied}</div>
+        <p className="hint">
+          Admin rights follow the Google account you sign in with. The owner is
+          the first address in <code>ALLOWED_EMAILS</code>; anyone else needs to
+          be listed in <code>ADMIN_EMAILS</code> on the Railway service, and to
+          sign in again afterwards.
+        </p>
         <div className="admin-actions">
-          <button className="btn" onClick={unlock} disabled={busy || !password} type="button">
-            {busy ? "Checking…" : "Unlock"}
-          </button>
-          <button className="btn quiet" onClick={onClose} type="button">
-            Cancel
+          <button className="btn quiet small" onClick={onClose} type="button">
+            Close
           </button>
         </div>
       </div>
     );
   }
 
-  if (!data) return <div className="admin-panel" />;
+  if (!data) {
+    return (
+      <div className="admin-panel">
+        {error ? <div className="notice bad">{error}</div> : null}
+      </div>
+    );
+  }
 
   const seatsLeft = data.seats_total - data.seats_used;
 
@@ -150,8 +101,8 @@ export function AdminView({ onClose }: { onClose: () => void }) {
       <div className="admin-head">
         <h2>Admin</h2>
         <div className="admin-actions">
-          <button className="link-button" onClick={lock} type="button">
-            Lock and close
+          <button className="link-button" onClick={onClose} type="button">
+            Close
           </button>
         </div>
       </div>
