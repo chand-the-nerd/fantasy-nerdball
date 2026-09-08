@@ -381,8 +381,9 @@ button {
 /* ── Pitch ───────────────────────────────────────────────────────────── */
 
 .pitch-frame {
-  /* Redeclared locally, so the shirts and the bench inside stay exactly as
-     they are under every theme. A pitch is green. */
+  /* Redeclared locally, so the shirts and the bench inside follow the pitch
+     rather than the page. A pitch is green under every theme; how light that
+     green is, and what the cards on it look like, is the part that moves. */
   --panel: #10241e;
   --panel-lift: #143029;
   --line: #1e3b33;
@@ -390,17 +391,38 @@ button {
   --fade: #7c978d;
   --input-bg: #0b1a16;
 
+  --pitch-turf: #0d211b;
+  --pitch-line: rgba(234, 242, 238, 0.13);
+  --pitch-bench: rgba(4, 12, 10, 0.55);
+  --pitch-glow: rgba(93, 211, 158, 0.07);
+
   border: 1px solid var(--line);
   border-radius: 0 0 var(--radius) var(--radius);
   overflow: hidden;
-  background: #0d211b;
+  background: var(--pitch-turf);
+}
+
+/* Light mode gets a daylight pitch, with white cards on it rather than the
+   night palette's dark ones. */
+[data-theme="light"] .pitch-frame {
+  --panel: #ffffff;
+  --panel-lift: #eef3f0;
+  --line: #cfdcd5;
+  --chalk: #101a16;
+  --fade: #5b6d67;
+  --input-bg: #ffffff;
+
+  --pitch-turf: #3f9a68;
+  --pitch-line: rgba(255, 255, 255, 0.45);
+  --pitch-bench: rgba(255, 255, 255, 0.5);
+  --pitch-glow: rgba(255, 255, 255, 0.16);
 }
 
 .pitch {
   position: relative;
   padding: 40px 18px 34px;
   background-image:
-    linear-gradient(180deg, rgba(93, 211, 158, 0.07), rgba(93, 211, 158, 0) 62%),
+    linear-gradient(180deg, var(--pitch-glow), rgba(255, 255, 255, 0) 62%),
     repeating-linear-gradient(
       90deg,
       rgba(255, 255, 255, 0.018) 0 7.14%,
@@ -421,7 +443,7 @@ button {
 .pitch-lines rect,
 .pitch-lines line {
   fill: none;
-  stroke: rgba(234, 242, 238, 0.13);
+  stroke: var(--pitch-line);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
@@ -444,7 +466,7 @@ button {
 
 .bench {
   border-top: 1px solid var(--line);
-  background: rgba(4, 12, 10, 0.55);
+  background: var(--pitch-bench);
   padding: 16px 18px 20px;
 }
 
