@@ -30,7 +30,6 @@ ALLOWED_OVERRIDES = {
     "OPTION_MIN_CHANGES",
     "OPTION_MIN_STARTER_CHANGES",
     "OPTION_MIN_SPEND_CHANGE",
-    "TRANSFER_HORIZON_GWS",
     "FIRST_N_GAMEWEEKS",
     "FIXTURE_DECAY_FACTOR",
     "USE_ML_WEIGHTS",
@@ -109,7 +108,6 @@ def build_config(
             1 if free_hit else int(settings_row.first_n_gameweeks)
         )
         RunConfig.MIN_TRANSFER_VALUE = float(settings_row.min_transfer_value)
-        RunConfig.TRANSFER_HORIZON_GWS = int(settings_row.transfer_horizon_gws)
 
         if settings_row.team_modifiers:
             merged = dict(base.TEAM_MODIFIERS)

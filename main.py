@@ -522,13 +522,18 @@ def optimise_squad(
     if config.GRANULAR_OUTPUT:
         print("\nThinking...")
 
-    penalty_mode = (
-        config.ACCEPT_TRANSFER_PENALTY and 
-        prev_squad_ids is not None and 
+    # Whether to weigh the transfer counts against each other rather
+    # than spending the allowance and asking afterwards. Hits are what
+    # ACCEPT_TRANSFER_PENALTY governs, not whether the question gets
+    # asked: with it off the sweep simply stops at the free transfers
+    # available, and "is the second one worth making" still needs an
+    # answer.
+    ladder_mode = (
+        prev_squad_ids is not None and
         not config.WILDCARD
     )
-    
-    if penalty_mode:
+
+    if ladder_mode:
         # Use transfer penalty optimisation
         result = components[
             'transfer_evaluator'

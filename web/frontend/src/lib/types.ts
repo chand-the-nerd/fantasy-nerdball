@@ -122,7 +122,6 @@ export interface Settings {
   use_ml_weights: boolean;
   first_n_gameweeks: number;
   min_transfer_value: number;
-  transfer_horizon_gws: number;
   overrides: Record<string, unknown>;
   team_modifiers: Record<string, number>;
   forced_selections: Record<string, string[]>;

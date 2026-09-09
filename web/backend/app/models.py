@@ -104,6 +104,10 @@ class UserSettings(Base):
     use_ml_weights: Mapped[bool] = mapped_column(Boolean, default=False)
     first_n_gameweeks: Mapped[int] = mapped_column(Integer, default=1)
     min_transfer_value: Mapped[float] = mapped_column(Float, default=2.0)
+    # Retained but no longer read: a transfer's benefit is now counted over
+    # first_n_gameweeks, the same window the scores are built over. Left in
+    # place because nothing here drops columns, and an unused one is
+    # harmless where a lost one is not.
     transfer_horizon_gws: Mapped[int] = mapped_column(Integer, default=4)
 
     # Free-form overrides, keyed by the engine's Config attribute name.

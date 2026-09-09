@@ -36,7 +36,6 @@ class SettingsOut(BaseModel):
     use_ml_weights: bool
     first_n_gameweeks: int
     min_transfer_value: float
-    transfer_horizon_gws: int
     overrides: dict[str, Any] = Field(default_factory=dict)
     team_modifiers: dict[str, float] = Field(default_factory=dict)
     forced_selections: dict[str, list[str]] = Field(default_factory=dict)
@@ -58,7 +57,6 @@ class SettingsIn(BaseModel):
     use_ml_weights: bool | None = None
     first_n_gameweeks: int | None = Field(default=None, ge=1, le=10)
     min_transfer_value: float | None = Field(default=None, ge=0, le=20)
-    transfer_horizon_gws: int | None = Field(default=None, ge=1, le=15)
     overrides: dict[str, Any] | None = None
     team_modifiers: dict[str, float] | None = None
     forced_selections: dict[str, list[str]] | None = None

@@ -15,11 +15,30 @@ class TransferEvaluator:
         # run - by evaluate_transfer_strategy, by its optimised variant
         # and again by the web pipeline - always with the same inputs.
         self._no_transfer_cache = None
+        # Set once the transfer ladder has run, so the later strategy
+        # check defers to it rather than deciding the same thing twice
+        # on a coarser basis.
+        self._last_best_scenario = None
 
     @property
     def horizon(self) -> int:
-        """Gameweeks over which a transfer's benefit is counted."""
-        return max(1, getattr(self.config, "TRANSFER_HORIZON_GWS", 4))
+        """Gameweeks over which a transfer's benefit is counted.
+
+        The same window the scores are built over, deliberately. This
+        used to be its own setting, and the two drifting apart was the
+        cause of a real misjudgement: with the look-ahead at one
+        gameweek and the horizon at four, a squad's advantage was
+        measured over a single fixture while the four-point hit that
+        bought it was spread across four, so a one-point edge outbid a
+        cost four times its size.
+
+        There is no reading of the model on which they should differ.
+        The look-ahead is the window over which a projection means
+        anything, so it is also the longest window over which a hit
+        can honestly be recouped. Counting the benefit further out
+        than the fixtures were scored is inventing evidence.
+        """
+        return max(1, int(getattr(self.config, "FIRST_N_GAMEWEEKS", 1)))
 
     def _amortised_penalty(self, penalty_points: float) -> float:
         """Spread a one-off points hit across the holding horizon."""
@@ -410,8 +429,7 @@ class TransferEvaluator:
             tuple: (starting_xi, bench, forced_display,
                     transfers_made, penalty_points)
         """
-        if (not self.config.ACCEPT_TRANSFER_PENALTY or
-                prev_squad_ids is None):
+        if prev_squad_ids is None:
             starting, bench, forced_display = (
                 squad_selector.select_squad_ilp(
                     df, forced_selections, prev_squad_ids,
@@ -422,6 +440,12 @@ class TransferEvaluator:
             )
             return starting, bench, forced_display, 0, 0
 
+        # With hits switched off the sweep stops at the free transfers
+        # available, so no scenario carries a penalty. The ladder still
+        # runs: deciding how many of the free transfers are worth using
+        # is the same question, and it was previously not being asked.
+        allow_penalties = bool(self.config.ACCEPT_TRANSFER_PENALTY)
+
         if self.config.GRANULAR_OUTPUT:
             print("\n=== TRANSFER ANALYSIS ===")
             print(f"\nEvaluating all transfer scenarios up to "
@@ -430,7 +454,8 @@ class TransferEvaluator:
 
         scenarios = self._evaluate_transfer_scenarios(
             df, forced_selections, prev_squad_ids, free_transfers,
-            available_budget, squad_selector
+            available_budget, squad_selector,
+            allow_penalties=allow_penalties
         )
 
         if not scenarios:
@@ -444,7 +469,9 @@ class TransferEvaluator:
                                      prev_squad_ids: list,
                                      free_transfers: int,
                                      available_budget: float,
-                                     squad_selector) -> list:
+                                     squad_selector,
+                                     allow_penalties: bool = True
+                                     ) -> list:
         """
         Evaluate transfer scenarios and return the results.
 
@@ -460,7 +487,12 @@ class TransferEvaluator:
             forced_selections, prev_squad_ids, df
         )
 
-        max_transfers_to_test = free_transfers + 3
+        max_transfers_to_test = (
+            free_transfers + 3 if allow_penalties else free_transfers
+        )
+        max_transfers_to_test = max(
+            max_transfers_to_test, min_transfers_needed
+        )
         start_transfers = min_transfers_needed
 
         if min_transfers_needed > 0 and self.config.GRANULAR_OUTPUT:
@@ -577,6 +609,9 @@ class TransferEvaluator:
             'extra_transfers': extra_transfers,
             'penalty_points': penalty_points,
             'amortised_penalty': amortised,
+            # What this squad actually scores this week with the whole
+            # hit paid, which is the number the app puts on screen.
+            'gw_net': starting_ppgw - penalty_points,
             'starting_points_total': starting_ppgw * self.horizon,
             'starting_ppgw': starting_ppgw,
             'net_ppgw': net_ppgw,
@@ -633,20 +668,24 @@ class TransferEvaluator:
                               free_transfers: int,
                               df: pd.DataFrame) -> tuple:
         """Select the best scenario on net points per gameweek."""
-        best_scenario = max(scenarios, key=lambda x: x['net_ppgw'])
+        ladder = self._best_by_transfer_count(scenarios)
 
-        baseline_scenario = self._get_baseline_scenario(scenarios)
-
-        if baseline_scenario is None:
+        if not ladder:
             print("No baseline transfer scenario found.")
             return pd.DataFrame(), pd.DataFrame(), None, 0, 0
+
+        baseline_scenario = ladder[0]
 
         if self.config.GRANULAR_OUTPUT:
             print("\nBest scenario analysis:")
             print(f"   Tested {len(scenarios)} different transfer "
-                  "limits")
-            self._print_top_scenarios(scenarios, best_scenario)
+                  f"limits, {len(ladder)} distinct outcomes")
 
+        # Climbed a rung at a time rather than taking the highest
+        # scoring scenario outright. The top scorer is almost always
+        # the one that spends every transfer available, and most of
+        # those transfers are not worth making.
+        best_scenario = self._climb_transfer_ladder(ladder)
         best_scenario = self._apply_value_threshold(
             best_scenario, baseline_scenario
         )
@@ -682,58 +721,104 @@ class TransferEvaluator:
             print(f"   #{i}: {scenario['actual_transfers']} transfers "
                   f"→ Net: {scenario['net_ppgw']:.1f} points{status}")
 
+    def _best_by_transfer_count(self, scenarios: list) -> list:
+        """One scenario per transfer count, ordered fewest first.
+
+        Several limits collapse to the same number of transfers
+        actually made - once the model has taken every move worth
+        taking, raising the bound changes nothing - so the sweep
+        returns duplicates. The ladder needs one rung per count.
+        """
+        best = {}
+
+        for scenario in scenarios:
+            count = scenario['actual_transfers']
+            if (count not in best
+                    or scenario['net_ppgw'] > best[count]['net_ppgw']):
+                best[count] = scenario
+
+        return [best[count] for count in sorted(best)]
+
+    def _climb_transfer_ladder(self, ladder: list) -> dict:
+        """Take transfers one at a time, while each one pays for itself.
+
+        MIN_TRANSFER_VALUE used to be tested against the total gain of
+        the best scenario over the baseline, however many transfers
+        produced it. That made the decision all or nothing: a first
+        transfer worth three points carried a second worth a tenth of
+        one, because between them they cleared the bar. The threshold
+        is a per-transfer standard, so it is applied per transfer.
+
+        Scanning continues past a rung that fails rather than stopping
+        at it. Gains are lumpy - two transfers can be worth little
+        separately and a lot together, when one funds the other - and
+        stopping at the first failure would miss that.
+
+        The second test is about hits. A scenario costing four points
+        is compared over the holding horizon, which quietly assumes
+        this week's edge repeats every week until the horizon runs
+        out, and that the same move could not have been made next week
+        for free. Neither is safe. So a scenario that pays a bigger
+        hit must also beat the one it displaces on this week's points
+        with the whole hit paid - the figure on screen. Anything else
+        recommends a squad that visibly scores less.
+        """
+        threshold = self.config.MIN_TRANSFER_VALUE
+        accepted = ladder[0]
+
+        if self.config.GRANULAR_OUTPUT:
+            print("\nTransfer ladder (each transfer must earn "
+                  f"{threshold:.1f} points per gameweek):")
+            print(f"   {accepted['actual_transfers']} transfers: "
+                  f"{accepted['net_ppgw']:.1f} net — baseline")
+
+        for candidate in ladder[1:]:
+            extra = (candidate['actual_transfers']
+                     - accepted['actual_transfers'])
+
+            if extra <= 0:
+                continue
+
+            gain = candidate['net_ppgw'] - accepted['net_ppgw']
+            required = threshold * extra
+            takes_bigger_hit = (
+                candidate['penalty_points'] > accepted['penalty_points']
+            )
+            hit_pays = candidate['gw_net'] >= accepted['gw_net']
+
+            if gain < required:
+                verdict = (f"rejected, {gain:.1f} gained against "
+                           f"{required:.1f} needed")
+            elif takes_bigger_hit and not hit_pays:
+                verdict = (
+                    f"rejected, the hit leaves it "
+                    f"{accepted['gw_net'] - candidate['gw_net']:.1f} "
+                    "points worse off this week"
+                )
+            else:
+                accepted = candidate
+                verdict = f"taken, {gain:.1f} gained for {extra} more"
+
+            if self.config.GRANULAR_OUTPUT:
+                print(f"   {candidate['actual_transfers']} transfers: "
+                      f"{candidate['net_ppgw']:.1f} net "
+                      f"({candidate['gw_net']:.1f} this week) — "
+                      f"{verdict}")
+
+        return accepted
+
     def _apply_value_threshold(self, best_scenario: dict,
                                baseline_scenario: dict) -> dict:
-        """Apply the MIN_TRANSFER_VALUE per-gameweek threshold."""
-        improvement_ppgw = 0
+        """Record what the ladder gained over making no transfers."""
+        improvement_ppgw = (
+            best_scenario['net_ppgw'] - baseline_scenario['net_ppgw']
+        )
 
-        if (best_scenario['actual_transfers'] >
-                baseline_scenario['actual_transfers']):
-            baseline_ppgw = baseline_scenario['net_ppgw']
-            best_ppgw = best_scenario['net_ppgw']
-            improvement_ppgw = best_ppgw - baseline_ppgw
-            extra_transfers = (
-                best_scenario['actual_transfers'] -
-                baseline_scenario['actual_transfers']
-            )
-
-            threshold_ppgw = self.config.MIN_TRANSFER_VALUE
-
-            if self.config.GRANULAR_OUTPUT:
-                print("\nTransfer Value Check (per-gameweek basis):")
-                print(f"   Baseline "
-                      f"({baseline_scenario['actual_transfers']} "
-                      f"transfers): {baseline_ppgw:.1f} points per "
-                      "gameweek")
-                print(f"   Best scenario "
-                      f"({best_scenario['actual_transfers']} "
-                      f"transfers): {best_ppgw:.1f} points per "
-                      "gameweek")
-                print(f"   Per-gameweek improvement: "
-                      f"{improvement_ppgw:.1f} points")
-                print(f"   Extra transfers: {extra_transfers}")
-                print(f"   Per-gameweek threshold: "
-                      f"{threshold_ppgw:.1f} points")
-
-            if improvement_ppgw < threshold_ppgw:
-                if self.config.GRANULAR_OUTPUT:
-                    print("   INSUFFICIENT VALUE GAINED: using "
-                          f"baseline "
-                          f"({baseline_scenario['actual_transfers']} "
-                          "transfers) instead")
-                best_scenario = baseline_scenario
-
-            if self.config.GRANULAR_OUTPUT:
-                print(f"   SELECTED: "
-                      f"{best_scenario['actual_transfers']} transfers "
-                      f"→ {best_scenario['net_ppgw']:.1f} points")
-        else:
-            if self.config.GRANULAR_OUTPUT:
-                print(f"\nUsing optimal scenario with "
-                      f"{best_scenario['actual_transfers']} transfers")
-                print(f"   SELECTED: "
-                      f"{best_scenario['actual_transfers']} transfers "
-                      f"→ {best_scenario['net_ppgw']:.1f} points")
+        if self.config.GRANULAR_OUTPUT:
+            print(f"   SELECTED: "
+                  f"{best_scenario['actual_transfers']} transfers "
+                  f"→ {best_scenario['net_ppgw']:.1f} points per "
+                  f"gameweek, {improvement_ppgw:+.1f} on the baseline")
 
         best_scenario['points_improvement_ppgw'] = improvement_ppgw
         best_scenario['gameweeks_analysed'] = self.horizon
@@ -1001,28 +1086,37 @@ class TransferEvaluator:
                       "changes without constraints")
             return True, {"reason": "Wildcard active - no limits"}
 
-        if self.config.ACCEPT_TRANSFER_PENALTY:
-            extra_transfers = max(0, transfers_made - free_transfers)
-            penalty_points = extra_transfers * 4
+        # The ladder has already weighed every transfer count against
+        # this one, per transfer and against the hit. Re-running the
+        # coarse all-or-nothing check below would only overrule a
+        # better decision with a worse one.
+        scenario = self._last_best_scenario
+
+        if scenario is not None:
+            penalty_points = max(
+                0, scenario['actual_transfers'] - free_transfers
+            ) * 4
 
             if self.config.GRANULAR_OUTPUT:
-                print(f"\nTRANSFER PENALTY MODE: making "
-                      f"{transfers_made} transfers")
+                print(f"\nTransfer ladder settled on "
+                      f"{scenario['actual_transfers']} transfers")
                 if penalty_points > 0:
                     print(f"   Transfer penalty: -{penalty_points} "
-                          "points (already factored into the "
-                          "optimisation)")
+                          "points, already costed")
 
-            if hasattr(self, '_last_best_scenario'):
-                scenario = self._last_best_scenario
-                return True, {
-                    "reason": "Transfers already optimised with hits",
-                    "points_improvement_ppgw": scenario.get(
-                        'points_improvement_ppgw', 0),
-                    "gameweeks_analysed": scenario.get(
-                        'gameweeks_analysed', self.horizon)
-                }
+            return True, {
+                "reason": (
+                    "Transfers chosen one at a time, each worth at "
+                    f"least {self.config.MIN_TRANSFER_VALUE:.1f} points "
+                    "a gameweek"
+                ),
+                "points_improvement_ppgw": scenario.get(
+                    'points_improvement_ppgw', 0),
+                "gameweeks_analysed": scenario.get(
+                    'gameweeks_analysed', self.horizon)
+            }
 
+        if self.config.ACCEPT_TRANSFER_PENALTY:
             return True, {
                 "reason": "Transfer penalty mode - already optimised"
             }
