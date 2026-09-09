@@ -2965,9 +2965,6 @@ tr.is-clickable:focus-visible {
   background: var(--gain);
 }
 
-.option-blurb {
-  margin: -4px 0 12px;
-}
 
 .option-row {
   display: grid;

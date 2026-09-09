@@ -19,6 +19,11 @@ class TransferEvaluator:
         # check defers to it rather than deciding the same thing twice
         # on a coarser basis.
         self._last_best_scenario = None
+        # The whole ladder, not just the rung chosen. Every rung is the
+        # best squad at one number of transfers, which is a set of
+        # genuinely different strategies rather than five variations on
+        # spending everything, so the web app offers them as options.
+        self._last_ladder = None
 
     @property
     def horizon(self) -> int:
@@ -685,6 +690,8 @@ class TransferEvaluator:
         # scoring scenario outright. The top scorer is almost always
         # the one that spends every transfer available, and most of
         # those transfers are not worth making.
+        self._last_ladder = ladder
+
         best_scenario = self._climb_transfer_ladder(ladder)
         best_scenario = self._apply_value_threshold(
             best_scenario, baseline_scenario

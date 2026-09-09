@@ -637,82 +637,120 @@ def run_optimisation(
                 and set(recommended_ids) == set(prev_squad_ids)
             )
 
-            if not holding:
-                options.append(
-                    _option_entry(
-                        key="option-1",
-                        label="Option 1",
-                        kind="alternative",
-                        starting_display=starting_display,
-                        bench_display=bench_display,
-                        projected_points=your_points,
-                        budget=float(config.BUDGET),
-                        player_ids=recommended_ids,
-                        prev_squad_ids=prev_squad_ids,
-                        free_transfers=config.FREE_TRANSFERS,
-                        # Deliberately recomputed rather than reusing the
-                        # run's own transfer_details, which describe the
-                        # squad the optimiser proposed before the hold
-                        # decision was taken.
-                        transfer_details=nerdball.extract_transfer_details(
-                            prev_squad_ids, starting, bench, players
-                        ),
-                    )
-                )
-                options[0]["recommended"] = True
-                option_frames["option-1"] = (starting_display, bench_display)
+            # The options are one squad per number of transfers, not the
+            # five highest scoring squads. Spending the whole allowance
+            # always scores best, so ranking on points alone offered five
+            # variations on "use everything" and never showed what two
+            # transfers would have looked like.
+            #
+            # These come free: the transfer ladder already solved the best
+            # squad at every count on its way to deciding how many to make,
+            # and used to throw all but the winner away.
+            picked = []
+            seen = set()
 
-            # Last week's fifteen is cut out of the ranking outright: it is
-            # on offer under its own button, and a numbered option that
-            # turned out to be "no change" would be a button that does
-            # nothing. One squad more than needed, because the ranking's
-            # winner is usually the one already sitting at option one.
-            ranked = nerdball.generate_squad_options(
-                components, config, scored, prev_squad_ids, available_budget,
-                count=option_count + 1,
-                free_transfers=allowance,
-                min_changes=spacing,
-                min_starter_changes=starter_spacing,
-                min_spend_change=spend_spacing,
-                exclude_squads=[prev_squad_ids] if prev_squad_ids else None,
+            if prev_squad_ids:
+                seen.add(frozenset(int(pid) for pid in prev_squad_ids))
+
+            if not holding:
+                picked.append({
+                    "ids": recommended_ids,
+                    "raw": (starting, bench),
+                    "dressed": (starting_display, bench_display, your_points),
+                })
+                seen.add(frozenset(recommended_ids))
+
+            rungs = sorted(
+                (
+                    rung
+                    for rung in (evaluator._last_ladder or [])
+                    if rung.get("actual_transfers", 0) > 0
+                    and rung.get("starting") is not None
+                ),
+                key=lambda rung: rung["actual_transfers"],
             )
 
-            for alt_starting, alt_bench in ranked:
-                if len(options) >= option_count:
+            for rung in rungs:
+                if len(picked) >= option_count:
                     break
-
                 ids = [
                     int(pid)
-                    for pid in pd.concat([alt_starting, alt_bench])["id"].tolist()
+                    for pid in pd.concat(
+                        [rung["starting"], rung["bench"]]
+                    )["id"].tolist()
                 ]
-                if set(ids) == set(recommended_ids):
+                if frozenset(ids) in seen:
                     continue
+                seen.add(frozenset(ids))
+                picked.append({
+                    "ids": ids,
+                    "raw": (rung["starting"], rung["bench"]),
+                    "dressed": None,
+                })
 
-                alt_start_display, alt_bench_display, alt_points = dress(
-                    alt_starting, alt_bench
+            # The ladder runs out when there is little to explore: one free
+            # transfer offers one count, and a wildcard week has no ladder at
+            # all. The ranking fills the rest, as it did before.
+            if len(picked) < option_count:
+                ranked = nerdball.generate_squad_options(
+                    components, config, scored, prev_squad_ids,
+                    available_budget,
+                    count=option_count + 1,
+                    free_transfers=allowance,
+                    min_changes=spacing,
+                    min_starter_changes=starter_spacing,
+                    min_spend_change=spend_spacing,
+                    exclude_squads=[sorted(ids) for ids in seen] or None,
                 )
-                rank = len(options) + 1
-                option_frames[f"option-{rank}"] = (
-                    alt_start_display,
-                    alt_bench_display,
-                )
+
+                for alt_starting, alt_bench in ranked:
+                    if len(picked) >= option_count:
+                        break
+                    ids = [
+                        int(pid)
+                        for pid in pd.concat(
+                            [alt_starting, alt_bench]
+                        )["id"].tolist()
+                    ]
+                    if frozenset(ids) in seen:
+                        continue
+                    seen.add(frozenset(ids))
+                    picked.append({
+                        "ids": ids,
+                        "raw": (alt_starting, alt_bench),
+                        "dressed": None,
+                    })
+
+            for rank, item in enumerate(picked, start=1):
+                key = f"option-{rank}"
+                if item["dressed"] is None:
+                    item["dressed"] = dress(*item["raw"])
+                item_starting, item_bench, item_points = item["dressed"]
+                option_frames[key] = (item_starting, item_bench)
                 options.append(
                     _option_entry(
-                        key=f"option-{rank}",
+                        key=key,
                         label=f"Option {rank}",
                         kind="alternative",
-                        starting_display=alt_start_display,
-                        bench_display=alt_bench_display,
-                        projected_points=alt_points,
+                        starting_display=item_starting,
+                        bench_display=item_bench,
+                        projected_points=item_points,
                         budget=float(config.BUDGET),
-                        player_ids=ids,
+                        player_ids=item["ids"],
                         prev_squad_ids=prev_squad_ids,
                         free_transfers=config.FREE_TRANSFERS,
+                        # Recomputed per option rather than reusing the run's
+                        # transfer_details, which describe only the squad the
+                        # optimiser proposed.
                         transfer_details=nerdball.extract_transfer_details(
-                            prev_squad_ids, alt_starting, alt_bench, players
+                            prev_squad_ids, item["raw"][0], item["raw"][1],
+                            players,
                         ),
                     )
                 )
+
+            if not holding and options:
+                options[0]["recommended"] = True
 
             held = _previous_gameweek_option(
                 components, scored, prev_squad_ids, dress,

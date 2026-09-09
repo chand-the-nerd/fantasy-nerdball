@@ -51,9 +51,6 @@ export function SquadOptions({
         </span>
       </div>
 
-      <p className="muted option-blurb">
-        Ranked by projected points. Nothing changes until you activate one.
-      </p>
 
       <div className="option-row">
         {options.map((option) => {
@@ -96,8 +93,6 @@ export function SquadOptions({
                     whether it's worth opening, and it isn't the transfer
                     count — two options can each make two transfers and still
                     be the same squad but for one player. */}
-                {!option.recommended && option.differs_by > 0 &&
-                  ` · ${option.differs_by} different`}
               </span>
               {active && <span className="option-flag">Active</span>}
             </button>
@@ -110,12 +105,11 @@ export function SquadOptions({
           <p className="muted">
             {preview.recommended
               ? preview.kind === "previous"
-                ? "The optimiser's pick: no move this week clears the improvement threshold."
-                : "The optimiser's pick, left to itself."
+                ? "The optimiser's pick: no move clears the threshold this week."
+                : "The optimiser's pick."
               : preview.kind === "previous"
-                ? "Last week's fifteen kept whole, with the best eleven of them starting."
-                : `${preview.formation}, £${preview.squad_value.toFixed(1)}m spent, ` +
-                  `${preview.differs_by} different to the recommendation.`}
+                ? "Last week's fifteen, best eleven starting."
+                : `${preview.formation}, £${preview.squad_value.toFixed(1)}m spent.`}
           </p>
           {showActivate ? (
             <button
