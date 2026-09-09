@@ -637,62 +637,107 @@ def run_optimisation(
                 and set(recommended_ids) == set(prev_squad_ids)
             )
 
-            # The options are one squad per number of transfers, not the
-            # five highest scoring squads. Spending the whole allowance
-            # always scores best, so ranking on points alone offered five
-            # variations on "use everything" and never showed what two
-            # transfers would have looked like.
-            #
-            # These come free: the transfer ladder already solved the best
-            # squad at every count on its way to deciding how many to make,
-            # and used to throw all but the winner away.
+            def squad_ids(starting_frame, bench_frame):
+                return [
+                    int(pid)
+                    for pid in pd.concat(
+                        [starting_frame, bench_frame]
+                    )["id"].tolist()
+                ]
+
             picked = []
             seen = set()
 
             if prev_squad_ids:
                 seen.add(frozenset(int(pid) for pid in prev_squad_ids))
 
-            if not holding:
-                picked.append({
-                    "ids": recommended_ids,
-                    "raw": (starting, bench),
-                    "dressed": (starting_display, bench_display, your_points),
-                })
-                seen.add(frozenset(recommended_ids))
+            def take(ids, raw, dressed=None):
+                """Add a squad to the list unless it is already on it."""
+                if len(picked) >= option_count or frozenset(ids) in seen:
+                    return False
+                seen.add(frozenset(ids))
+                picked.append(
+                    {"ids": ids, "raw": raw, "dressed": dressed}
+                )
+                return True
 
-            rungs = sorted(
+            if not holding:
+                take(
+                    recommended_ids,
+                    (starting, bench),
+                    (starting_display, bench_display, your_points),
+                )
+
+            # Options never take a hit of their own. A -4 is worth paying
+            # only when the gain covers it, which the ladder has already
+            # judged; manufacturing one to fill a slot offers a squad that
+            # starts four points down. If the recommendation itself took a
+            # hit it is still option one, because that one was earned.
+            spendable = min(
+                max(0, int(config.FREE_TRANSFERS or 0)), option_count
+            )
+
+            # One squad at each number of transfers, fewest first. The
+            # ladder already solved these on its way to deciding how many to
+            # make, and used to throw all but the winner away.
+            for rung in sorted(
                 (
                     rung
                     for rung in (evaluator._last_ladder or [])
-                    if rung.get("actual_transfers", 0) > 0
+                    if 0 < rung.get("actual_transfers", 0) <= spendable
                     and rung.get("starting") is not None
                 ),
                 key=lambda rung: rung["actual_transfers"],
-            )
+            ):
+                take(
+                    squad_ids(rung["starting"], rung["bench"]),
+                    (rung["starting"], rung["bench"]),
+                )
 
-            for rung in rungs:
-                if len(picked) >= option_count:
-                    break
-                ids = [
-                    int(pid)
-                    for pid in pd.concat(
-                        [rung["starting"], rung["bench"]]
-                    )["id"].tolist()
-                ]
-                if frozenset(ids) in seen:
-                    continue
-                seen.add(frozenset(ids))
-                picked.append({
-                    "ids": ids,
-                    "raw": (rung["starting"], rung["bench"]),
-                    "dressed": None,
-                })
+            # Slots left over go to runners-up at the counts already on
+            # offer, rather than to a bigger move nobody wants. One free
+            # transfer means five different single transfers, which is the
+            # useful thing to see when only one is available.
+            if len(picked) < option_count and spendable > 0:
+                pools = {}
+                blocked = [sorted(ids) for ids in seen]
 
-            # The ladder runs out when there is little to explore: one free
-            # transfer offers one count, and a wildcard week has no ladder at
-            # all. The ranking fills the rest, as it did before.
-            if len(picked) < option_count:
-                ranked = nerdball.generate_squad_options(
+                for count in range(1, spendable + 1):
+                    pools[count] = list(
+                        nerdball.generate_squad_options(
+                            components, config, scored, prev_squad_ids,
+                            available_budget,
+                            count=option_count,
+                            free_transfers=count,
+                            min_changes=spacing,
+                            min_starter_changes=starter_spacing,
+                            min_spend_change=spend_spacing,
+                            exclude_squads=blocked or None,
+                        )
+                    )
+
+                # Round robin, so the spare slots spread across the counts
+                # instead of stacking five alternatives onto the smallest.
+                while len(picked) < option_count and any(pools.values()):
+                    added = False
+                    for count in sorted(pools):
+                        if len(picked) >= option_count:
+                            break
+                        while pools[count]:
+                            alt_starting, alt_bench = pools[count].pop(0)
+                            if take(
+                                squad_ids(alt_starting, alt_bench),
+                                (alt_starting, alt_bench),
+                            ):
+                                added = True
+                                break
+                    if not added:
+                        break
+
+            # No previous squad, or a wildcard: there is no transfer count
+            # to vary, so the ranking supplies the lot.
+            if len(picked) < option_count and not spendable:
+                for alt_starting, alt_bench in nerdball.generate_squad_options(
                     components, config, scored, prev_squad_ids,
                     available_budget,
                     count=option_count + 1,
@@ -701,25 +746,11 @@ def run_optimisation(
                     min_starter_changes=starter_spacing,
                     min_spend_change=spend_spacing,
                     exclude_squads=[sorted(ids) for ids in seen] or None,
-                )
-
-                for alt_starting, alt_bench in ranked:
-                    if len(picked) >= option_count:
-                        break
-                    ids = [
-                        int(pid)
-                        for pid in pd.concat(
-                            [alt_starting, alt_bench]
-                        )["id"].tolist()
-                    ]
-                    if frozenset(ids) in seen:
-                        continue
-                    seen.add(frozenset(ids))
-                    picked.append({
-                        "ids": ids,
-                        "raw": (alt_starting, alt_bench),
-                        "dressed": None,
-                    })
+                ):
+                    take(
+                        squad_ids(alt_starting, alt_bench),
+                        (alt_starting, alt_bench),
+                    )
 
             for rank, item in enumerate(picked, start=1):
                 key = f"option-{rank}"
