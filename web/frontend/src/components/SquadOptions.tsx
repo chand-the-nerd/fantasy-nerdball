@@ -47,7 +47,7 @@ export function SquadOptions({
         <strong>Other ways to line up</strong>
         <span className="option-key">
           <span className="swatch" aria-hidden="true" />
-          Green is the optimiser&rsquo;s recommendation
+          Recommended
         </span>
       </div>
 
@@ -109,10 +109,13 @@ export function SquadOptions({
         The big number is <strong>projected points</strong>: what the eleven
         should score this gameweek. The small one is the{" "}
         <strong>nerdball score</strong>, the model&rsquo;s own rating of the
-        squad from form, history and fixtures across your look-ahead. Squads
-        are picked on nerdball score, because a side has to hold up beyond
-        Saturday; the projection only says how the coming week looks. The
-        green option is neither the highest of the two — it is the one where
+        squad from form, history and fixtures across your look-ahead.
+      </p>
+      
+      <p>
+        Squads are picked on nerdball score, because a side has to hold up beyond
+        the weekend; the projection only says how the next gameweek looks. The
+        recommended option isn't always the highest score — it's the squad where
         every transfer was worth making.
       </p>
 
