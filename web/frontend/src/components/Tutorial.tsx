@@ -375,7 +375,7 @@ const STEPS: Step[] = [
           <strong>Projected points</strong>, the large one, is what the
           starting eleven should score in the coming gameweek. The{" "}
           <strong>nerdball score</strong> beneath it is the model's own rating
-          of the whole squad, built from form, historic returns and fixture
+          of the whole squad, built from form, historic returns, likeliness to play, and fixture
           difficulty across however many gameweeks you set it to look ahead.
         </p>
         <p>

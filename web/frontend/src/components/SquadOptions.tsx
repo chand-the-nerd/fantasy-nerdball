@@ -109,7 +109,7 @@ export function SquadOptions({
         The big number is <strong>projected points</strong>: what the eleven
         should score this gameweek. The small one is the{" "}
         <strong>nerdball score</strong>, the model&rsquo;s own rating of the
-        squad from form, history and fixtures across your look-ahead.
+        squad from form, history, availability and fixtures across your look-ahead.
       </p>
       
       <p className="muted option-legend">
