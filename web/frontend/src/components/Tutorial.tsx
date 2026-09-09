@@ -280,7 +280,7 @@ function ArtScores() {
         60.4
       </text>
       <text x="72" y="88" className="ink-cap">
-        412.7 nerdball
+        28.7 nerdball
       </text>
     </svg>
   );
