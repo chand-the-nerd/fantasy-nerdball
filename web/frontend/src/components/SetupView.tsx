@@ -232,11 +232,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
                 <span>Ten weeks out</span>
               </div>
             </div>
-            <span className="hint">
-              How far ahead fixtures are scored, and the window a −4 hit has
-              to earn itself back over. One gameweek means a hit must pay for
-              itself immediately.
-            </span>
+            <span className="hint">How far ahead the model looks.</span>
           </div>
 
           <div className="field">
@@ -262,10 +258,8 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
               </div>
             </div>
             <span className="hint">
-              What every transfer has to be worth, in points per gameweek,
-              before it is made. Applied one transfer at a time, so a strong
-              first move no longer drags a weak second one along with it.
-              Kneejerk takes anything that helps at all.
+              How many points-gain a single transfer must deliver to the
+              squad to be considered worth making.
             </span>
           </div>
           <Toggle

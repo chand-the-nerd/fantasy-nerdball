@@ -107,7 +107,14 @@ def build_config(
         RunConfig.FIRST_N_GAMEWEEKS = (
             1 if free_hit else int(settings_row.first_n_gameweeks)
         )
-        RunConfig.MIN_TRANSFER_VALUE = float(settings_row.min_transfer_value)
+        # A threshold is a price on a transfer, and on a Wildcard or Free
+        # Hit transfers are free and unlimited. Holding a move back because
+        # it only gains a point costs nothing to make and gains nothing to
+        # refuse, so the strategy setting is ignored for the week.
+        RunConfig.MIN_TRANSFER_VALUE = (
+            0.0 if RunConfig.WILDCARD
+            else float(settings_row.min_transfer_value)
+        )
 
         if settings_row.team_modifiers:
             merged = dict(base.TEAM_MODIFIERS)
