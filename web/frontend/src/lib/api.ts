@@ -1,4 +1,5 @@
 import type {
+  AuthConfig,
   GameweekInfo,
   PlayerPool,
   Reference,
@@ -39,8 +40,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  authConfig: () => request<{ google: boolean; dev_login: boolean }>("/api/auth/config"),
-  devLogin: () => request<{ ok: boolean }>("/api/auth/dev-login", { method: "POST" }),
+  authConfig: () => request<AuthConfig>("/api/auth/config"),
+  guestLogin: () =>
+    request<{ ok: boolean }>("/api/auth/guest", { method: "POST" }),
+  devLogin: () =>
+    request<{ ok: boolean }>("/api/auth/dev-login", { method: "POST" }),
   logout: () => request<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
 
   me: () => request<Me>("/api/me"),

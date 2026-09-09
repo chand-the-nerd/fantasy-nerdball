@@ -104,7 +104,15 @@ export interface Me {
   name: string;
   avatar_url: string;
   is_admin: boolean;
+  /** A throwaway session started from "Continue without signing in". */
+  is_guest: boolean;
   fpl_entry_id: number | null;
+}
+
+export interface AuthConfig {
+  google: boolean;
+  dev_login: boolean;
+  guest: boolean;
 }
 
 export type Theme = "legacy" | "dark" | "light";

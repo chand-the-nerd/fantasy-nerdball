@@ -28,10 +28,13 @@ export function WeightBar({
   weights,
   onChange,
   label,
+  locked = false,
 }: {
   weights: Weights;
   onChange: (weights: Weights) => void;
   label: string;
+  /** Read-only: the bar still shows the split, the handles don't move. */
+  locked?: boolean;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<0 | 1 | null>(null);
@@ -96,7 +99,7 @@ export function WeightBar({
   const percent = (n: number) => `${Math.round(n * 100)}%`;
 
   return (
-    <div className="weight-row">
+    <div className={`weight-row${locked ? " is-locked" : ""}`}>
       <div className="weight-head">
         <span className="weight-label">{label}</span>
         <span className="weight-readout">
@@ -131,7 +134,8 @@ export function WeightBar({
           }}
         />
 
-        {([0, 1] as const).map((handle) => {
+        {!locked &&
+          ([0, 1] as const).map((handle) => {
           const value = handle === 0 ? a : b;
           return (
             <span

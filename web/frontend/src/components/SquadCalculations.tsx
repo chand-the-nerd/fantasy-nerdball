@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { GuestLock } from "./GuestLock";
+import { useGuest } from "../lib/guest";
 import type { Player, Squad } from "../lib/types";
 
 type SortKey =
@@ -87,6 +89,7 @@ function value(player: Player, key: SortKey): string | number {
 export function SquadCalculations({ squad }: { squad: Squad }) {
   const [sort, setSort] = useState<SortKey>("projected_points");
   const [ascending, setAscending] = useState(false);
+  const guest = useGuest();
 
   const players = [...squad.payload.starting, ...squad.payload.bench];
   const sorted = [...players].sort((a, b) => {
@@ -115,6 +118,7 @@ export function SquadCalculations({ squad }: { squad: Squad }) {
         click to sort.
       </p>
 
+      <Wrap locked={guest}>
       <div className="calc-scroll">
         <table className="calc-table">
           <thead>
@@ -160,7 +164,24 @@ export function SquadCalculations({ squad }: { squad: Squad }) {
           </tbody>
         </table>
       </div>
+      </Wrap>
     </div>
+  );
+}
+
+/** The table, veiled for guests and plain for everyone else. */
+function Wrap({
+  locked,
+  children,
+}: {
+  locked: boolean;
+  children: React.ReactNode;
+}) {
+  if (!locked) return <>{children}</>;
+  return (
+    <GuestLock note="Every number the projection was built from, player by player.">
+      {children}
+    </GuestLock>
   );
 }
 

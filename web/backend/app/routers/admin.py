@@ -39,7 +39,11 @@ def admin_status(user: User = Depends(current_user)) -> dict:
 def members(
     admin: User = Depends(current_admin), session: Session = Depends(get_session)
 ) -> dict:
-    users = session.scalars(select(User).order_by(User.created_at)).all()
+    users = session.scalars(
+        select(User)
+        .where(User.is_guest.is_(False))
+        .order_by(User.created_at)
+    ).all()
     invites = session.scalars(select(Invite).order_by(Invite.created_at)).all()
 
     registered = {u.email for u in users}

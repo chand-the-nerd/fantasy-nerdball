@@ -88,6 +88,16 @@ class Settings:
         # are serialised. This only caps how many can queue up.
         self.max_queued_runs = int(os.getenv("MAX_QUEUED_RUNS", "20"))
 
+        # Whether the sign-in page offers "Continue without signing in".
+        # Guests get a capped, throwaway account: see guest.py.
+        self.guest_mode = os.getenv("GUEST_MODE", "true").lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        # How long an idle guest account survives before it is swept up.
+        self.guest_ttl_hours = int(os.getenv("GUEST_TTL_HOURS", "24"))
+
         self.dev_mode = os.getenv("DEV_MODE", "").lower() in {"1", "true", "yes"}
         # Lets you work on the UI without Google credentials configured.
         self.dev_login_email = os.getenv("DEV_LOGIN_EMAIL", "")

@@ -6,9 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
+from .. import guest
 from ..auth import is_allowed, oauth, upsert_user
 from ..config import settings
 from ..db import get_session
+from ..models import User
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -19,6 +21,7 @@ def auth_config() -> dict:
     return {
         "google": settings.google_configured,
         "dev_login": settings.dev_mode and bool(settings.dev_login_email),
+        "guest": settings.guest_mode,
     }
 
 
@@ -64,6 +67,25 @@ async def callback(request: Request, session: Session = Depends(get_session)):
     return RedirectResponse("/")
 
 
+@router.post("/guest")
+def guest_login(request: Request, session: Session = Depends(get_session)):
+    """Start a throwaway session for someone who hasn't been invited.
+
+    A guest account is created rather than the request being let through
+    unauthenticated: every route below this expects a user id, and a
+    guest still needs somewhere to put a squad while it looks at one.
+    What it doesn't get is a seat, or anything that outlives the session.
+    """
+    if not settings.guest_mode:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Guest access is switched off on this deployment.",
+        )
+    user = guest.create(session)
+    request.session["user_id"] = user.id
+    return {"ok": True}
+
+
 @router.post("/dev-login")
 def dev_login(request: Request, session: Session = Depends(get_session)):
     """Local development only. Never enabled when DEV_MODE is off."""
@@ -81,6 +103,18 @@ def dev_login(request: Request, session: Session = Depends(get_session)):
 
 
 @router.post("/logout")
-def logout(request: Request) -> dict:
+def logout(request: Request, session: Session = Depends(get_session)) -> dict:
+    """Ends the session, and for a guest ends the account with it.
+
+    This is the promise on the sign-in page kept literally: a guest's
+    squads, runs and settings are gone the moment they leave.
+    """
+    user_id = request.session.get("user_id")
     request.session.clear()
+
+    if user_id:
+        user = session.get(User, user_id)
+        if user is not None and user.is_guest:
+            guest.discard(session, user)
+
     return {"ok": True}

@@ -3130,3 +3130,177 @@ tr.is-clickable:focus-visible {
   font-variant-numeric: tabular-nums;
   color: var(--floodlight);
 }
+
+/* ── Guest access ────────────────────────────────────────────────────────
+   Everything a guest can see the shape of but not use. The rule
+   throughout is that the thing is still on screen: a blurred table says
+   "there is a table here and it isn't yours yet", where an empty box
+   says nothing at all. */
+
+.locked {
+  position: relative;
+  isolation: isolate;
+}
+
+/* Inert as well as unreadable. aria-hidden keeps it out of the
+   accessibility tree; pointer-events keeps the mouse out of it. */
+.locked-body {
+  filter: blur(5px) saturate(0.55);
+  opacity: 0.5;
+  pointer-events: none;
+  user-select: none;
+}
+
+.locked-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+}
+
+.locked-veil strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--floodlight);
+}
+
+.locked-veil p {
+  margin: 0;
+  max-width: 42ch;
+  font-size: 13.5px;
+  color: var(--fade);
+}
+
+/* A limit, said in one line, with the way past it on the same line. */
+.guest-note {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.guest-note .link-button {
+  flex: none;
+}
+
+/* Locked controls: greyed, still readable, obviously not draggable. */
+.field.is-locked,
+.toggle.is-locked {
+  opacity: 0.62;
+}
+
+.field.is-locked input[type="range"],
+.team-sliders.is-locked input[type="range"],
+.toggle.is-locked input {
+  cursor: not-allowed;
+}
+
+.field.is-locked input[type="range"]::-webkit-slider-thumb,
+.team-sliders.is-locked input[type="range"]::-webkit-slider-thumb {
+  background: var(--fade);
+}
+
+.field.is-locked input[type="range"]::-moz-range-thumb,
+.team-sliders.is-locked input[type="range"]::-moz-range-thumb {
+  background: var(--fade);
+}
+
+.team-sliders.is-locked {
+  opacity: 0.62;
+}
+
+/* A locked weighting bar keeps its colours — the split is the point —
+   but loses the handles, so there is nothing to reach for. */
+.weight-row.is-locked .weight-track {
+  opacity: 0.7;
+  cursor: default;
+}
+
+/* ── Sign-in page additions ──────────────────────────────────────────── */
+
+.beta-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.beta-notice strong {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--floodlight);
+}
+
+.beta-notice span {
+  color: var(--fade);
+  line-height: 1.5;
+}
+
+.guest-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  max-width: 42ch;
+}
+
+.guest-btn {
+  align-self: flex-start;
+}
+
+/* ── Guest feature comparison ────────────────────────────────────────── */
+
+.feature-table td:first-child {
+  white-space: nowrap;
+}
+
+.feature-table tr.feature-group th {
+  padding-top: 16px;
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--floodlight);
+  text-align: left;
+}
+
+.feature-table .mark {
+  display: inline-block;
+  width: 16px;
+  margin-right: 7px;
+  font-weight: 600;
+}
+
+.feature-table .mark.yes {
+  color: var(--gain);
+}
+
+.feature-table .mark.partial {
+  color: var(--floodlight);
+}
+
+.feature-table .mark.no {
+  color: var(--fade);
+}
+
+@media (max-width: 620px) {
+  .guest-note {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .feature-table td:first-child {
+    white-space: normal;
+  }
+}

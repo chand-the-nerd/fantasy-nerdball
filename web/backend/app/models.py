@@ -38,6 +38,13 @@ class User(Base):
     avatar_url: Mapped[str] = mapped_column(String(512), default="")
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # A throwaway account behind "Continue without signing in". It never
+    # counts towards the seat cap, and everything it owns is deleted when
+    # the session ends or the row goes stale.
+    is_guest: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
+
     # Optional link to the manager's real FPL side, so actual points can be
     # pulled and charted next to the model's projection.
     fpl_entry_id: Mapped[int | None] = mapped_column(Integer)

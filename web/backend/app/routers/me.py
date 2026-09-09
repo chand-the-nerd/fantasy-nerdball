@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import guest
 from ..auth import current_user
 from ..config import settings
 from ..db import get_session
@@ -123,6 +124,11 @@ def update_settings(
         _validate_position_weights(changes["overrides"])
     if changes.get("forced_selections") is not None:
         _validate_forced(changes["forced_selections"])
+    if user.is_guest:
+        guest.check_lists(
+            forced=changes.get("forced_selections"),
+            blacklist=changes.get("blacklist_players"),
+        )
     if changes.get("theme") is not None and changes["theme"] not in THEMES:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
@@ -132,6 +138,12 @@ def update_settings(
     for field, value in changes.items():
         if value is not None:
             setattr(row, field, value)
+
+    # Applied after the assignment rather than by rejecting the save: the
+    # Setup page sends the whole row back, so a guest saving a budget
+    # would otherwise be refused over fields it never let them touch.
+    if user.is_guest:
+        guest.enforce(row)
 
     chips = [row.wildcard, row.free_hit, row.bench_boost, row.triple_captain]
     if sum(1 for chip in chips if chip) > 1:
@@ -203,6 +215,9 @@ def force_player(
     row = _settings_row(session, user)
     name = payload.name.strip()
     key = _key(name)
+
+    if user.is_guest and len(_forced_pairs(row)) >= guest.MAX_FORCED:
+        raise guest.limit("forced picks", guest.MAX_FORCED)
 
     for position, existing in _forced_pairs(row):
         if _key(existing) == key:
@@ -299,6 +314,11 @@ def blacklist_player(
     name = payload.name.strip()
     key = _key(name)
 
+    if user.is_guest and len(row.blacklist_players or []) >= (
+        guest.MAX_BLACKLIST
+    ):
+        raise guest.limit("players to avoid", guest.MAX_BLACKLIST)
+
     for existing in row.blacklist_players or []:
         if _key(existing) == key:
             raise _conflict(f"{existing} is already on your avoid list.")
@@ -348,6 +368,9 @@ def link_entry(
     session: Session = Depends(get_session),
 ) -> User:
     """Connect a real FPL team so actual points can be charted."""
+    if user.is_guest:
+        raise guest.members_only("Linking an FPL team")
+
     if payload.fpl_entry_id is None:
         user.fpl_entry_id = None
         session.commit()
@@ -557,6 +580,9 @@ def import_squad(
     Without this the optimiser has nothing to compare against mid-season and
     treats you as a new team, so its first set of transfers is meaningless.
     """
+    if user.is_guest:
+        raise guest.members_only("Importing a squad from FPL")
+
     if not user.fpl_entry_id:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,

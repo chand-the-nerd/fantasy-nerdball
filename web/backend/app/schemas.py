@@ -16,6 +16,7 @@ class UserOut(BaseModel):
     name: str
     avatar_url: str
     is_admin: bool
+    is_guest: bool = False
     fpl_entry_id: int | None = None
 
 
