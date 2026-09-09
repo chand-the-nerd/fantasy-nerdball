@@ -125,6 +125,11 @@ export const api = {
   squads: () => request<Squad[]>("/api/squads"),
   latestSquad: () => request<Squad | null>("/api/squads/latest"),
   squad: (gameweek: number) => request<Squad>(`/api/squads/${gameweek}`),
+  activateOption: (gameweek: number, option: string) =>
+    request<Squad>(`/api/squads/${gameweek}/activate`, {
+      method: "POST",
+      body: JSON.stringify({ option }),
+    }),
 
   performance: (refresh = false) =>
     request<Performance>(`/api/performance${refresh ? "?refresh=true" : ""}`),

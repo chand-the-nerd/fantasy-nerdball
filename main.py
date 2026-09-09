@@ -512,6 +512,25 @@ def analyse_unavailable_players(components, config, scored, prev_squad_ids):
             print(f"\nAll previous squad players are available")
 
 
+def _optimise_on_projected_points(config) -> bool:
+    """Whether to pick the squad on projected points rather than score.
+
+    Normally the squad is chosen on fpl_score, which blends form,
+    history and fixture difficulty across the look-ahead, and
+    projected_points is only used to pick the eleven and to report.
+    Over several gameweeks that is right: the squad has to be good for
+    longer than the coming Saturday.
+
+    A Free Hit is the exception. The side reverts next week, so this
+    gameweek's points are the only ones it can ever bank, and there is
+    nothing for a longer-range score to be right about. Picking on
+    fpl_score there optimises one number and displays another, which is
+    how an option can end up projecting more points than the squad
+    recommended above it.
+    """
+    return bool(getattr(config, "FREE_HIT", False))
+
+
 def optimise_squad(
         components,
         config, scored,
@@ -522,13 +541,18 @@ def optimise_squad(
     if config.GRANULAR_OUTPUT:
         print("\nThinking...")
 
-    penalty_mode = (
-        config.ACCEPT_TRANSFER_PENALTY and 
-        prev_squad_ids is not None and 
+    # Whether to weigh the transfer counts against each other rather
+    # than spending the allowance and asking afterwards. Hits are what
+    # ACCEPT_TRANSFER_PENALTY governs, not whether the question gets
+    # asked: with it off the sweep simply stops at the free transfers
+    # available, and "is the second one worth making" still needs an
+    # answer.
+    ladder_mode = (
+        prev_squad_ids is not None and
         not config.WILDCARD
     )
-    
-    if penalty_mode:
+
+    if ladder_mode:
         # Use transfer penalty optimisation
         result = components[
             'transfer_evaluator'
@@ -552,7 +576,9 @@ def optimise_squad(
                 scored, config.FORCED_SELECTIONS, prev_squad_ids,
                 config.FREE_TRANSFERS, show_transfer_summary=True,
                 available_budget=available_budget,
-                use_projected_points=False
+                use_projected_points=_optimise_on_projected_points(
+                    config
+                )
             )
         )
         
@@ -573,6 +599,74 @@ def optimise_squad(
 
     return (starting_with_transfers, bench_with_transfers, 
             transfers_made, penalty_points)
+
+
+def generate_squad_options(components, config, scored, prev_squad_ids,
+                           available_budget, count=5,
+                           free_transfers=None, min_changes=1,
+                           min_starter_changes=0, min_spend_change=0.0,
+                           exclude_squads=None):
+    """Rank the best few squads available under this week's rules.
+
+    The optimiser has only ever answered with its single best squad,
+    which hides how close the runners-up were. This asks the same
+    model for its next choices too, so a manager can see what it
+    nearly picked and take one of those instead.
+
+    Args:
+        components (dict): Initialised engine components.
+        config: The run's config.
+        scored (pd.DataFrame): Scored player pool.
+        prev_squad_ids (list): Previous squad player IDs, or None.
+        available_budget (float): Budget for the squad.
+        count (int): How many squads to rank.
+        free_transfers (int, optional): Transfer allowance to rank
+                                        under. Defaults to the
+                                        config's free transfers. Pass
+                                        the number the recommendation
+                                        actually used so the options
+                                        are judged on equal terms.
+        min_changes (int): Minimum players separating one option from
+                           the next.
+        min_starter_changes (int): How many of those must have been
+                                   starting, so the difference shows
+                                   on the pitch rather than on the
+                                   bench.
+        min_spend_change (float): Combined price, in millions, that
+                                  must change hands between one
+                                  option and the next.
+        exclude_squads (list, optional): Squads to keep out of the
+                                         ranking, as lists of player
+                                         IDs.
+
+    Returns:
+        list: (starting_xi, bench) tuples, best first.
+    """
+    if count <= 0:
+        return []
+
+    allowance = (
+        config.FREE_TRANSFERS if free_transfers is None
+        else free_transfers
+    )
+
+    return components['squad_selector'].select_squad_alternatives(
+        scored,
+        config.FORCED_SELECTIONS,
+        count,
+        prev_squad_ids=prev_squad_ids,
+        free_transfers=allowance,
+        available_budget=available_budget,
+        # Matched to the recommendation deliberately. Ranking the
+        # options on one measure while the squad above them was picked
+        # on another puts a higher number on an option than on the
+        # recommendation, which reads as the optimiser getting it wrong.
+        use_projected_points=_optimise_on_projected_points(config),
+        min_changes=min_changes,
+        min_starter_changes=min_starter_changes,
+        min_spend_change=min_spend_change,
+        exclude_squads=exclude_squads,
+    )
 
 
 def evaluate_transfer_strategy(components, config, scored, prev_squad_ids, 

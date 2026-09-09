@@ -58,6 +58,22 @@ function Toggle({
   );
 }
 
+const STRATEGY_MAX = 2.5;
+
+/**
+ * Where the transfer threshold sits on the Kneejerk-to-Conservative scale.
+ *
+ * The old control was a free number and its hint suggested five, so a stored
+ * value can sit above the slider's top. Clamped for display rather than
+ * quietly rewritten: the setting is still whatever it was until the slider
+ * is moved.
+ */
+function strategyLabel(value: number): string {
+  if (value <= 0.05) return "Kneejerk";
+  if (value >= STRATEGY_MAX - 0.05) return "Conservative";
+  return `${value.toFixed(1)} pts a gameweek`;
+}
+
 export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => void }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [reference, setReference] = useState<Reference | null>(null);
@@ -147,6 +163,9 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
 
   if (!settings) return <p className="muted">{error || "Loading settings…"}</p>;
 
+  const strategy = Math.min(settings.min_transfer_value, STRATEGY_MAX);
+  const benchPercent = Math.round((settings.bench_weight ?? 0.2) * 100);
+
   const forced = settings.forced_selections ?? {};
   const setForced = (position: string, names: string[]) =>
     patch({ forced_selections: { ...forced, [position]: names } });
@@ -189,47 +208,88 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
       >
         <div className="panel col-half">
           <h3>Model</h3>
-          <div className="grid-2">
-            <div className="field">
-              <label htmlFor="horizon">Fixtures ahead</label>
+          <div className="field">
+            <label htmlFor="horizon">
+              Fixtures ahead
+              <output htmlFor="horizon">
+                {settings.first_n_gameweeks}{" "}
+                {settings.first_n_gameweeks === 1 ? "gameweek" : "gameweeks"}
+              </output>
+            </label>
+            <div className="setting-slider">
               <input
                 id="horizon"
-                type="number"
+                type="range"
                 min={1}
                 max={10}
+                step={1}
                 value={settings.first_n_gameweeks}
-                onChange={(e) => patch({ first_n_gameweeks: Number(e.target.value) })}
+                onChange={(e) =>
+                  patch({ first_n_gameweeks: Number(e.target.value) })
+                }
               />
-              <span className="hint">
-                How many fixtures the optimiser looks ahead for.
-              </span>
+              <div className="slider-ends">
+                <span>This week only</span>
+                <span>Ten weeks out</span>
+              </div>
             </div>
-            <div className="field">
-              <label htmlFor="minval">Transfer threshold</label>
+            <span className="hint">How far ahead the model looks.</span>
+          </div>
+
+          <div className="field">
+            <label htmlFor="minval">
+              Transfer strategy
+              <output htmlFor="minval">{strategyLabel(strategy)}</output>
+            </label>
+            <div className="setting-slider">
               <input
                 id="minval"
-                type="number"
-                step="0.5"
-                value={settings.min_transfer_value}
-                onChange={(e) => patch({ min_transfer_value: Number(e.target.value) })}
+                type="range"
+                min={0}
+                max={2.5}
+                step={0.1}
+                value={strategy}
+                onChange={(e) =>
+                  patch({ min_transfer_value: Number(e.target.value) })
+                }
               />
-              <span className="hint">
-                How many points each future gameweek must improve by before a transfer is recommended. 
-                Setting to zero is the ultimate knee-jerk setting. Setting to 5 is highly conservative.
-              </span>
+              <div className="slider-ends">
+                <span>Kneejerk</span>
+                <span>Conservative</span>
+              </div>
             </div>
+            <span className="hint">
+              How many points-gain a single transfer must deliver to the
+              squad to be considered worth making.
+            </span>
           </div>
+
           <div className="field">
-            <label htmlFor="hold">Gameweeks a transfer is held</label>
-            <input
-              id="hold"
-              type="number"
-              min={1}
-              max={15}
-              value={settings.transfer_horizon_gws}
-              onChange={(e) => patch({ transfer_horizon_gws: Number(e.target.value) })}
-            />
-            <span className="hint">When taking a -4 hit, how many gameweeks to ammortise the -4 cost against.</span>
+            <label htmlFor="bench">
+              Bench importance
+              <output htmlFor="bench">{benchPercent}%</output>
+            </label>
+            <div className="setting-slider">
+              <input
+                id="bench"
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={benchPercent}
+                onChange={(e) =>
+                  patch({ bench_weight: Number(e.target.value) / 100 })
+                }
+              />
+              <div className="slider-ends">
+                <span>Ignore the bench</span>
+                <span>Equal to starters</span>
+              </div>
+            </div>
+            <span className="hint">
+              How much a bench player&rsquo;s score counts when picking the
+              squad. A Bench Boost week uses 100% whatever this is set to.
+            </span>
           </div>
           <Toggle
             checked={settings.accept_transfer_penalty}

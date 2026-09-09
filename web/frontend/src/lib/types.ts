@@ -26,6 +26,32 @@ export interface Player {
   bench_order: number | null;
 }
 
+/**
+ * One squad the optimiser is offering. Everything the pitch and the scoreline
+ * need is here, so switching between them is a repaint rather than a run.
+ */
+export interface SquadOption {
+  key: string;
+  label: string;
+  kind: "recommended" | "alternative" | "previous";
+  starting: Player[];
+  bench: Player[];
+  formation: string;
+  projected_points: number;
+  /** The model's own rating, null on squads saved before it was recorded. */
+  nerdball_score: number | null;
+  squad_value: number;
+  bank: number;
+  transfers_made: number;
+  penalty_points: number;
+  player_ids: number[];
+  transfers: { in: string[]; out: string[] };
+  /** True for the one the optimiser would pick left to itself. */
+  recommended: boolean;
+  /** Players this option drops relative to option one. Zero on option one. */
+  differs_by: number;
+}
+
 export interface SquadPayload {
   starting: Player[];
   bench: Player[];
@@ -43,6 +69,8 @@ export interface SquadPayload {
   points_gain_per_gw: number | null;
   transfers: { in: string[]; out: string[] };
   model_xi: { projected_points: number; cost: number; starting: Player[] } | null;
+  options?: SquadOption[];
+  active_option?: string;
   imported?: boolean;
   explored?: {
     player_out: string;
@@ -66,6 +94,7 @@ export interface Squad {
   transfers_made: number;
   penalty_points: number;
   chip: string;
+  active_option?: string;
   payload: SquadPayload;
 }
 
@@ -92,10 +121,10 @@ export interface Settings {
   free_hit_prev_gw: boolean;
   bench_boost: boolean;
   triple_captain: boolean;
+  bench_weight: number;
   use_ml_weights: boolean;
   first_n_gameweeks: number;
   min_transfer_value: number;
-  transfer_horizon_gws: number;
   overrides: Record<string, unknown>;
   team_modifiers: Record<string, number>;
   forced_selections: Record<string, string[]>;

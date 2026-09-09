@@ -33,10 +33,10 @@ class SettingsOut(BaseModel):
     triple_captain: bool
     theme: str = "legacy"
     tutorial_seen: bool = False
+    bench_weight: float = 0.2
     use_ml_weights: bool
     first_n_gameweeks: int
     min_transfer_value: float
-    transfer_horizon_gws: int
     overrides: dict[str, Any] = Field(default_factory=dict)
     team_modifiers: dict[str, float] = Field(default_factory=dict)
     forced_selections: dict[str, list[str]] = Field(default_factory=dict)
@@ -55,10 +55,10 @@ class SettingsIn(BaseModel):
     triple_captain: bool | None = None
     theme: str | None = None
     tutorial_seen: bool | None = None
+    bench_weight: float | None = Field(default=None, ge=0, le=1)
     use_ml_weights: bool | None = None
     first_n_gameweeks: int | None = Field(default=None, ge=1, le=10)
     min_transfer_value: float | None = Field(default=None, ge=0, le=20)
-    transfer_horizon_gws: int | None = Field(default=None, ge=1, le=15)
     overrides: dict[str, Any] | None = None
     team_modifiers: dict[str, float] | None = None
     forced_selections: dict[str, list[str]] | None = None
@@ -152,7 +152,14 @@ class SquadOut(BaseModel):
     transfers_made: int
     penalty_points: int
     chip: str
+    active_option: str = "option-1"
     payload: dict[str, Any]
+
+
+class ActivateOptionIn(BaseModel):
+    """Which of a run's squads to put in force."""
+
+    option: str = Field(min_length=1, max_length=24)
 
 
 class ResultIn(BaseModel):

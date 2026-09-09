@@ -101,9 +101,21 @@ class UserSettings(Base):
         String(16), default="legacy", server_default="legacy"
     )
 
+    # How much a bench player's score counts when picking the squad, as a
+    # proportion of a starter's. Zero optimises the eleven alone and lets
+    # the bench be whatever the budget leaves; one makes all fifteen count
+    # equally, which is what a Bench Boost actually does.
+    bench_weight: Mapped[float] = mapped_column(
+        Float, default=0.2, server_default="0.2"
+    )
+
     use_ml_weights: Mapped[bool] = mapped_column(Boolean, default=False)
     first_n_gameweeks: Mapped[int] = mapped_column(Integer, default=1)
     min_transfer_value: Mapped[float] = mapped_column(Float, default=2.0)
+    # Retained but no longer read: a transfer's benefit is now counted over
+    # first_n_gameweeks, the same window the scores are built over. Left in
+    # place because nothing here drops columns, and an unused one is
+    # harmless where a lost one is not.
     transfer_horizon_gws: Mapped[int] = mapped_column(Integer, default=4)
 
     # Free-form overrides, keyed by the engine's Config attribute name.
@@ -140,10 +152,24 @@ class Squad(Base):
     chip: Mapped[str] = mapped_column(String(24), default="")
 
     # Structured squad used by the UI: starting XI, bench, captain flags.
+    # Also carries every option the run offered, under "options".
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     # Verbatim rows the engine wrote to squads/gw{n}/full_squad.csv, so a
     # later run can be handed exactly the file it expects.
     engine_rows: Mapped[list[Any]] = mapped_column(JSON, default=list)
+
+    # Which of the run's options is in force. The columns above and the
+    # payload's own starting XI always describe this one.
+    active_option: Mapped[str] = mapped_column(
+        String(24), default="option-1", server_default="option-1"
+    )
+    # Engine rows for every option, keyed the same way, so activating one
+    # can hand next week's run the fifteen that were actually kept. Kept out
+    # of the payload deliberately: it is several times the size of everything
+    # the browser needs, and the browser never reads it.
+    option_rows: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, default=dict, nullable=True
+    )
 
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 

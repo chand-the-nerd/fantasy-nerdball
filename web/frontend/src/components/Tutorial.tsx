@@ -261,6 +261,31 @@ function ArtDone() {
   );
 }
 
+function ArtScores() {
+  return (
+    <svg viewBox="0 0 220 120" aria-hidden="true">
+      {/* An option button, with the pair of numbers it carries. */}
+      <rect
+        x="56"
+        y="22"
+        width="108"
+        height="76"
+        rx="4"
+        className="ink-line"
+      />
+      <text x="72" y="44" className="ink-cap">
+        OPTION 1
+      </text>
+      <text x="72" y="72" className="ink-num">
+        60.4
+      </text>
+      <text x="72" y="88" className="ink-cap">
+        28.7 nerdball
+      </text>
+    </svg>
+  );
+}
+
 interface Step {
   title: string;
   tab?: TourTab;
@@ -335,6 +360,39 @@ const STEPS: Step[] = [
         <p>
           Under the pitch, every player's score is broken down line by line, so
           you can see why someone was picked rather than take it on trust.
+        </p>
+      </>
+    ),
+  },
+  {
+    title: "Nerdball Points vs Projected Points",
+    tab: "squad",
+    art: ArtScores,
+    body: (
+      <>
+        <p>
+          Each option carries two figures.{" "}
+          <strong>Projected points</strong>, the large one, is what the
+          starting eleven should score in the coming gameweek. The{" "}
+          <strong>nerdball score</strong> beneath it is the model's own rating
+          of the whole squad, built from form, historic returns, likeliness to play, and fixture
+          difficulty across however many gameweeks you set it to look ahead.
+        </p>
+        <p>
+          Squads are picked on the nerdball score rather than the projection,
+          because a side has to hold up beyond the weekend. A player with a kind
+          run of fixtures is worth having even in a week he is not the highest
+          projected, and the projection alone cannot see that.
+        </p>
+        <p>
+          The exception is a Free Hit, where the squad reverts next week. There
+          is no beyond-Saturday to plan for, so that week is picked on
+          projected points instead.
+        </p>
+        <p className="tour-tip">
+          The recommended option is not simply the highest of either number.
+          It is the one where every transfer earned its keep, which is what
+          Transfer strategy on the Setup page controls.
         </p>
       </>
     ),

@@ -23,7 +23,13 @@ ALLOWED_OVERRIDES = {
     "BENCH_BOOST",
     "TRIPLE_CAPTAIN",
     "MIN_TRANSFER_VALUE",
-    "TRANSFER_HORIZON_GWS",
+    # How far apart the squad options on the Squad page must be. Player
+    # count, how many of them were starting, and how much money changes
+    # hands. All three trade a little of the true ranking for options that
+    # differ enough to be worth looking at.
+    "OPTION_MIN_CHANGES",
+    "OPTION_MIN_STARTER_CHANGES",
+    "OPTION_MIN_SPEND_CHANGE",
     "FIRST_N_GAMEWEEKS",
     "FIXTURE_DECAY_FACTOR",
     "USE_ML_WEIGHTS",
@@ -97,12 +103,26 @@ def build_config(
         RunConfig.FREE_HIT_PREV_GW = bool(settings_row.free_hit_prev_gw)
         RunConfig.BENCH_BOOST = bool(settings_row.bench_boost)
         RunConfig.TRIPLE_CAPTAIN = bool(settings_row.triple_captain)
+        # A Bench Boost scores all fifteen, so on that week the bench is
+        # not a reserve to be traded down — it is half the return. Picking
+        # it at a fifth of a starter's weight would spend the chip on four
+        # players chosen to be cheap.
+        RunConfig.BENCH_WEIGHT = (
+            1.0 if RunConfig.BENCH_BOOST
+            else float(getattr(settings_row, "bench_weight", 0.2))
+        )
         RunConfig.USE_ML_WEIGHTS = bool(settings_row.use_ml_weights)
         RunConfig.FIRST_N_GAMEWEEKS = (
             1 if free_hit else int(settings_row.first_n_gameweeks)
         )
-        RunConfig.MIN_TRANSFER_VALUE = float(settings_row.min_transfer_value)
-        RunConfig.TRANSFER_HORIZON_GWS = int(settings_row.transfer_horizon_gws)
+        # A threshold is a price on a transfer, and on a Wildcard or Free
+        # Hit transfers are free and unlimited. Holding a move back because
+        # it only gains a point costs nothing to make and gains nothing to
+        # refuse, so the strategy setting is ignored for the week.
+        RunConfig.MIN_TRANSFER_VALUE = (
+            0.0 if RunConfig.WILDCARD
+            else float(settings_row.min_transfer_value)
+        )
 
         if settings_row.team_modifiers:
             merged = dict(base.TEAM_MODIFIERS)
