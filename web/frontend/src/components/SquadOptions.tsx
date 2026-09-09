@@ -112,7 +112,7 @@ export function SquadOptions({
         squad from form, history and fixtures across your look-ahead.
       </p>
       
-      <p>
+      <p className="muted option-legend">
         Squads are picked on nerdball score, because a side has to hold up beyond
         the weekend; the projection only says how the next gameweek looks. The
         recommended option isn't always the highest score — it's the squad where

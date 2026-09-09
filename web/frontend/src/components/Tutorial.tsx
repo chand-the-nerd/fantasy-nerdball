@@ -365,7 +365,7 @@ const STEPS: Step[] = [
     ),
   },
   {
-    title: "Two numbers, two questions",
+    title: "Nerdball Points vs Projected Points",
     tab: "squad",
     art: ArtScores,
     body: (
@@ -380,7 +380,7 @@ const STEPS: Step[] = [
         </p>
         <p>
           Squads are picked on the nerdball score rather than the projection,
-          because a side has to hold up beyond Saturday. A player with a kind
+          because a side has to hold up beyond the weekend. A player with a kind
           run of fixtures is worth having even in a week he is not the highest
           projected, and the projection alone cannot see that.
         </p>
