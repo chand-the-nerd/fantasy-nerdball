@@ -255,6 +255,7 @@ def _option_entry(
     prev_squad_ids: list | None,
     free_transfers: int,
     transfer_details: dict | None,
+    bench_weight: float = 0.2,
 ) -> dict:
     """One selectable squad, dressed the same way the main one is.
 
@@ -267,6 +268,20 @@ def _option_entry(
         starting_display["now_cost_m"].sum()
         + bench_display["now_cost_m"].sum()
     )
+
+    # The model's own rating of the squad, on the same terms the selector
+    # maximised it: the eleven in full, the bench at whatever weight it was
+    # given. Reported alongside the projection because they answer different
+    # questions and the recommendation follows this one.
+    nerdball_score = None
+    if "fpl_score" in starting_display.columns:
+        try:
+            nerdball_score = float(
+                starting_display["fpl_score"].sum()
+                + float(bench_weight) * bench_display["fpl_score"].sum()
+            )
+        except (TypeError, ValueError):
+            nerdball_score = None
 
     transfers_made = 0
     if prev_squad_ids is not None:
@@ -284,6 +299,7 @@ def _option_entry(
             "label": label,
             "kind": kind,
             "projected_points": _clean(projected_points) or 0.0,
+            "nerdball_score": _clean(nerdball_score),
             "squad_value": round(value, 1),
             "bank": round(float(budget) - value, 1),
             "transfers_made": transfers_made,
@@ -310,6 +326,7 @@ def _previous_gameweek_option(
     budget: float,
     free_transfers: int,
     frames: dict[str, tuple],
+    bench_weight: float = 0.2,
 ) -> dict | None:
     """Last week's fifteen, kept whole.
 
@@ -352,6 +369,7 @@ def _previous_gameweek_option(
         player_ids=ids,
         prev_squad_ids=prev_squad_ids,
         free_transfers=free_transfers,
+        bench_weight=bench_weight,
         transfer_details=None,
     )
 
@@ -770,6 +788,7 @@ def run_optimisation(
                         player_ids=item["ids"],
                         prev_squad_ids=prev_squad_ids,
                         free_transfers=config.FREE_TRANSFERS,
+                        bench_weight=getattr(config, "BENCH_WEIGHT", 0.2),
                         # Recomputed per option rather than reusing the run's
                         # transfer_details, which describe only the squad the
                         # optimiser proposed.
@@ -788,6 +807,7 @@ def run_optimisation(
                 budget=float(config.BUDGET),
                 free_transfers=config.FREE_TRANSFERS,
                 frames=option_frames,
+                bench_weight=getattr(config, "BENCH_WEIGHT", 0.2),
             )
             if held is not None:
                 if holding:

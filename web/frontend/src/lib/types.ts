@@ -38,6 +38,8 @@ export interface SquadOption {
   bench: Player[];
   formation: string;
   projected_points: number;
+  /** The model's own rating, null on squads saved before it was recorded. */
+  nerdball_score: number | null;
   squad_value: number;
   bank: number;
   transfers_made: number;

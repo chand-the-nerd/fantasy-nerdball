@@ -78,6 +78,11 @@ export function SquadOptions({
               <span className="option-points">
                 {option.projected_points.toFixed(1)}
               </span>
+              {option.nerdball_score != null && (
+                <span className="option-score">
+                  {option.nerdball_score.toFixed(1)} nerdball
+                </span>
+              )}
               <span className="option-note">
                 {option.penalty_points > 0
                   ? `${net.toFixed(1)} after the −${option.penalty_points} hit`
@@ -99,6 +104,17 @@ export function SquadOptions({
           );
         })}
       </div>
+
+      <p className="muted option-legend">
+        The big number is <strong>projected points</strong>: what the eleven
+        should score this gameweek. The small one is the{" "}
+        <strong>nerdball score</strong>, the model&rsquo;s own rating of the
+        squad from form, history and fixtures across your look-ahead. Squads
+        are picked on nerdball score, because a side has to hold up beyond
+        Saturday; the projection only says how the coming week looks. The
+        green option is neither the highest of the two — it is the one where
+        every transfer was worth making.
+      </p>
 
       {preview && (
         <div className="option-foot-row">

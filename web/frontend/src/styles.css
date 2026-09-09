@@ -3042,6 +3042,12 @@ tr.is-clickable:focus-visible {
   letter-spacing: -0.02em;
 }
 
+.option-score {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--crowd);
+}
+
 .option-note,
 .option-foot {
   font-size: 12px;
@@ -3060,6 +3066,12 @@ tr.is-clickable:focus-visible {
   background: var(--floodlight);
   border-radius: 999px;
   padding: 1px 7px;
+}
+
+.option-legend {
+  margin: 13px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .option-foot-row {
