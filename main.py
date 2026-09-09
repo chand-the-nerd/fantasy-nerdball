@@ -512,6 +512,25 @@ def analyse_unavailable_players(components, config, scored, prev_squad_ids):
             print(f"\nAll previous squad players are available")
 
 
+def _optimise_on_projected_points(config) -> bool:
+    """Whether to pick the squad on projected points rather than score.
+
+    Normally the squad is chosen on fpl_score, which blends form,
+    history and fixture difficulty across the look-ahead, and
+    projected_points is only used to pick the eleven and to report.
+    Over several gameweeks that is right: the squad has to be good for
+    longer than the coming Saturday.
+
+    A Free Hit is the exception. The side reverts next week, so this
+    gameweek's points are the only ones it can ever bank, and there is
+    nothing for a longer-range score to be right about. Picking on
+    fpl_score there optimises one number and displays another, which is
+    how an option can end up projecting more points than the squad
+    recommended above it.
+    """
+    return bool(getattr(config, "FREE_HIT", False))
+
+
 def optimise_squad(
         components,
         config, scored,
@@ -557,7 +576,9 @@ def optimise_squad(
                 scored, config.FORCED_SELECTIONS, prev_squad_ids,
                 config.FREE_TRANSFERS, show_transfer_summary=True,
                 available_budget=available_budget,
-                use_projected_points=False
+                use_projected_points=_optimise_on_projected_points(
+                    config
+                )
             )
         )
         
@@ -636,7 +657,11 @@ def generate_squad_options(components, config, scored, prev_squad_ids,
         prev_squad_ids=prev_squad_ids,
         free_transfers=allowance,
         available_budget=available_budget,
-        use_projected_points=False,
+        # Matched to the recommendation deliberately. Ranking the
+        # options on one measure while the squad above them was picked
+        # on another puts a higher number on an option than on the
+        # recommendation, which reads as the optimiser getting it wrong.
+        use_projected_points=_optimise_on_projected_points(config),
         min_changes=min_changes,
         min_starter_changes=min_starter_changes,
         min_spend_change=min_spend_change,

@@ -103,6 +103,14 @@ def build_config(
         RunConfig.FREE_HIT_PREV_GW = bool(settings_row.free_hit_prev_gw)
         RunConfig.BENCH_BOOST = bool(settings_row.bench_boost)
         RunConfig.TRIPLE_CAPTAIN = bool(settings_row.triple_captain)
+        # A Bench Boost scores all fifteen, so on that week the bench is
+        # not a reserve to be traded down — it is half the return. Picking
+        # it at a fifth of a starter's weight would spend the chip on four
+        # players chosen to be cheap.
+        RunConfig.BENCH_WEIGHT = (
+            1.0 if RunConfig.BENCH_BOOST
+            else float(getattr(settings_row, "bench_weight", 0.2))
+        )
         RunConfig.USE_ML_WEIGHTS = bool(settings_row.use_ml_weights)
         RunConfig.FIRST_N_GAMEWEEKS = (
             1 if free_hit else int(settings_row.first_n_gameweeks)

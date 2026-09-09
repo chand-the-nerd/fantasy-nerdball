@@ -101,6 +101,14 @@ class UserSettings(Base):
         String(16), default="legacy", server_default="legacy"
     )
 
+    # How much a bench player's score counts when picking the squad, as a
+    # proportion of a starter's. Zero optimises the eleven alone and lets
+    # the bench be whatever the budget leaves; one makes all fifteen count
+    # equally, which is what a Bench Boost actually does.
+    bench_weight: Mapped[float] = mapped_column(
+        Float, default=0.2, server_default="0.2"
+    )
+
     use_ml_weights: Mapped[bool] = mapped_column(Boolean, default=False)
     first_n_gameweeks: Mapped[int] = mapped_column(Integer, default=1)
     min_transfer_value: Mapped[float] = mapped_column(Float, default=2.0)

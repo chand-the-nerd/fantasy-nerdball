@@ -164,6 +164,7 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
   if (!settings) return <p className="muted">{error || "Loading settings…"}</p>;
 
   const strategy = Math.min(settings.min_transfer_value, STRATEGY_MAX);
+  const benchPercent = Math.round((settings.bench_weight ?? 0.2) * 100);
 
   const forced = settings.forced_selections ?? {};
   const setForced = (position: string, names: string[]) =>
@@ -260,6 +261,34 @@ export function SetupView({ me, onMeChange }: { me: Me; onMeChange: (me: Me) => 
             <span className="hint">
               How many points-gain a single transfer must deliver to the
               squad to be considered worth making.
+            </span>
+          </div>
+
+          <div className="field">
+            <label htmlFor="bench">
+              Bench importance
+              <output htmlFor="bench">{benchPercent}%</output>
+            </label>
+            <div className="setting-slider">
+              <input
+                id="bench"
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={benchPercent}
+                onChange={(e) =>
+                  patch({ bench_weight: Number(e.target.value) / 100 })
+                }
+              />
+              <div className="slider-ends">
+                <span>Ignore the bench</span>
+                <span>Equal to starters</span>
+              </div>
+            </div>
+            <span className="hint">
+              How much a bench player&rsquo;s score counts when picking the
+              squad. A Bench Boost week uses 100% whatever this is set to.
             </span>
           </div>
           <Toggle

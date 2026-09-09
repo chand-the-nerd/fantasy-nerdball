@@ -119,6 +119,7 @@ export interface Settings {
   free_hit_prev_gw: boolean;
   bench_boost: boolean;
   triple_captain: boolean;
+  bench_weight: number;
   use_ml_weights: boolean;
   first_n_gameweeks: number;
   min_transfer_value: number;
