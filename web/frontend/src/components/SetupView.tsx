@@ -357,9 +357,7 @@ export function SetupView({
               {guest
                 ? `Fixed at ${Math.round(GUEST.benchWeight * 100)}% ` +
                   "without an account."
-                : "How much a bench player’s score counts when picking " +
-                  "the squad. A Bench Boost week uses 100% whatever this " +
-                  "is set to."}
+                : "How important your bench is."}
             </span>
           </div>
           <Toggle
