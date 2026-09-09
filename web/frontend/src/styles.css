@@ -2929,3 +2929,169 @@ tr.is-clickable:focus-visible {
 .dir-mark.out {
   color: var(--flag);
 }
+
+/* ── Squad options: the ranked alternatives under the pitch ──────────── */
+
+.option-strip {
+  margin-top: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px 16px;
+}
+
+.option-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.option-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--fade);
+  white-space: nowrap;
+}
+
+.option-key .swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--gain);
+}
+
+.option-blurb {
+  margin: -4px 0 12px;
+}
+
+.option-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(122px, 1fr));
+  gap: 8px;
+}
+
+.option-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px 11px;
+  text-align: left;
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--chalk);
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.option-card:hover:not(:disabled) {
+  border-color: var(--fade);
+}
+
+.option-card:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Holding last week's squad is a different kind of answer to the four the
+   optimiser ranked, so it reads as one rather than as a fifth option. */
+.option-card.hold {
+  border-style: dashed;
+}
+
+/* The optimiser's own pick. Kept distinct from .active, which is whichever
+   squad is currently in force — the two separate the moment a manager
+   activates something the optimiser didn't recommend. */
+.option-card.recommended {
+  border-color: var(--gain);
+  box-shadow: inset 3px 0 0 var(--gain);
+}
+
+.option-card.recommended .option-points {
+  color: var(--gain);
+}
+
+.option-card.shown {
+  border-color: var(--floodlight);
+  background: var(--tint-accent);
+}
+
+.option-card.recommended.shown {
+  border-color: var(--gain);
+  background: var(--tint-good);
+}
+
+.option-card.active .option-label {
+  color: var(--floodlight);
+}
+
+.option-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fade);
+}
+
+.option-points {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.option-note,
+.option-foot {
+  font-size: 12px;
+  color: var(--fade);
+}
+
+.option-flag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--on-accent);
+  background: var(--floodlight);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.option-foot-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 13px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+}
+
+.option-foot-row .muted {
+  margin: 0;
+}
+
+.option-current {
+  font-size: 13px;
+  color: var(--fade);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .option-row {
+    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  }
+
+  .option-points {
+    font-size: 18px;
+  }
+}

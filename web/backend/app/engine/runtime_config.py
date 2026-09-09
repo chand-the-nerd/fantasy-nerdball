@@ -23,6 +23,13 @@ ALLOWED_OVERRIDES = {
     "BENCH_BOOST",
     "TRIPLE_CAPTAIN",
     "MIN_TRANSFER_VALUE",
+    # How far apart the squad options on the Squad page must be. Player
+    # count, how many of them were starting, and how much money changes
+    # hands. All three trade a little of the true ranking for options that
+    # differ enough to be worth looking at.
+    "OPTION_MIN_CHANGES",
+    "OPTION_MIN_STARTER_CHANGES",
+    "OPTION_MIN_SPEND_CHANGE",
     "TRANSFER_HORIZON_GWS",
     "FIRST_N_GAMEWEEKS",
     "FIXTURE_DECAY_FACTOR",

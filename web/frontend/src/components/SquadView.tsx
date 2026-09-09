@@ -4,12 +4,20 @@ import { PlayerActions } from "./PlayerActions";
 import { RunConsole } from "./RunConsole";
 import { RunSettings } from "./RunSettings";
 import { SquadBuilder } from "./SquadBuilder";
+import { SquadOptions } from "./SquadOptions";
 import { StartingSquadPrompt } from "./StartingSquadPrompt";
 import { ExploredTransfers, SquadCalculations } from "./SquadCalculations";
 import { api, ApiError } from "../lib/api";
 import { useSettings } from "../lib/settingsStore";
 import { normalise } from "../lib/text";
-import type { GameweekInfo, Me, Player, Run, Squad } from "../lib/types";
+import type {
+  GameweekInfo,
+  Me,
+  Player,
+  Run,
+  Squad,
+  SquadOption,
+} from "../lib/types";
 
 /**
  * The squad to open on: the gameweek FPL is currently on, or the closest one
@@ -37,38 +45,53 @@ function deadlineText(iso: string | null): string {
   });
 }
 
-function Scoreline({ squad }: { squad: Squad }) {
-  const payload = squad.payload;
+/**
+ * The numbers on screen. Either the squad as saved, or an option being looked
+ * at before it is committed — the two are interchangeable here on purpose, so
+ * previewing costs nothing more than swapping this object.
+ */
+interface SquadShape {
+  starting: Player[];
+  bench: Player[];
+  formation: string;
+  projected_points: number;
+  squad_value: number;
+  bank: number;
+  transfers_made: number;
+  penalty_points: number;
+  made_transfers: boolean;
+  transfers: { in: string[]; out: string[] };
+}
+
+function Scoreline({ gameweek, chip, view }: { gameweek: number; chip: string; view: SquadShape }) {
   return (
     <div className="scoreline">
       <div className="cell">
-        <span className="value">GW{squad.gameweek}</span>
+        <span className="value">GW{gameweek}</span>
       </div>
       <div className="cell">
-        <span className="value accent">{squad.projected_points.toFixed(1)}</span>
+        <span className="value accent">{view.projected_points.toFixed(1)}</span>
         <span className="label">projected</span>
       </div>
       <div className="cell">
-        <span className="value">{squad.formation}</span>
+        <span className="value">{view.formation}</span>
         <span className="label">shape</span>
       </div>
       <div className="cell">
-        <span className="value">£{squad.squad_value.toFixed(1)}m</span>
+        <span className="value">£{view.squad_value.toFixed(1)}m</span>
         <span className="label">
-          {squad.bank >= 0.05 ? `£${squad.bank.toFixed(1)}m in the bank` : "fully spent"}
+          {view.bank >= 0.05 ? `£${view.bank.toFixed(1)}m in the bank` : "fully spent"}
         </span>
       </div>
       <div className="cell">
-        <span className="value">
-          {payload.made_transfers ? squad.transfers_made : 0}
-        </span>
+        <span className="value">{view.transfers_made}</span>
         <span className="label">
-          {squad.penalty_points > 0
-            ? `transfers, −${squad.penalty_points} pts`
+          {view.penalty_points > 0
+            ? `transfers, −${view.penalty_points} pts`
             : "transfers"}
         </span>
       </div>
-      {squad.chip && <span className="chip-badge">{squad.chip}</span>}
+      {chip && <span className="chip-badge">{chip}</span>}
     </div>
   );
 }
@@ -91,17 +114,23 @@ function TransferArrow({ direction }: { direction: "in" | "out" }) {
   );
 }
 
-function TransferPanel({ squad }: { squad: Squad }) {
-  const payload = squad.payload;
-  const { in: incoming, out: outgoing } = payload.transfers;
+function TransferPanel({
+  view,
+  reason,
+  gain,
+}: {
+  view: SquadShape;
+  reason: string;
+  gain: number | null;
+}) {
+  const { in: incoming, out: outgoing } = view.transfers;
 
-  if (!payload.made_transfers || (incoming.length === 0 && outgoing.length === 0)) {
+  if (!view.made_transfers || (incoming.length === 0 && outgoing.length === 0)) {
     return (
       <div className="panel">
         <h3>Hold the squad</h3>
         <p className="muted">
-          {payload.transfer_reason ||
-            "No move clears the improvement threshold this week."}
+          {reason || "No move clears the improvement threshold this week."}
         </p>
       </div>
     );
@@ -124,18 +153,18 @@ function TransferPanel({ squad }: { squad: Squad }) {
           </li>
         ))}
       </ul>
-      {payload.points_gain_per_gw != null && payload.points_gain_per_gw > 0 ? (
+      {gain != null && gain > 0 ? (
         <p className="transfer-gain">
-          Worth about <strong>{payload.points_gain_per_gw.toFixed(1)} points a
+          Worth about <strong>{gain.toFixed(1)} points a
           gameweek</strong> more than holding the squad
-          {squad.penalty_points > 0
-            ? `, before the ${squad.penalty_points} point hit.`
+          {view.penalty_points > 0
+            ? `, before the ${view.penalty_points} point hit.`
             : "."}
         </p>
       ) : (
-        payload.transfer_reason && (
+        reason && (
           <p className="muted" style={{ marginTop: 12, marginBottom: 0 }}>
-            {payload.transfer_reason}
+            {reason}
           </p>
         )
       )}
@@ -254,6 +283,11 @@ export function SquadView({
   const [targetGw, setTargetGw] = useState<number | null>(null);
   const [building, setBuilding] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  // The option being looked at. Null means whichever one is in force, so a
+  // fresh run or a change of gameweek falls back to the active squad rather
+  // than holding a preview of something that no longer exists.
+  const [previewKey, setPreviewKey] = useState<string | null>(null);
+  const [activating, setActivating] = useState(false);
 
   const busy = run?.status === "queued" || run?.status === "running";
 
@@ -302,6 +336,10 @@ export function SquadView({
     return () => clearInterval(timer);
   }, [busy, run?.id]);
 
+  useEffect(() => {
+    setPreviewKey(null);
+  }, [squad?.id, squad?.payload.active_option]);
+
   const reloadSquads = async () => {
     const squads = await api.squads();
     setHistory(squads);
@@ -315,6 +353,66 @@ export function SquadView({
       setRun(await api.startRun(targetGw ?? undefined));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
+    }
+  };
+
+  const options: SquadOption[] = squad?.payload.options ?? [];
+  const activeKey = squad?.payload.active_option ?? "option-1";
+  const shownKey = previewKey ?? activeKey;
+  const previewing = shownKey !== activeKey;
+
+  // What to draw. An option carries its own eleven, shape and totals, so a
+  // preview is a straight swap; without options — an older squad saved before
+  // this existed, or an imported one — the payload is the view.
+  const view: SquadShape | null = useMemo(() => {
+    if (!squad) return null;
+    const payload = squad.payload;
+    const chosen = options.find((option) => option.key === shownKey);
+
+    if (!chosen) {
+      return {
+        starting: payload.starting,
+        bench: payload.bench,
+        formation: squad.formation,
+        projected_points: squad.projected_points,
+        squad_value: squad.squad_value,
+        bank: squad.bank,
+        transfers_made: payload.made_transfers ? squad.transfers_made : 0,
+        penalty_points: squad.penalty_points,
+        made_transfers: payload.made_transfers,
+        transfers: payload.transfers,
+      };
+    }
+
+    return {
+      starting: chosen.starting,
+      bench: chosen.bench,
+      formation: chosen.formation,
+      projected_points: chosen.projected_points,
+      squad_value: chosen.squad_value,
+      bank: chosen.bank,
+      transfers_made: chosen.transfers_made,
+      penalty_points: chosen.penalty_points,
+      made_transfers: chosen.transfers_made > 0,
+      transfers: chosen.transfers,
+    };
+  }, [squad, options, shownKey]);
+
+  const activate = async (key: string) => {
+    if (!squad) return;
+    setError("");
+    setActivating(true);
+    try {
+      const updated = await api.activateOption(squad.gameweek, key);
+      setSquad(updated);
+      setHistory((squads) =>
+        squads.map((entry) => (entry.id === updated.id ? updated : entry)),
+      );
+      setPreviewKey(null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err));
+    } finally {
+      setActivating(false);
     }
   };
 
@@ -414,15 +512,28 @@ export function SquadView({
 
       <div className="squad-layout">
         <div>
-          {squad ? (
+          {squad && view ? (
             <>
-              <Scoreline squad={squad} />
+              <Scoreline
+                gameweek={squad.gameweek}
+                chip={squad.chip}
+                view={view}
+              />
               <Pitch
-                starting={squad.payload.starting}
-                bench={squad.payload.bench}
+                starting={view.starting}
+                bench={view.bench}
                 benchBoost={squad.chip === "Bench Boost"}
                 onSelect={setSelected}
                 forced={forcedNames}
+              />
+              <SquadOptions
+                options={options}
+                activeKey={activeKey}
+                previewKey={shownKey}
+                onPreview={setPreviewKey}
+                onActivate={activate}
+                activating={activating}
+                disabled={busy}
               />
             </>
           ) : (
@@ -442,7 +553,20 @@ export function SquadView({
           {selected && (
             <PlayerDetail player={selected} onClose={() => setSelected(null)} />
           )}
-          {squad && !selected && <TransferPanel squad={squad} />}
+          {squad && view && !selected && (
+            <TransferPanel
+              view={view}
+              // The optimiser's reasoning belongs to the squad it recommended.
+              // Shown against one you picked instead, it would be arguing for
+              // transfers that aren't on screen.
+              reason={
+                previewing
+                  ? "Previewing an option. Activate it to make it your squad."
+                  : squad.payload.transfer_reason
+              }
+              gain={previewing ? null : squad.payload.points_gain_per_gw}
+            />
+          )}
           {squad && !selected && <ExploredTransfers squad={squad} />}
           {squad && !selected && <ModelXiPanel squad={squad} />}
         </div>

@@ -152,7 +152,14 @@ class SquadOut(BaseModel):
     transfers_made: int
     penalty_points: int
     chip: str
+    active_option: str = "option-1"
     payload: dict[str, Any]
+
+
+class ActivateOptionIn(BaseModel):
+    """Which of a run's squads to put in force."""
+
+    option: str = Field(min_length=1, max_length=24)
 
 
 class ResultIn(BaseModel):

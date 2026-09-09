@@ -140,10 +140,24 @@ class Squad(Base):
     chip: Mapped[str] = mapped_column(String(24), default="")
 
     # Structured squad used by the UI: starting XI, bench, captain flags.
+    # Also carries every option the run offered, under "options".
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     # Verbatim rows the engine wrote to squads/gw{n}/full_squad.csv, so a
     # later run can be handed exactly the file it expects.
     engine_rows: Mapped[list[Any]] = mapped_column(JSON, default=list)
+
+    # Which of the run's options is in force. The columns above and the
+    # payload's own starting XI always describe this one.
+    active_option: Mapped[str] = mapped_column(
+        String(24), default="option-1", server_default="option-1"
+    )
+    # Engine rows for every option, keyed the same way, so activating one
+    # can hand next week's run the fifteen that were actually kept. Kept out
+    # of the payload deliberately: it is several times the size of everything
+    # the browser needs, and the browser never reads it.
+    option_rows: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, default=dict, nullable=True
+    )
 
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 

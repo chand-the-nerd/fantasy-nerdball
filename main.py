@@ -575,6 +575,70 @@ def optimise_squad(
             transfers_made, penalty_points)
 
 
+def generate_squad_options(components, config, scored, prev_squad_ids,
+                           available_budget, count=5,
+                           free_transfers=None, min_changes=1,
+                           min_starter_changes=0, min_spend_change=0.0,
+                           exclude_squads=None):
+    """Rank the best few squads available under this week's rules.
+
+    The optimiser has only ever answered with its single best squad,
+    which hides how close the runners-up were. This asks the same
+    model for its next choices too, so a manager can see what it
+    nearly picked and take one of those instead.
+
+    Args:
+        components (dict): Initialised engine components.
+        config: The run's config.
+        scored (pd.DataFrame): Scored player pool.
+        prev_squad_ids (list): Previous squad player IDs, or None.
+        available_budget (float): Budget for the squad.
+        count (int): How many squads to rank.
+        free_transfers (int, optional): Transfer allowance to rank
+                                        under. Defaults to the
+                                        config's free transfers. Pass
+                                        the number the recommendation
+                                        actually used so the options
+                                        are judged on equal terms.
+        min_changes (int): Minimum players separating one option from
+                           the next.
+        min_starter_changes (int): How many of those must have been
+                                   starting, so the difference shows
+                                   on the pitch rather than on the
+                                   bench.
+        min_spend_change (float): Combined price, in millions, that
+                                  must change hands between one
+                                  option and the next.
+        exclude_squads (list, optional): Squads to keep out of the
+                                         ranking, as lists of player
+                                         IDs.
+
+    Returns:
+        list: (starting_xi, bench) tuples, best first.
+    """
+    if count <= 0:
+        return []
+
+    allowance = (
+        config.FREE_TRANSFERS if free_transfers is None
+        else free_transfers
+    )
+
+    return components['squad_selector'].select_squad_alternatives(
+        scored,
+        config.FORCED_SELECTIONS,
+        count,
+        prev_squad_ids=prev_squad_ids,
+        free_transfers=allowance,
+        available_budget=available_budget,
+        use_projected_points=False,
+        min_changes=min_changes,
+        min_starter_changes=min_starter_changes,
+        min_spend_change=min_spend_change,
+        exclude_squads=exclude_squads,
+    )
+
+
 def evaluate_transfer_strategy(components, config, scored, prev_squad_ids, 
                              starting_with_transfers, transfers_made):
     """Evaluate whether transfers should be made."""

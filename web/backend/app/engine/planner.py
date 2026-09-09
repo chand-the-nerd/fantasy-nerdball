@@ -160,6 +160,10 @@ def run_plan(
             # heading above is the useful granularity here.
             on_progress=None,
             scratch=SCRATCH,
+            # A plan is one line through the season, and every week of it is
+            # speculative anyway. Ranking five squads a week would multiply
+            # the work for alternatives nobody can act on.
+            option_count=0,
         )
 
         squad = result["squad"]

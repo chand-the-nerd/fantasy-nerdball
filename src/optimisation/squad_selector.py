@@ -229,9 +229,16 @@ class SquadSelector:
             forced_player_ids=forced_player_ids,
         )
 
-    def solve_model(self, model: SquadModel):
+    def solve_model(self, model: SquadModel, quiet: bool = False):
         """
         Solve a built model and return the selected squad.
+
+        Args:
+            model (SquadModel): The built problem.
+            quiet (bool): Suppress the failure message. Set when a
+                          failure is an expected outcome rather than a
+                          fault - enumerating alternatives runs the
+                          model until it goes infeasible on purpose.
 
         Returns:
             pd.DataFrame: The fifteen selected players, or None if the
@@ -240,12 +247,14 @@ class SquadSelector:
         status = model.prob.solve(pulp.PULP_CBC_CMD(msg=0))
 
         if status != pulp.LpStatusOptimal:
-            # Always reported, not only under GRANULAR_OUTPUT: an
-            # infeasible problem returns empty frames, and a silent
-            # empty squad is indistinguishable from "no transfers".
-            print(f"Optimisation failed with status: "
-                  f"{pulp.LpStatus[status]}. Check the budget, forced "
-                  "selections and free transfer count.")
+            # Otherwise always reported, not only under
+            # GRANULAR_OUTPUT: an infeasible problem returns empty
+            # frames, and a silent empty squad is indistinguishable
+            # from "no transfers".
+            if not quiet:
+                print(f"Optimisation failed with status: "
+                      f"{pulp.LpStatus[status]}. Check the budget, "
+                      "forced selections and free transfer count.")
             return None
 
         return self._extract_solution(
@@ -282,6 +291,274 @@ class SquadSelector:
         # PuLP holds ``expr >= k`` as ``expr - k >= 0``, so the bound
         # sits in the constraint's constant with its sign flipped.
         transfer["constraint"].constant = -minimum
+
+    def separation_ceiling(self, prev_squad_ids: list = None,
+                           free_transfers: int = None) -> int:
+        """Most players any two legal squads can differ by this week.
+
+        Every squad has to keep all but ``free_transfers`` of last
+        week's fifteen, so two of them can differ only where each spent
+        its allowance differently: one drops A, the other drops B, and
+        the pair are two players apart. The ceiling is therefore twice
+        the allowance, and on a one-transfer week no amount of tuning
+        will produce options further apart than two players. Asking for
+        more would only make the model infeasible and return a shorter
+        list.
+        """
+        if prev_squad_ids is None or free_transfers is None:
+            return 15
+        if self.config.WILDCARD:
+            return 15
+        return max(1, min(15, 2 * int(free_transfers)))
+
+    def exclude_squad(self, model: SquadModel, squad_ids: list,
+                      min_changes: int = 1, starter_ids: list = None,
+                      min_starter_changes: int = 0,
+                      min_spend_change: float = 0.0) -> None:
+        """
+        Forbid a squad, and anything close to it, from a built model.
+
+        The first cut is the no-good cut: the selection variables of a
+        squad already found are held to at most fifteen minus
+        ``min_changes``, so the next solve has to differ by that many
+        players. At one it removes exactly the squad given, which is
+        the standard way to read a problem's second, third and fourth
+        best answers off the same model.
+
+        Counting players alone is a poor measure of how different two
+        squads look, because a fourth-choice goalkeeper counts the same
+        as a captain. The other two cuts count what a manager would
+        actually notice:
+
+        ``min_starter_changes`` requires that many of this squad's
+        starting eleven leave the *squad* entirely, not merely drop to
+        the bench, so the pitch is visibly different.
+
+        ``min_spend_change`` requires that the departing players be
+        worth at least that much between them, so an option cannot
+        distinguish itself by swapping two cheap defenders.
+
+        All three are linear and go on the same model, so they cost a
+        constraint each and nothing else. Raising any of them means the
+        list stops being the true top N: the squads skipped were ranked
+        where they were honestly.
+
+        Args:
+            model (SquadModel): The built problem to cut.
+            squad_ids (list): Player IDs of the squad to exclude.
+            min_changes (int): Players the next squad must change.
+                               Values below one are treated as one; a
+                               cut of zero excludes nothing and the
+                               enumeration would repeat itself forever.
+            starter_ids (list, optional): The subset of ``squad_ids``
+                                          picked to start.
+            min_starter_changes (int): How many of those must go.
+            min_spend_change (float): Combined price, in millions, that
+                                      must leave the squad.
+        """
+        rows = [
+            model.index.id_to_index[player_id]
+            for player_id in squad_ids
+            if player_id in model.index.id_to_index
+        ]
+
+        if not rows:
+            return
+
+        model.prob += (
+            pulp.lpSum([model.x[i] for i in rows])
+            <= len(rows) - max(1, int(min_changes))
+        )
+
+        if starter_ids and int(min_starter_changes) > 0:
+            starter_rows = [
+                model.index.id_to_index[player_id]
+                for player_id in starter_ids
+                if player_id in model.index.id_to_index
+            ]
+            if starter_rows:
+                going = min(int(min_starter_changes), len(starter_rows))
+                model.prob += (
+                    pulp.lpSum([model.x[i] for i in starter_rows])
+                    <= len(starter_rows) - going
+                )
+
+        if float(min_spend_change) > 0:
+            held = sum(float(model.index.cost[i]) for i in rows)
+            model.prob += (
+                pulp.lpSum(
+                    [model.x[i] * float(model.index.cost[i])
+                     for i in rows]
+                )
+                <= held - float(min_spend_change)
+            )
+
+    def _separation_ladder(self, min_changes: int,
+                           min_starter_changes: int,
+                           min_spend_change: float) -> list:
+        """Separations to try, strictest first.
+
+        Forcing options apart and returning five of them are competing
+        aims: the strictest setting that still yields five squads is
+        not knowable in advance, because it depends on the pool, the
+        budget and the forced picks. So the strict setting is tried
+        first and weakened only to fill a list that came up short. Four
+        distinct options beat five identical ones, but two beat
+        neither.
+        """
+        rungs = [(max(1, min_changes), max(0, min_starter_changes),
+                  max(0.0, min_spend_change))]
+
+        # Bounded rather than while-true: the arithmetic below always
+        # reaches the floor, but a guard costs nothing and a runaway
+        # loop inside a solver call would be invisible.
+        for _ in range(8):
+            changes, starters, spend = rungs[-1]
+            if (changes, starters, spend) == (1, 0, 0.0):
+                break
+            rungs.append((
+                max(1, changes - 1),
+                max(0, starters - 1),
+                0.0 if spend <= 0.5 else round(spend / 2, 1),
+            ))
+
+        return rungs
+
+    def select_squad_alternatives(
+        self,
+        df: pd.DataFrame,
+        forced_selections: dict,
+        count: int,
+        prev_squad_ids: list = None,
+        free_transfers: int = None,
+        available_budget: float = None,
+        use_projected_points: bool = False,
+        min_changes: int = 1,
+        min_starter_changes: int = 0,
+        min_spend_change: float = 0.0,
+        exclude_squads: list = None,
+    ) -> list:
+        """
+        Rank the best ``count`` squads rather than returning only one.
+
+        The model is built once per separation setting and re-solved
+        after each answer with a fresh exclusion cut, so what comes
+        back is a ranking under the constraints rather than a set of
+        nudges away from the winner. Building costs more than solving
+        here, so the runners-up are close to free.
+
+        Separation beyond the default is a presentation choice, and it
+        is honest about what it costs: with the cuts at their loosest
+        the list is the true second, third and fourth best squads;
+        tightened, it is the best squads that are also far enough
+        apart to be worth showing. Where a setting is too strict to
+        fill the list, it is weakened a rung at a time rather than
+        returning two options, and the result is sorted by objective
+        so the ranking still reads correctly.
+
+        Args:
+            df (pd.DataFrame): Player data with scores.
+            forced_selections (dict): Forced player selections.
+            count (int): How many squads to return at most.
+            prev_squad_ids (list, optional): Previous squad player IDs.
+            free_transfers (int, optional): Free transfers available.
+            available_budget (float, optional): Available budget.
+            use_projected_points (bool): Optimise on projected points
+                                         rather than FPL score.
+            min_changes (int): Players separating one squad from the
+                               next.
+            min_starter_changes (int): How many of those must have
+                                       been starting.
+            min_spend_change (float): Combined price, in millions,
+                                      that must change hands.
+            exclude_squads (list, optional): Squads, as lists of player
+                                             IDs, to keep out of the
+                                             ranking entirely. Cut
+                                             exactly rather than given
+                                             a wide berth: the point is
+                                             to omit a specific answer
+                                             that is being offered
+                                             elsewhere, not to push the
+                                             ranking away from it.
+
+        Returns:
+            list: (starting_xi, bench) tuples, best first. Shorter
+                  than ``count`` when the constraints run out of
+                  distinct squads, and empty when the pool does.
+        """
+        if count <= 0:
+            return []
+
+        # Asking for more separation than the transfer allowance can
+        # deliver just makes the model infeasible, so it is clamped
+        # rather than attempted.
+        ceiling = self.separation_ceiling(prev_squad_ids, free_transfers)
+        min_changes = max(1, min(int(min_changes), ceiling))
+        min_starter_changes = max(
+            0, min(int(min_starter_changes), ceiling, 11)
+        )
+
+        found = []
+        ranked = []
+
+        for changes, starters, spend in self._separation_ladder(
+            min_changes, min_starter_changes, min_spend_change
+        ):
+            if len(ranked) >= count:
+                break
+
+            model = self.build_model(
+                df,
+                forced_selections,
+                prev_squad_ids=prev_squad_ids,
+                free_transfers=free_transfers,
+                available_budget=available_budget,
+                use_projected_points=use_projected_points,
+            )
+
+            if model is None:
+                break
+
+            for blocked in (exclude_squads or []):
+                self.exclude_squad(model, blocked, 1)
+
+            # A weaker rung starts from a fresh model, so everything
+            # already found has to be cut out of it again.
+            for squad_ids, starter_ids in found:
+                self.exclude_squad(
+                    model, squad_ids, changes, starter_ids, starters,
+                    spend,
+                )
+
+            while len(ranked) < count:
+                squad = self.solve_model(model, quiet=True)
+
+                if squad is None or squad.empty:
+                    break
+
+                value = pulp.value(model.prob.objective)
+                squad_ids = squad["id"].tolist()
+                starter_ids = squad[
+                    squad["starting_XI"] == 1
+                ]["id"].tolist()
+
+                ranked.append(
+                    (value if value is not None else 0.0,
+                     self.split_squad(squad))
+                )
+                found.append((squad_ids, starter_ids))
+                self.exclude_squad(
+                    model, squad_ids, changes, starter_ids, starters,
+                    spend,
+                )
+
+        # Squads found on a weaker rung can outscore ones found on a
+        # stricter one, so the list is ordered at the end rather than
+        # trusted to come out in order. Keyed on the value alone:
+        # comparing the dataframes beside it would raise on a tie.
+        ranked.sort(key=lambda pair: pair[0], reverse=True)
+
+        return [squads for _value, squads in ranked]
 
     # ------------------------------------------------------------------
     # Preparation

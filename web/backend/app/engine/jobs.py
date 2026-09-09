@@ -320,6 +320,10 @@ def _store_result(run_id: int, context: dict[str, Any], result: dict) -> None:
         squad.chip = squad_data.get("chip", "")
         squad.payload = squad_data
         squad.engine_rows = result.get("engine_rows", [])
+        squad.option_rows = result.get("option_rows") or {}
+        # A fresh run replaces the options, so whatever was active last time
+        # no longer refers to anything. Back to the recommendation.
+        squad.active_option = squad_data.get("active_option") or "option-1"
         session.flush()
 
         # The scored pool feeds the Players tab. Stored per season and
