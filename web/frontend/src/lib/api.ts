@@ -1,6 +1,7 @@
 import type {
   AdminMetrics,
   AdminUsers,
+  SavedSquad,
   AuthConfig,
   Inbox,
   GameweekInfo,
@@ -170,6 +171,20 @@ export const api = {
       body: JSON.stringify({ kind, body }),
     }),
   adminUsers: () => request<AdminUsers>("/api/admin/users"),
+  adminUserSquads: (id: number) =>
+    request<{ squads: SavedSquad[] }>(`/api/admin/users/${id}/squads`),
+  adminReactivate: (id: number) =>
+    request<{ ok: boolean }>(`/api/admin/users/${id}/reactivate`, {
+      method: "POST",
+    }),
+  adminRestoreSquad: (
+    id: number,
+    body: { season: string; gameweek: number; into_gameweek?: number },
+  ) =>
+    request<{ ok: boolean; restored_from: number; into: number }>(
+      `/api/admin/users/${id}/restore-squad`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
   adminTestEmail: () =>
     request<{ ok: boolean; detail: string }>("/api/admin/test-email", {
       method: "POST",

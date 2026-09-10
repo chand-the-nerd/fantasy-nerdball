@@ -184,5 +184,15 @@ class FeedbackIn(BaseModel):
     body: str = Field(min_length=1, max_length=4000)
 
 
+class RestoreSquadIn(BaseModel):
+    """Which saved squad to put back, and where to put it."""
+
+    season: str = Field(min_length=4, max_length=16)
+    gameweek: int = Field(ge=1, le=38)
+    # Defaults to restoring into the gameweek it came from. Set it to
+    # bring an old squad forward into the current week instead.
+    into_gameweek: int | None = Field(default=None, ge=1, le=38)
+
+
 class InviteIn(BaseModel):
     email: str

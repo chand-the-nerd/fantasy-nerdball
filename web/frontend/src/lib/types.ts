@@ -331,6 +331,12 @@ export interface ManagerRow {
   name: string;
   email: string;
   is_admin: boolean;
+  /** "active", "dormant" (place freed, data kept), or "purged". */
+  status: string;
+  dormant_at: string | null;
+  squads_kept: number;
+  latest_gameweek: number | null;
+  latest_season: string | null;
   fpl_entry_id: number | null;
   created_at: string;
   last_seen_at: string;
@@ -355,4 +361,17 @@ export interface AdminUsers {
   seats_total: number;
   inactive_days: number;
   invite_ttl_hours: number;
+  purge_after_months: number;
+  season: string;
+}
+
+export interface SavedSquad {
+  season: string;
+  gameweek: number;
+  formation: string;
+  projected_points: number;
+  squad_value: number;
+  transfers_made: number;
+  chip: string;
+  players: number;
 }

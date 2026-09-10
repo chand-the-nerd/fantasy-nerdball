@@ -3587,3 +3587,40 @@ tr.is-clickable:focus-visible {
   font-size: 14px;
   line-height: 1.6;
 }
+
+.calc-table tr.is-dormant td {
+  opacity: 0.72;
+}
+
+.pill.warn {
+  border-color: var(--floodlight);
+  color: var(--floodlight);
+}
+
+.manager-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.manager-actions .link-button {
+  font-size: 11.5px;
+}
+
+.squad-list {
+  margin: 8px 0 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.squad-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 12px;
+}

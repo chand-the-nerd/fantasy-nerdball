@@ -64,7 +64,7 @@ def seat_count(session: Session) -> int:
         session.scalar(
             select(func.count())
             .select_from(User)
-            .where(User.is_guest.is_(False))
+            .where(User.is_guest.is_(False), User.dormant_at.is_(None))
         )
         or 0
     )
@@ -92,6 +92,20 @@ def upsert_user(session: Session, *, email: str, sub: str | None, name: str, pic
         user.settings = UserSettings()
         session.add(user)
     else:
+        if user.dormant_at is not None:
+            # They gave their place up through inactivity and have come
+            # back. The seat cap is checked again here — being welcome
+            # once doesn't hold a place open forever — and everything
+            # they had is simply theirs again.
+            if seat_count(session) >= settings.max_users:
+                raise HTTPException(
+                    status.HTTP_403_FORBIDDEN,
+                    f"This league is full ({settings.max_users} "
+                    "managers). Your squads are still here — ask the "
+                    "admin to make room and you'll get them back.",
+                )
+            user.dormant_at = None
+
         user.google_sub = sub or user.google_sub
         user.name = name or user.name
         user.avatar_url = picture or user.avatar_url

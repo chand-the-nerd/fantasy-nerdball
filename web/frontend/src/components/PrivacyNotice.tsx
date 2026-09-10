@@ -69,9 +69,13 @@ export function PrivacyNotice({ onClose }: { onClose: () => void }) {
 
         <h4>How long</h4>
         <p>
-          Usage records are deleted after 90 days. Accounts inactive for 28
-          days are deleted along with everything in them. Email delivery is
-          handled by Resend, who process the messages on our behalf.
+          Usage records are deleted after 90 days. If you don't sign in
+          for 28 days your place is freed for someone else, but nothing
+          is deleted — your squads and settings are kept for the rest of
+          the season and come back if you return. Once a season ends,
+          only your FPL team id is kept. Accounts are deleted outright
+          after two years without a sign-in. Email delivery is handled by
+          Resend, who process the messages on our behalf.
         </p>
 
         <h4>Your data</h4>

@@ -260,8 +260,11 @@ def access_approved(
         )
         + note(
             f"Places are freed after <strong>{inactive_days} days</strong> "
-            "without signing in, so someone waiting can have a go. You'll "
-            "be emailed if that happens, and you can always ask again.",
+            "without signing in, so someone waiting can have a go. "
+            "Nothing is deleted: your squads and settings are kept for "
+            "the rest of the season, and if you ask for your place back "
+            "you pick up exactly where you left off. After the season "
+            "ends, only your FPL team id is kept.",
             colour=FADE,
         )
         + muted(
@@ -285,8 +288,10 @@ def access_approved(
         "to transfer, and any players to force or avoid.\n"
         "3. Run it. Takes a couple of minutes.\n\n"
         f"Places are freed after {inactive_days} days without signing "
-        "in, so someone waiting can have a go. You'll be emailed if that "
-        "happens, and you can always ask again.\n\n"
+        "in, so someone waiting can have a go. Nothing is deleted: your "
+        "squads and settings are kept for the rest of the season, and "
+        "asking for your place back picks up where you left off. After "
+        "the season ends, only your FPL team id is kept.\n\n"
         "The app is in beta. There's a feedback link in the footer."
     )
     return "Fantasy Nerdball — you're in", layout("You're in", body), text
@@ -315,6 +320,72 @@ def invite_expired(email: str, hours: int) -> tuple[str, str, str]:
     return (
         "Fantasy Nerdball — your invitation has expired",
         layout("Your invitation has expired", body),
+        text,
+    )
+
+
+def gone_dormant(
+    email: str, days: int, season: str
+) -> tuple[str, str, str]:
+    """Their place is gone; their squads are not."""
+    body = (
+        heading("Your place has been freed up")
+        + para(
+            f"You haven't signed in to Fantasy Nerdball for {days} days, "
+            "so your place has gone to someone on the waiting list. "
+            "Places are limited, and this was mentioned when you joined."
+        )
+        + note(
+            "<strong>Your squads, settings and history are still "
+            f"here.</strong> Ask for access again at any point during "
+            f"the {_escape(season)} season and you'll pick up exactly "
+            "where you left off."
+        )
+        + para(
+            "After the season ends, only your FPL team id is kept, so "
+            "coming back later means starting fresh rather than losing "
+            "anything you'd still be using."
+        )
+        + button("Ask for your place back", _url())
+    )
+    text = (
+        "Your place has been freed up\n\n"
+        f"You haven't signed in for {days} days, so your place has gone "
+        "to someone on the waiting list.\n\n"
+        "YOUR SQUADS, SETTINGS AND HISTORY ARE STILL HERE. Ask for "
+        f"access again at any point during the {season} season and "
+        "you'll pick up where you left off.\n\n"
+        "After the season ends, only your FPL team id is kept.\n\n"
+        f"Ask for your place back: {_url()}"
+    )
+    return (
+        "Fantasy Nerdball — your place has been freed up",
+        layout("Your place has been freed up", body),
+        text,
+    )
+
+
+def admin_dormant(email: str, days: int) -> tuple[str, str, str]:
+    body = (
+        heading("A place has been freed")
+        + para(
+            f"<strong>{_escape(email)}</strong> hasn't signed in for "
+            f"{days} days, so their place is free. Their data is kept "
+            "and they've been told they can come back to it."
+        )
+        + muted(
+            "You can see and restore dormant managers under Managers in "
+            "the admin pane."
+        )
+    )
+    text = (
+        f"{email} hasn't signed in for {days} days, so their place is "
+        "free. Their data is kept and they've been told they can come "
+        "back to it. See Managers in the admin pane."
+    )
+    return (
+        f"Place freed — {email}",
+        layout("A place has been freed", body),
         text,
     )
 

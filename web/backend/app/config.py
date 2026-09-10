@@ -113,9 +113,15 @@ class Settings:
         # the place goes back to whoever is waiting. 0 disables it.
         self.invite_ttl_hours = int(os.getenv("INVITE_TTL_HOURS", "72"))
         # How long a manager can go without signing in before their
-        # place is freed. 0 disables it. Admins and anyone named in
-        # ALLOWED_EMAILS are never removed.
+        # place is freed for somebody waiting. Nothing is deleted at
+        # this point: the account goes dormant, keeps everything it had,
+        # and wakes up intact if they sign in again. 0 disables it.
         self.inactive_days = int(os.getenv("INACTIVE_DAYS", "28"))
+        # How long before a dormant account is deleted outright. Two
+        # years, because the only reason to delete at all is to avoid
+        # holding data nobody will ever want again. 0 keeps them
+        # forever.
+        self.purge_after_months = int(os.getenv("PURGE_AFTER_MONTHS", "24"))
         # A ceiling on outbound email, since the access-request endpoint
         # is unauthenticated and the free tier of most providers is a
         # few hundred a day.

@@ -15,12 +15,12 @@ from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import events, metrics
+from .. import emails, events, lifecycle, mailer, metrics
 from ..auth import current_admin, current_user, seat_count
 from ..config import settings
 from ..db import get_session
-from ..models import Invite, Run, User, utcnow
-from ..schemas import InviteIn
+from ..models import Invite, Run, Squad, User, utcnow
+from ..schemas import InviteIn, RestoreSquadIn
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -98,6 +98,8 @@ def admin_users(
         .where(User.is_guest.is_(False))
         .order_by(User.last_seen_at.desc())
     ).all()
+    # Dormant managers are listed too. The whole point of not deleting
+    # them is being able to see them and give them their place back.
 
     cutoff_days = settings.inactive_days
     now = utcnow()
@@ -111,7 +113,12 @@ def admin_users(
 
         protected = user.is_admin or user.email in settings.allowed_emails
         removal_in = None
-        if cutoff_days > 0 and idle_days is not None and not protected:
+        if (
+            cutoff_days > 0
+            and idle_days is not None
+            and not protected
+            and user.dormant_at is None
+        ):
             removal_in = max(0, cutoff_days - idle_days)
 
         runs = session.scalar(
@@ -120,12 +127,36 @@ def admin_users(
             .where(Run.user_id == user.id)
         )
 
+        squads = session.scalar(
+            select(func.count())
+            .select_from(Squad)
+            .where(Squad.user_id == user.id)
+        )
+        latest = session.scalar(
+            select(Squad)
+            .where(Squad.user_id == user.id)
+            .order_by(Squad.season.desc(), Squad.gameweek.desc())
+            .limit(1)
+        )
+
+        if user.dormant_at is not None:
+            status_label = "purged" if user.data_purged_at else "dormant"
+        else:
+            status_label = "active"
+
         rows.append(
             {
                 "id": user.id,
                 "name": user.name,
                 "email": user.email,
                 "is_admin": user.is_admin,
+                "status": status_label,
+                "dormant_at": user.dormant_at.isoformat()
+                if user.dormant_at
+                else None,
+                "squads_kept": int(squads or 0),
+                "latest_gameweek": latest.gameweek if latest else None,
+                "latest_season": latest.season if latest else None,
                 "fpl_entry_id": user.fpl_entry_id,
                 "created_at": user.created_at.isoformat()
                 if user.created_at
@@ -165,10 +196,153 @@ def admin_users(
     return {
         "users": rows,
         "invites": invites,
-        "seats_used": len(rows),
+        "seats_used": len(
+            [r for r in rows if r["status"] == "active"]
+        ),
         "seats_total": settings.max_users,
         "inactive_days": cutoff_days,
         "invite_ttl_hours": settings.invite_ttl_hours,
+        "purge_after_months": settings.purge_after_months,
+        "season": settings.current_season,
+    }
+
+
+@router.get("/users/{user_id}/squads")
+def admin_user_squads(
+    user_id: int,
+    admin: User = Depends(current_admin),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Every gameweek this manager has saved, newest first."""
+    user = session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such manager")
+
+    squads = session.scalars(
+        select(Squad)
+        .where(Squad.user_id == user_id)
+        .order_by(Squad.season.desc(), Squad.gameweek.desc())
+    ).all()
+
+    return {
+        "user": {"id": user.id, "email": user.email, "name": user.name},
+        "squads": [
+            {
+                "season": squad.season,
+                "gameweek": squad.gameweek,
+                "formation": squad.formation,
+                "projected_points": squad.projected_points,
+                "squad_value": squad.squad_value,
+                "transfers_made": squad.transfers_made,
+                "chip": squad.chip,
+                "players": len(squad.engine_rows or []),
+            }
+            for squad in squads
+        ],
+    }
+
+
+@router.post("/users/{user_id}/reactivate")
+def admin_reactivate(
+    user_id: int,
+    admin: User = Depends(current_admin),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Give a dormant manager their place, and their data, back."""
+    user = session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such manager")
+    if user.dormant_at is None:
+        return {"ok": True, "already_active": True}
+
+    if seat_count(session) >= settings.max_users:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"All {settings.max_users} places are taken. Free one first.",
+        )
+
+    lifecycle.reactivate(session, user)
+    mailer.send_template(
+        emails.access_approved(
+            user.email, settings.invite_ttl_hours, settings.inactive_days
+        ),
+        to=user.email,
+        reply_to=settings.mail_to,
+    )
+    return {"ok": True, "email": user.email}
+
+
+@router.post("/users/{user_id}/restore-squad")
+def admin_restore_squad(
+    user_id: int,
+    payload: RestoreSquadIn,
+    admin: User = Depends(current_admin),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Put an old squad back as the manager's current one.
+
+    Copies forward rather than rewinding: the chosen gameweek's squad is
+    written into the target gameweek, and every row in between is left
+    exactly as it was. An admin fixing one week's mistake should not be
+    able to erase a season by accident.
+    """
+    user = session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such manager")
+
+    source = session.scalar(
+        select(Squad).where(
+            Squad.user_id == user_id,
+            Squad.season == payload.season,
+            Squad.gameweek == payload.gameweek,
+        )
+    )
+    if source is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            f"Nothing saved for gameweek {payload.gameweek}.",
+        )
+
+    target_gw = payload.into_gameweek or payload.gameweek
+    target = session.scalar(
+        select(Squad).where(
+            Squad.user_id == user_id,
+            Squad.season == payload.season,
+            Squad.gameweek == target_gw,
+        )
+    )
+    if target is None:
+        target = Squad(
+            user_id=user_id, season=payload.season, gameweek=target_gw
+        )
+        session.add(target)
+
+    for field in (
+        "formation",
+        "projected_points",
+        "squad_value",
+        "bank",
+        "transfers_made",
+        "penalty_points",
+        "chip",
+        "payload",
+        "engine_rows",
+        "active_option",
+    ):
+        setattr(target, field, getattr(source, field))
+
+    session.commit()
+    events.emit(
+        "squad_restored",
+        by=admin.id,
+        user=user_id,
+        source_gameweek=payload.gameweek,
+        into_gameweek=target_gw,
+    )
+    return {
+        "ok": True,
+        "restored_from": payload.gameweek,
+        "into": target_gw,
     }
 
 

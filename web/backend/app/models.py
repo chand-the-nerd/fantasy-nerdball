@@ -52,6 +52,21 @@ class User(Base):
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_seen_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+    # When their place was given up for inactivity. A dormant manager
+    # keeps everything they had — squads, runs, settings — and simply
+    # stops occupying a seat. Signing back in clears this and hands it
+    # all back. Deleting an account outright happens only after the far
+    # longer window in PURGE_AFTER_MONTHS.
+    dormant_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # When a dormant manager's season data was cleared out. Their FPL id
+    # survives this, which is the one thing worth carrying between
+    # seasons — everything else describes a season that has ended.
+    data_purged_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     settings: Mapped["UserSettings"] = relationship(
         back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
