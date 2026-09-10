@@ -7,15 +7,19 @@ order, which also keeps the engine's working-directory switching safe.
 
 from __future__ import annotations
 
+import datetime as dt
 import io
 import queue
 import threading
+import time
 import traceback
 from contextlib import redirect_stdout
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
+from .. import capacity, events
 from ..config import settings
 from ..db import session_scope
 from ..models import Plan, PlayerScores, Run, Squad, User, utcnow
@@ -28,6 +32,10 @@ from .planner import run_plan
 _queue: "queue.Queue[tuple[str, int]]" = queue.Queue()
 _worker: threading.Thread | None = None
 _worker_lock = threading.Lock()
+# Whether the single worker is mid-job. Read by the heartbeat, which is
+# how utilisation of the one thing that can't be parallelised gets onto a
+# dashboard.
+_busy = False
 
 
 def _should_store_scores(cache: PlayerScores | None, gameweek: int) -> bool:
@@ -68,6 +76,7 @@ def append_plan_log(plan_id: int, line: str) -> None:
 
 
 def _execute_plan(plan_id: int) -> None:
+    started = time.perf_counter()
     with session_scope() as session:
         plan = session.get(Plan, plan_id)
         if plan is None or plan.status != "queued":
@@ -77,6 +86,13 @@ def _execute_plan(plan_id: int) -> None:
             return
         plan.status = "running"
         plan.started_at = utcnow()
+        events.emit(
+            "plan_started",
+            plan=plan.id,
+            user=user.id,
+            weeks=plan.weeks,
+            queue_depth=queue_depth(session),
+        )
 
         squads = session.scalars(
             select(Squad).where(Squad.user_id == user.id, Squad.season == plan.season)
@@ -100,7 +116,7 @@ def _execute_plan(plan_id: int) -> None:
                 row.progress = done
 
     try:
-        with redirect_stdout(stream):
+        with capacity.MemorySampler() as memory, redirect_stdout(stream):
             weeks = run_plan(
                 user_id=context["user_id"],
                 season=context["season"],
@@ -122,6 +138,12 @@ def _execute_plan(plan_id: int) -> None:
                 row.status = "failed"
                 row.error = f"{type(error).__name__}: {error}\n\n{stream.tail()}".strip()
                 row.finished_at = utcnow()
+        events.emit(
+            "plan_failed",
+            plan=plan_id,
+            seconds=round(time.perf_counter() - started, 1),
+            error_type=type(error).__name__,
+        )
         traceback.print_exc()
         return
 
@@ -132,6 +154,15 @@ def _execute_plan(plan_id: int) -> None:
             row.progress = len(weeks)
             row.status = "complete"
             row.finished_at = utcnow()
+
+    events.emit(
+        "plan_finished",
+        plan=plan_id,
+        weeks=len(weeks),
+        seconds=round(time.perf_counter() - started, 1),
+        rss_cost_mb=memory.cost_mb,
+        rss_peak_mb=memory.peak,
+    )
 
 
 class _LogStream(io.TextIOBase):
@@ -195,12 +226,43 @@ def _enqueue(item: tuple[str, int]) -> None:
     start_worker()
 
 
-def queue_position(run_id: int, kind: str = "run") -> int:
-    """0 means running or next up."""
-    with _queue.mutex:
-        pending = list(_queue.queue)
-    item = (kind, run_id)
-    return pending.index(item) if item in pending else 0
+def queue_depth(session: Session | None = None) -> int:
+    """How many jobs are waiting, across the whole deployment.
+
+    Counted from the database rather than from this process's queue.
+    The in-memory queue is per worker process, so with more than one it
+    would report a fraction of the real backlog — which is exactly the
+    moment the number starts to matter.
+
+    Pass an open session when there is one: opening a second connection
+    inside a transaction that is midway through a write is asking for
+    trouble on SQLite.
+    """
+    def count(active: Session) -> int:
+        runs = active.scalar(
+            select(func.count())
+            .select_from(Run)
+            .where(Run.status == "queued")
+        )
+        plans = active.scalar(
+            select(func.count())
+            .select_from(Plan)
+            .where(Plan.status == "queued")
+        )
+        return int(runs or 0) + int(plans or 0)
+
+    try:
+        if session is not None:
+            return count(session)
+        with session_scope() as fresh:
+            return count(fresh)
+    except Exception:
+        # Never let a diagnostic take a run down with it.
+        return _queue.qsize()
+
+
+def is_busy() -> bool:
+    return _busy
 
 
 def start_worker() -> None:
@@ -213,16 +275,20 @@ def start_worker() -> None:
 
 
 def _loop() -> None:
+    global _busy
     while True:
         kind, item_id = _queue.get()
+        _busy = True
         try:
             if kind == "plan":
                 _execute_plan(item_id)
             else:
                 _execute(item_id)
         except Exception:  # a worker that dies takes the queue with it
+            events.emit("worker_error", kind=kind, id=item_id)
             traceback.print_exc()
         finally:
+            _busy = False
             _queue.task_done()
 
 
@@ -237,6 +303,26 @@ def _load_context(run_id: int) -> dict[str, Any] | None:
 
         run.status = "running"
         run.started_at = utcnow()
+
+        # How long this run sat in the queue. With one worker for the
+        # whole site this is the number that turns into "the app feels
+        # slow" long before any request does.
+        waited = None
+        if run.created_at is not None:
+            created = run.created_at
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=dt.timezone.utc)
+            waited = round((utcnow() - created).total_seconds(), 1)
+
+        events.emit(
+            "run_started",
+            run=run.id,
+            user=user.id,
+            guest=bool(user.is_guest),
+            gameweek=run.gameweek,
+            waited_seconds=waited,
+            queue_depth=queue_depth(session),
+        )
 
         # Hand the engine every squad this manager has saved this season. It
         # asks for a specific gameweek, which varies with Free Hit.
@@ -259,9 +345,10 @@ def _execute(run_id: int) -> None:
     if context is None:
         return
 
+    started = time.perf_counter()
     stream = _LogStream(run_id)
     try:
-        with redirect_stdout(stream):
+        with capacity.MemorySampler() as memory, redirect_stdout(stream):
             result = run_optimisation(
                 user_id=context["user_id"],
                 gameweek=context["gameweek"],
@@ -283,10 +370,37 @@ def _execute(run_id: int) -> None:
                 # breaks, so it goes here rather than in the progress feed.
                 run.error = f"{detail}\n\n{stream.tail()}".strip()
                 run.finished_at = utcnow()
+        events.emit(
+            "run_failed",
+            run=run_id,
+            user=context["user_id"],
+            gameweek=context["gameweek"],
+            seconds=round(time.perf_counter() - started, 1),
+            error_type=type(error).__name__,
+            rss_peak_mb=memory.peak,
+        )
         traceback.print_exc()
         return
 
     _store_result(run_id, context, result)
+    events.emit(
+        "run_finished",
+        run=run_id,
+        user=context["user_id"],
+        gameweek=context["gameweek"],
+        seconds=round(time.perf_counter() - started, 1),
+        projected_points=round(
+            float(result.get("squad", {}).get("projected_points") or 0), 1
+        ),
+        transfers=int(result.get("squad", {}).get("transfers_made") or 0),
+        chip=result.get("squad", {}).get("chip") or None,
+        # What the run cost on top of an already-warm process, and where
+        # that left the process overall. Together with the container's
+        # limit these are what decide how many runs could ever go at
+        # once — see web/CAPACITY.md.
+        rss_cost_mb=memory.cost_mb,
+        rss_peak_mb=memory.peak,
+    )
 
 
 def _store_result(run_id: int, context: dict[str, Any], result: dict) -> None:

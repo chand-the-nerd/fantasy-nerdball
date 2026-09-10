@@ -104,7 +104,51 @@ export interface Me {
   name: string;
   avatar_url: string;
   is_admin: boolean;
+  /** A throwaway session started from "Continue without signing in". */
+  is_guest: boolean;
   fpl_entry_id: number | null;
+}
+
+export interface AuthConfig {
+  google: boolean;
+  dev_login: boolean;
+  guest: boolean;
+  seats_used: number;
+  seats_total: number;
+  seats_free: number;
+}
+
+/** One access request or piece of feedback, in the admin inbox. */
+export interface InboxItem {
+  id: number;
+  kind: string;
+  title: string;
+  email: string;
+  name: string;
+  body: string;
+  from_guest: boolean;
+  status: string;
+  created_at: string;
+  handled_by: string;
+}
+
+export interface MailStatus {
+  configured: boolean;
+  mode: string;
+  to: string;
+  from: string;
+  last_error: string;
+  last_sent: string;
+}
+
+export interface Inbox {
+  items: InboxItem[];
+  unread: number;
+  has_unread: boolean;
+  seats_used: number;
+  seats_total: number;
+  email_configured: boolean;
+  email: MailStatus;
 }
 
 export type Theme = "legacy" | "dark" | "light";
@@ -216,4 +260,62 @@ export interface PlayerPool {
     selected_by: number;
     ambiguous: boolean;
   }[];
+}
+
+/** One time bucket on the admin dashboard's chart. */
+export interface MetricPoint {
+  at: string;
+  label: string;
+  visitors: number;
+  runs: number;
+}
+
+/** One visitor over the selected window: a manager, or an anonymous
+ *  guest identified only as far as VISITOR_IP_MODE allows. */
+export interface MetricPerson {
+  visitor: string;
+  who: string;
+  detail: string;
+  guest: boolean;
+  sessions: number;
+  runs: number;
+  events: number;
+  first_seen: string;
+  last_seen: string;
+}
+
+export interface AdminMetrics {
+  window: string;
+  since: string;
+  bucket_minutes: number;
+  totals: {
+    visitors: number;
+    members: number;
+    guests: number;
+    sessions: number;
+    sign_ins: number;
+    runs: number;
+    runs_finished: number;
+    runs_failed: number;
+    runs_rejected: number;
+    plans: number;
+    run_seconds_median: number | null;
+    run_seconds_p95: number | null;
+    wait_seconds_p95: number | null;
+    run_cost_mb_median: number | null;
+    run_cost_mb_p95: number | null;
+  };
+  capacity: {
+    rss_mb: number | null;
+    memory_limit_mb: number | null;
+    workers: number;
+    parallel_runs_by_memory: number | null;
+    measured_runs: number;
+  };
+  series: MetricPoint[];
+  people: MetricPerson[];
+  blocked: { feature: string; count: number }[];
+  activity: { kind: string; count: number }[];
+  ip_mode: string;
+  dropped: number;
 }

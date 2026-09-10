@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { GuestLock } from "./GuestLock";
 import { PlayerActions, PlayerActionsDialog } from "./PlayerActions";
 import { PlayerPicker, type PoolPlayer, availability } from "./PlayerPicker";
 import { api, ApiError } from "../lib/api";
+import { useGuest } from "../lib/guest";
 
 type Mode = "best" | "differentials" | "lookup";
 
@@ -351,8 +353,46 @@ function Lookup() {
   );
 }
 
+/** The lookup panel as a guest sees it: present, blurred, inert. */
+function LockedLookup() {
+  return (
+    <GuestLock
+      note={
+        "Season totals, expected goals and upcoming fixtures for any " +
+        "player in the game."
+      }
+    >
+      <div className="panel">
+        <h3>Look up a player</h3>
+        <p className="muted" style={{ marginTop: -6 }}>
+          Underlying numbers and upcoming fixtures, straight from FPL.
+        </p>
+        <div className="stat-rows">
+          <div>
+            <span>Total points</span>
+            <span>—</span>
+          </div>
+          <div>
+            <span>Expected goals</span>
+            <span>—</span>
+          </div>
+          <div>
+            <span>Expected assists</span>
+            <span>—</span>
+          </div>
+          <div>
+            <span>Next fixtures</span>
+            <span>—</span>
+          </div>
+        </div>
+      </div>
+    </GuestLock>
+  );
+}
+
 export function PlayersView() {
   const [mode, setMode] = useState<Mode>("best");
+  const guest = useGuest();
 
   return (
     <>
@@ -381,7 +421,15 @@ export function PlayersView() {
         </div>
       </div>
 
-      {mode === "lookup" ? <Lookup /> : <Ranked mode={mode} />}
+      {mode === "lookup" ? (
+        guest ? (
+          <LockedLookup />
+        ) : (
+          <Lookup />
+        )
+      ) : (
+        <Ranked mode={mode} />
+      )}
     </>
   );
 }

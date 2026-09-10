@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { AdminView } from "./components/AdminView";
+import { FeedbackDialog } from "./components/FeedbackDialog";
+import { GuestFeaturesDialog } from "./components/GuestFeatures";
+import { GuestLock } from "./components/GuestLock";
 import { PlannerView } from "./components/PlannerView";
 import { PlayersView } from "./components/PlayersView";
 import { SetupView } from "./components/SetupView";
@@ -9,6 +12,7 @@ import { SquadView } from "./components/SquadView";
 import { ThemePicker } from "./components/ThemePicker";
 import { FirstRunTour, Tutorial } from "./components/Tutorial";
 import { api, ApiError } from "./lib/api";
+import { GuestProvider, backToSignIn } from "./lib/guest";
 import type { Me } from "./lib/types";
 
 // Form and League are built and working, but hidden for now. To bring either
@@ -30,6 +34,8 @@ export function App() {
   const [tab, setTab] = useState<Tab>("squad");
   const [adminOpen, setAdminOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
+  const [guestInfo, setGuestInfo] = useState(false);
+  const [feedback, setFeedback] = useState(false);
 
   useEffect(() => {
     api
@@ -54,9 +60,11 @@ export function App() {
   if (!checked) return null;
   if (!me) return <SignIn />;
 
+  const guest = me.is_guest;
   const signOut = () => api.logout().then(() => window.location.reload());
 
   return (
+    <GuestProvider value={guest}>
     <div className="shell">
       <aside className="rail">
         <div className="wordmark">
@@ -78,19 +86,57 @@ export function App() {
         </nav>
 
         <div className="rail-foot">
-          {me.avatar_url && <img src={me.avatar_url} alt="" />}
+          {!guest && me.avatar_url && <img src={me.avatar_url} alt="" />}
           <span className="who">
-            <strong>{me.name}</strong>
-            <button className="link-button" onClick={signOut} type="button">
-              Sign out
-            </button>
+            <strong>{guest ? "Guest" : me.name}</strong>
+            {guest ? (
+              <button
+                className="link-button"
+                onClick={backToSignIn}
+                type="button"
+              >
+                Sign in
+              </button>
+            ) : (
+              <button className="link-button" onClick={signOut} type="button">
+                Sign out
+              </button>
+            )}
           </span>
         </div>
       </aside>
 
       <main className="main">
         {tab === "squad" && <SquadView me={me} onMeChange={setMe} />}
-        {tab === "planner" && <PlannerView />}
+        {tab === "planner" &&
+          (guest ? (
+            <>
+              <div className="topbar">
+                <div>
+                  <h1>Planner</h1>
+                  <span className="when">
+                    Several gameweeks, planned in one go
+                  </span>
+                </div>
+              </div>
+              <GuestLock
+                note={
+                  "A plan is built over several gameweeks and kept " +
+                  "between them, so it needs an account."
+                }
+              >
+                <div className="panel">
+                  <h3>Plan ahead</h3>
+                  <p className="muted">
+                    Runs the optimiser forward week after week, with your
+                    chips placed where you want them.
+                  </p>
+                </div>
+              </GuestLock>
+            </>
+          ) : (
+            <PlannerView />
+          ))}
         {tab === "players" && <PlayersView />}
         {tab === "teams" && <TeamsView />}
         {tab === "setup" && <SetupView me={me} onMeChange={setMe} />}
@@ -105,6 +151,22 @@ export function App() {
             >
               Tutorial
             </button>
+            <button
+              className="admin-link"
+              type="button"
+              onClick={() => setFeedback(true)}
+            >
+              Feedback
+            </button>
+            {guest && (
+              <button
+                className="admin-link"
+                type="button"
+                onClick={() => setGuestInfo(true)}
+              >
+                Guest limits
+              </button>
+            )}
             <ThemePicker />
             {me.is_admin && (
               <button
@@ -128,6 +190,12 @@ export function App() {
         onTab={setTab}
       />
 
+      {guestInfo && (
+        <GuestFeaturesDialog onClose={() => setGuestInfo(false)} />
+      )}
+
+      {feedback && <FeedbackDialog onClose={() => setFeedback(false)} />}
+
       {adminOpen && (
         <div
           className="overlay"
@@ -142,5 +210,6 @@ export function App() {
         </div>
       )}
     </div>
+    </GuestProvider>
   );
 }

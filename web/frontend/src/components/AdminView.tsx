@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import { AdminInbox } from "./AdminInbox";
+import { AdminMetricsPanel } from "./AdminMetrics";
 import { api, ApiError } from "../lib/api";
 
 interface Member {
@@ -29,7 +31,11 @@ interface Members {
   invites: Invite[];
 }
 
+type Pane = "inbox" | "members" | "metrics";
+
 export function AdminView({ onClose }: { onClose: () => void }) {
+  const [pane, setPane] = useState<Pane>("inbox");
+  const [waiting, setWaiting] = useState(0);
   const [denied, setDenied] = useState("");
   const [data, setData] = useState<Members | null>(null);
   const [cron, setCron] = useState<any>(null);
@@ -101,6 +107,30 @@ export function AdminView({ onClose }: { onClose: () => void }) {
       <div className="admin-head">
         <h2>Admin</h2>
         <div className="admin-actions">
+          <div className="tabs small">
+            <button
+              type="button"
+              className={pane === "inbox" ? "on" : ""}
+              onClick={() => setPane("inbox")}
+            >
+              Inbox
+              {waiting > 0 && <span className="badge">{waiting}</span>}
+            </button>
+            <button
+              type="button"
+              className={pane === "members" ? "on" : ""}
+              onClick={() => setPane("members")}
+            >
+              Managers
+            </button>
+            <button
+              type="button"
+              className={pane === "metrics" ? "on" : ""}
+              onClick={() => setPane("metrics")}
+            >
+              Usage
+            </button>
+          </div>
           <button className="link-button" onClick={onClose} type="button">
             Close
           </button>
@@ -110,6 +140,20 @@ export function AdminView({ onClose }: { onClose: () => void }) {
       {error && <div className="notice bad">{error}</div>}
       {status && <div className="notice good">{status}</div>}
 
+      {pane === "inbox" && (
+        <section className="admin-section">
+          <AdminInbox onCount={setWaiting} />
+        </section>
+      )}
+
+      {pane === "metrics" && (
+        <section className="admin-section">
+          <AdminMetricsPanel />
+        </section>
+      )}
+
+      {pane === "members" && (
+      <>
       <section className="admin-section">
         <h3>
           Managers <span className="muted">{data.seats_used} of {data.seats_total} seats</span>
@@ -315,6 +359,8 @@ export function AdminView({ onClose }: { onClose: () => void }) {
           </p>
         )}
       </section>
+      </>
+      )}
     </div>
   );
 }

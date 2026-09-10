@@ -7,6 +7,7 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from . import events, guest, metrics
 from .config import settings
 from .db import get_session
 from .models import Invite, User, UserSettings, utcnow
@@ -34,7 +35,20 @@ def is_allowed(email: str, session: Session) -> bool:
 
 
 def seat_count(session: Session) -> int:
-    return int(session.scalar(select(func.count()).select_from(User)) or 0)
+    """How many of the league's seats are taken.
+
+    Guests are deliberately not counted. They are throwaway accounts on
+    the same table, and a busy afternoon of them would otherwise lock
+    real managers out of a deployment that has plenty of room.
+    """
+    return int(
+        session.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(User.is_guest.is_(False))
+        )
+        or 0
+    )
 
 
 def upsert_user(session: Session, *, email: str, sub: str | None, name: str, picture: str) -> User:
@@ -83,8 +97,12 @@ def current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in to continue")
     user = session.get(User, user_id)
     if user is None:
+        # A swept-up guest lands here: the cookie outlives the row.
         request.session.clear()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in to continue")
+    guest.touch(session, user)
+    metrics.set_actor(user.id, user.is_guest)
+    events.note_session(user)
     return user
 
 

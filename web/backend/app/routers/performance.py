@@ -178,7 +178,9 @@ def league_table(
     """How everyone on this deployment is doing, side by side."""
     season = season or settings.current_season
 
-    users = session.scalars(select(User)).all()
+    users = session.scalars(
+        select(User).where(User.is_guest.is_(False))
+    ).all()
     stats = {
         row.gameweek: row
         for row in session.scalars(

@@ -14,6 +14,7 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import events, metrics
 from ..auth import current_admin, current_user, seat_count
 from ..config import settings
 from ..db import get_session
@@ -39,7 +40,11 @@ def admin_status(user: User = Depends(current_user)) -> dict:
 def members(
     admin: User = Depends(current_admin), session: Session = Depends(get_session)
 ) -> dict:
-    users = session.scalars(select(User).order_by(User.created_at)).all()
+    users = session.scalars(
+        select(User)
+        .where(User.is_guest.is_(False))
+        .order_by(User.created_at)
+    ).all()
     invites = session.scalars(select(Invite).order_by(Invite.created_at)).all()
 
     registered = {u.email for u in users}
@@ -77,6 +82,24 @@ def members(
     }
 
 
+@router.get("/metrics")
+def admin_metrics(
+    window: str = "24h",
+    admin: User = Depends(current_admin),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Usage over one time window, for the dashboard in the admin pane.
+
+    Admin-only, and the only place stored addresses are ever shown.
+    """
+    if window not in metrics.WINDOWS:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Pick one of: {', '.join(metrics.WINDOWS)}.",
+        )
+    return metrics.summary(session, window)
+
+
 @router.post("/invites", status_code=status.HTTP_201_CREATED)
 def add_invite(
     payload: InviteIn,
@@ -105,6 +128,7 @@ def add_invite(
 
     session.add(Invite(email=email, invited_by=admin.email))
     session.commit()
+    events.emit("invite_added", by=admin.id, email=email)
     return {"email": email}
 
 
@@ -156,3 +180,4 @@ def remove_member(
     # invite has to go too. The members list flags this either way.
     session.delete(member)
     session.commit()
+    events.emit("member_removed", by=admin.id, removed=user_id)

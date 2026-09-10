@@ -7,6 +7,7 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import events
 from ..auth import current_user
 from ..config import settings
 from ..db import get_session
@@ -154,6 +155,15 @@ def activate_option(
 
     session.commit()
     session.refresh(squad)
+    # Which alternative people pick over the recommendation is the closest
+    # thing the app has to feedback on the optimiser itself.
+    events.emit(
+        "option_activated",
+        option=chosen["key"],
+        recommended=bool(chosen.get("recommended")),
+        gameweek=gameweek,
+        **events.actor(user),
+    )
     return squad
 
 
@@ -176,3 +186,4 @@ def delete_squad(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No squad for that gameweek")
     session.delete(squad)
     session.commit()
+    events.emit("squad_deleted", gameweek=gameweek, **events.actor(user))

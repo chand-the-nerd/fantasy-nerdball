@@ -7,7 +7,9 @@ import { SquadBuilder } from "./SquadBuilder";
 import { SquadOptions } from "./SquadOptions";
 import { StartingSquadPrompt } from "./StartingSquadPrompt";
 import { ExploredTransfers, SquadCalculations } from "./SquadCalculations";
+import { GuestNote } from "./GuestLock";
 import { api, ApiError } from "../lib/api";
+import { useGuest } from "../lib/guest";
 import { useSettings } from "../lib/settingsStore";
 import { normalise } from "../lib/text";
 import type {
@@ -271,6 +273,7 @@ export function SquadView({
   onMeChange: (me: Me) => void;
 }) {
   const { settings } = useSettings();
+  const guest = useGuest();
   const [squad, setSquad] = useState<Squad | null>(null);
   const [history, setHistory] = useState<Squad[]>([]);
   const [run, setRun] = useState<Run | null>(null);
@@ -486,6 +489,13 @@ export function SquadView({
       </div>
 
       {error && <div className="notice bad">{error}</div>}
+
+      {guest && (
+        <GuestNote>
+          Guest session: your squad and any runs live in this browser
+          session only, and are deleted the moment you leave.
+        </GuestNote>
+      )}
 
       {/* The gameweek just gone is what a run transfers from, so a gap there
           is worth resolving before anything else on the page. */}

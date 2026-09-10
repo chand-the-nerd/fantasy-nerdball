@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { FplIdHelp } from "./FplIdHelp";
+import { GuestLock } from "./GuestLock";
 import { api, ApiError } from "../lib/api";
+import { useGuest } from "../lib/guest";
 import type { Me } from "../lib/types";
 
 /**
@@ -26,6 +28,7 @@ export function StartingSquadPrompt({
   onBuild: () => void;
   onDismiss: () => void;
 }) {
+  const guest = useGuest();
   const [entryId, setEntryId] = useState("");
   const [busy, setBusy] = useState<"link" | "import" | null>(null);
   const [error, setError] = useState("");
@@ -87,6 +90,22 @@ export function StartingSquadPrompt({
       {note && <div className="notice good">{note}</div>}
 
       <div className="start-options">
+        {guest ? (
+          <GuestLock
+            note={
+              "Pulls your real side, its value and your free transfers " +
+              "straight from FPL."
+            }
+          >
+            <div className="start-option">
+              <strong>Import from FPL</strong>
+              <p className="muted">
+                Link your team id once and the squad comes across on its
+                own.
+              </p>
+            </div>
+          </GuestLock>
+        ) : (
         <div className="start-option">
           <strong>Import from FPL</strong>
           <p className="muted">
@@ -133,6 +152,7 @@ export function StartingSquadPrompt({
             </>
           )}
         </div>
+        )}
 
         <div className="start-option">
           <strong>Enter it by hand</strong>

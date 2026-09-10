@@ -88,9 +88,73 @@ class Settings:
         # are serialised. This only caps how many can queue up.
         self.max_queued_runs = int(os.getenv("MAX_QUEUED_RUNS", "20"))
 
+        # Whether the sign-in page offers "Continue without signing in".
+        # Guests get a capped, throwaway account: see guest.py.
+        self.guest_mode = os.getenv("GUEST_MODE", "true").lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        # How long an idle guest account survives before it is swept up.
+        self.guest_ttl_hours = int(os.getenv("GUEST_TTL_HOURS", "24"))
+
         self.dev_mode = os.getenv("DEV_MODE", "").lower() in {"1", "true", "yes"}
         # Lets you work on the UI without Google credentials configured.
         self.dev_login_email = os.getenv("DEV_LOGIN_EMAIL", "")
+
+        # Where access requests and feedback get emailed. Without this
+        # they still land in the admin inbox; this is the nudge to go
+        # and read it.
+        self.mail_to = os.getenv("MAIL_TO", "").strip()
+        self.mail_from = os.getenv(
+            "MAIL_FROM", "Fantasy Nerdball <onboarding@resend.dev>"
+        ).strip()
+        # An HTTP API is preferred where one is configured: some hosts
+        # block outbound SMTP, and this needs no open port at all.
+        self.resend_api_key = os.getenv("RESEND_API_KEY", "").strip()
+        self.smtp_host = os.getenv("SMTP_HOST", "").strip()
+        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        self.smtp_user = os.getenv("SMTP_USER", "").strip()
+        self.smtp_password = os.getenv("SMTP_PASSWORD", "")
+
+        # Structured JSON logs on stdout, which is what lets the Railway
+        # dashboard filter on attributes. Off in dev, where a person is
+        # reading the terminal.
+        self.log_json = os.getenv(
+            "LOG_JSON", "false" if self.dev_mode else "true"
+        ).lower() in {"1", "true", "yes"}
+        # One http_request event per API call. Worth turning off if log
+        # volume ever becomes the cost rather than the insight.
+        self.log_requests = os.getenv("LOG_REQUESTS", "true").lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        # Keeps a queryable copy of the meaningful events in the
+        # database, which is what the admin dashboard reads.
+        self.metrics_enabled = os.getenv("METRICS", "true").lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        self.metrics_retention_days = int(
+            os.getenv("METRICS_RETENTION_DAYS", "90")
+        )
+        # How much of a guest's address is kept so the dashboard can tell
+        # one anonymous visitor from another: "truncated" stores the /24
+        # it came from, "full" the address itself, "none" neither. Unique
+        # visitors are counted from a salted hash either way, so counting
+        # works even on "none" — the setting only governs what a person
+        # reading the dashboard can see.
+        mode = os.getenv("VISITOR_IP_MODE", "truncated").lower()
+        self.visitor_ip_mode = (
+            mode if mode in {"full", "truncated", "none"} else "truncated"
+        )
+
+        # How often the app writes its own totals to the log, which is
+        # what makes "how many users do I have" a chartable number
+        # rather than a query someone has to remember to run.
+        self.heartbeat_minutes = int(os.getenv("HEARTBEAT_MINUTES", "15"))
 
     @staticmethod
     def _normalise_db_url(url: str) -> str:

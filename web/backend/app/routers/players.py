@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import events
 from ..auth import current_user
 from ..config import settings
 from ..db import get_session
@@ -204,6 +205,10 @@ def player_detail(
     )
     if element is None:
         raise HTTPException(404, "No such player.")
+
+    # Player ids, not names: enough to see which players people search for
+    # without the log turning into a record of anyone's team.
+    events.emit("player_lookup", player=player_id, **events.actor(user))
 
     teams = {int(t["id"]): t for t in data.get("teams", [])}
     team = teams.get(element.get("team"), {})

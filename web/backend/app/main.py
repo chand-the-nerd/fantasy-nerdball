@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import os
 import threading
@@ -11,18 +12,21 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
+from . import capacity, events, metrics
 from .auth import current_user
 from .config import settings
-from .db import get_session, init_db
+from .db import get_session, init_db, session_scope
 from .engine import jobs
-from .models import User
+from .models import Run, User, utcnow
 from .routers import (
     admin,
     auth,
     cron,
+    inbox,
     me,
     performance,
     plans,
@@ -37,7 +41,7 @@ from .services import fpl
 # headless backend it tries to find a display and the run dies.
 os.environ.setdefault("MPLBACKEND", "Agg")
 
-logging.basicConfig(level=logging.INFO)
+events.configure(as_json=settings.log_json)
 log = logging.getLogger("nerdball")
 
 
@@ -54,7 +58,13 @@ async def lifespan(app: FastAPI):
             settings.data_dir / "nerdball.db",
         )
     jobs.start_worker()
-    start_history_scheduler()
+    # Both write things that belong to the deployment rather than to a
+    # process, so with several workers only one of them should.
+    if claim("scheduler"):
+        start_history_scheduler()
+        start_heartbeat()
+    else:
+        log.info("Another worker holds the scheduler lease; skipping")
     if not settings.engine_dir.exists():
         log.warning(
             "Optimiser not found at %s. Runs will fail until it's cloned.",
@@ -62,6 +72,13 @@ async def lifespan(app: FastAPI):
         )
     else:
         warm_engine()
+
+    events.emit(
+        "boot",
+        commit=os.getenv("RAILWAY_GIT_COMMIT_SHA", "unknown")[:8],
+        database=settings.database_backend,
+        guest_mode=settings.guest_mode,
+    )
     yield
 
 
@@ -76,6 +93,72 @@ app.add_middleware(
     max_age=60 * 60 * 24 * 30,
 )
 
+# Endpoints the browser polls or the platform pings. They would be most
+# of the log by volume and none of it by information: a single run is
+# polled every 2.5 seconds, and the run's own lifecycle is recorded by the
+# worker in far more useful detail.
+QUIET_ROUTES = {
+    "/api/health",
+    "/api/runs/{run_id}",
+    "/api/plans/{plan_id}",
+}
+
+
+@app.middleware("http")
+async def log_request(request: Request, call_next):
+    """One line per request: what was asked for, by whom, and how slowly.
+
+    Read after the response rather than before, because the session
+    middleware runs inside this one and the user id isn't on the scope
+    until it has.
+    """
+    if not settings.log_requests:
+        metrics.set_client_ip(metrics.client_ip_from(request))
+        return await call_next(request)
+
+    metrics.set_client_ip(metrics.client_ip_from(request))
+
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        # An unhandled exception never reaches the code below, and a
+        # request that vanishes from the log is exactly the one worth
+        # having. Re-raised so FastAPI still returns its 500.
+        events.emit(
+            "http_error",
+            path=request.url.path,
+            method=request.method,
+            ms=round((time.perf_counter() - started) * 1000),
+        )
+        raise
+
+    elapsed = round((time.perf_counter() - started) * 1000)
+    route = getattr(request.scope.get("route"), "path", request.url.path)
+    session = request.scope.get("session") or {}
+
+    if route in QUIET_ROUTES:
+        return response
+
+    # The catch-all serves both pages and files. A path with no extension
+    # is somebody opening the app, which is worth counting; favicon.ico
+    # is not.
+    if route == "/{full_path:path}":
+        if "." not in request.url.path.rsplit("/", 1)[-1]:
+            events.emit("page_view", path=request.url.path)
+        return response
+
+    events.emit(
+        "http_request",
+        method=request.method,
+        route=route,
+        status=response.status_code,
+        ms=elapsed,
+        user=session.get("user_id"),
+    )
+    return response
+
+
 app.include_router(auth.router)
 app.include_router(me.router)
 app.include_router(runs.router)
@@ -86,6 +169,7 @@ app.include_router(teams.router)
 app.include_router(cron.router)
 app.include_router(performance.router)
 app.include_router(admin.router)
+app.include_router(inbox.router)
 
 
 def warm_engine() -> None:
@@ -168,6 +252,101 @@ def start_history_scheduler() -> None:
             time.sleep(max(5, settings.history_check_minutes) * 60)
 
     threading.Thread(target=loop, name="history-scheduler", daemon=True).start()
+
+
+_leases: list = []
+
+
+def claim(name: str) -> bool:
+    """Take the process-wide lease for a job only one process should do.
+
+    Anything that writes shared state — topping up player history, or
+    emitting the deployment's totals — has to happen once, not once per
+    uvicorn worker. An exclusive lock on a file on the mounted volume is
+    enough for that: the workers are processes in one container, and the
+    lock dies with whichever of them holds it.
+
+    Returns False if another process already has it, in which case the
+    caller should simply not run.
+    """
+    try:
+        import fcntl
+
+        settings.data_dir.mkdir(parents=True, exist_ok=True)
+        handle = open(settings.data_dir / f".{name}.lease", "w")
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        # Held for the life of the process: the reference keeps the file
+        # object, and so the lock, from being garbage collected.
+        _leases.append(handle)
+        return True
+    except OSError:
+        return False
+    except Exception:
+        # No fcntl, or an unusual filesystem. Better to do the work
+        # twice than not at all.
+        return True
+
+
+def start_heartbeat() -> None:
+    """Writes the app's own totals to the log on a timer.
+
+    Counts like these are a database query away at any moment, but a
+    query is something you have to remember to run. Emitted as an event,
+    "how many managers are there" becomes a line on a dashboard that is
+    already open, and the queue depth alongside it is the early warning
+    that the single worker is falling behind.
+    """
+    if settings.heartbeat_minutes <= 0:
+        return
+
+    def loop() -> None:
+        while True:
+            try:
+                with session_scope() as session:
+                    members = session.scalar(
+                        select(func.count())
+                        .select_from(User)
+                        .where(User.is_guest.is_(False))
+                    )
+                    guests = session.scalar(
+                        select(func.count())
+                        .select_from(User)
+                        .where(User.is_guest.is_(True))
+                    )
+                    day = utcnow() - dt.timedelta(hours=24)
+                    runs = session.scalar(
+                        select(func.count())
+                        .select_from(Run)
+                        .where(Run.created_at > day)
+                    )
+                    failed = session.scalar(
+                        select(func.count())
+                        .select_from(Run)
+                        .where(Run.created_at > day, Run.status == "failed")
+                    )
+                    depth = jobs.queue_depth(session)
+                    removed = metrics.prune(session)
+                if removed:
+                    events.emit("metrics_pruned", rows=removed)
+                events.emit(
+                    "heartbeat",
+                    members=int(members or 0),
+                    guests_live=int(guests or 0),
+                    runs_24h=int(runs or 0),
+                    runs_failed_24h=int(failed or 0),
+                    queue_depth=depth,
+                    worker_busy=jobs.is_busy(),
+                    # What the box is doing while it does all that, so
+                    # sizing decisions have a baseline to sit against.
+                    rss_mb=capacity.rss_mb(),
+                    memory_limit_mb=capacity.memory_limit_mb(),
+                    workers=int(os.getenv("WEB_CONCURRENCY", "1")),
+                )
+            except Exception:
+                log.warning("Heartbeat failed", exc_info=True)
+            time.sleep(max(1, settings.heartbeat_minutes) * 60)
+
+    threading.Thread(target=loop, name="heartbeat", daemon=True).start()
 
 
 @app.get("/api/health")

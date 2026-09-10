@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import events, guest
 from ..auth import current_user
 from ..config import settings
 from ..db import get_session
@@ -27,6 +28,11 @@ def start_plan(
     user: User = Depends(current_user),
     session: Session = Depends(get_session),
 ) -> Plan:
+    # A plan is a long job whose whole point is the weeks it saves for
+    # later, so it belongs to an account that will still be there.
+    if user.is_guest:
+        raise guest.members_only("The planner")
+
     season = payload.season or settings.current_season
 
     if not MIN_WEEKS <= payload.weeks <= MAX_WEEKS:
@@ -102,8 +108,21 @@ def start_plan(
         plan.status = "failed"
         plan.error = str(error)
         session.commit()
+        events.emit(
+            "plan_rejected",
+            reason="queue_full",
+            queue_depth=jobs.queue_depth(session),
+            **events.actor(user),
+        )
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(error))
 
+    events.emit(
+        "plan_queued",
+        plan=plan.id,
+        weeks=plan.weeks,
+        chips=len(plan.chips or {}) or None,
+        **events.actor(user),
+    )
     return plan
 
 

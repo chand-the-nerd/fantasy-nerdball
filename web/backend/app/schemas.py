@@ -16,6 +16,7 @@ class UserOut(BaseModel):
     name: str
     avatar_url: str
     is_admin: bool
+    is_guest: bool = False
     fpl_entry_id: int | None = None
 
 
@@ -166,6 +167,21 @@ class ResultIn(BaseModel):
     gameweek: int = Field(ge=1, le=38)
     actual_points: float | None = Field(default=None, ge=0, le=300)
     season: str | None = None
+
+
+class AccessRequestIn(BaseModel):
+    """Somebody asking to be let in, from the sign-in page."""
+
+    email: str = Field(min_length=3, max_length=320)
+    name: str | None = Field(default=None, max_length=120)
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class FeedbackIn(BaseModel):
+    """A message from inside the app."""
+
+    kind: str = Field(min_length=1, max_length=24)
+    body: str = Field(min_length=1, max_length=4000)
 
 
 class InviteIn(BaseModel):

@@ -10,10 +10,13 @@ export function TeamSliders({
   teams,
   modifiers,
   onChange,
+  locked = false,
 }: {
   teams: string[];
   modifiers: Record<string, number>;
   onChange: (modifiers: Record<string, number>) => void;
+  /** Guests get the panel to look at, with every club left neutral. */
+  locked?: boolean;
 }) {
   const valueFor = (team: string) => modifiers[team] ?? 1;
 
@@ -26,13 +29,19 @@ export function TeamSliders({
     onChange(next);
   };
 
-  const adjusted = teams.filter((team) => Math.abs(valueFor(team) - 1) >= 0.001);
+  const adjusted = locked
+    ? []
+    : teams.filter((team) => Math.abs(valueFor(team) - 1) >= 0.001);
 
   return (
-    <div className="team-sliders">
+    <div className={`team-sliders${locked ? " is-locked" : ""}`}>
       <div className="team-sliders-head">
         <span className="muted">
-          {adjusted.length === 0 ? "All clubs neutral" : `${adjusted.length} adjusted`}
+          {locked
+            ? "Every club neutral at 1.00"
+            : adjusted.length === 0
+              ? "All clubs neutral"
+              : `${adjusted.length} adjusted`}
         </span>
         {adjusted.length > 0 && (
           <button className="link-button" type="button" onClick={() => onChange({})}>
@@ -43,8 +52,8 @@ export function TeamSliders({
 
       <div className="team-slider-columns">
         {teams.map((team) => {
-          const value = valueFor(team);
-          const moved = Math.abs(value - 1) >= 0.001;
+          const value = locked ? 1 : valueFor(team);
+          const moved = !locked && Math.abs(value - 1) >= 0.001;
 
           return (
             <div className={`team-slider${moved ? " is-moved" : ""}`} key={team}>
@@ -58,6 +67,7 @@ export function TeamSliders({
                   max={2}
                   step={0.05}
                   value={value}
+                  disabled={locked}
                   onChange={(event) => set(team, Number(event.target.value))}
                   aria-valuetext={
                     moved

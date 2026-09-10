@@ -71,6 +71,12 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
-# Exactly one worker. The optimiser switches the process working directory and
-# holds a lock while it runs, so a second worker would fight it.
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
+# One worker by default. os.chdir is process-wide and the optimiser holds a
+# lock while it runs, so within a process runs are serialised — which is the
+# whole capacity ceiling.
+#
+# Raising WEB_CONCURRENCY gives you that many concurrent runs, because each
+# worker is a separate process with its own working directory and every
+# manager has their own workspace. Before you do, read web/CAPACITY.md: the
+# limit is memory, and the shared scheduler is leased to one process.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1}"]

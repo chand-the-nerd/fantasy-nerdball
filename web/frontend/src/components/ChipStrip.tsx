@@ -1,3 +1,4 @@
+import { useGuest } from "../lib/guest";
 import type { Settings } from "../lib/types";
 
 /* Icons are drawn here rather than pulled from a set, so they sit on the same
@@ -110,6 +111,13 @@ interface Props {
 }
 
 export function ChipStrip({ settings, onChange, disabled = false }: Props) {
+  const guest = useGuest();
+  // Nothing carries over between guest sessions, so there is no Free Hit
+  // side from last week for the optimiser to look past.
+  const chips = guest
+    ? CHIPS.filter((chip) => chip.id !== "free_hit_prev_gw")
+    : CHIPS;
+
   const toggle = (chip: Chip) => {
     const next = !settings[chip.id];
     if (!chip.exclusive) {
@@ -128,7 +136,7 @@ export function ChipStrip({ settings, onChange, disabled = false }: Props) {
 
   return (
     <div className="chip-strip" role="group" aria-label="Chips">
-      {CHIPS.map((chip) => {
+      {chips.map((chip) => {
         const active = Boolean(settings[chip.id]);
         const Icon = chip.icon;
         return (

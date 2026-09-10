@@ -1,4 +1,7 @@
 import type {
+  AdminMetrics,
+  AuthConfig,
+  Inbox,
   GameweekInfo,
   PlayerPool,
   Reference,
@@ -39,8 +42,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  authConfig: () => request<{ google: boolean; dev_login: boolean }>("/api/auth/config"),
-  devLogin: () => request<{ ok: boolean }>("/api/auth/dev-login", { method: "POST" }),
+  authConfig: () => request<AuthConfig>("/api/auth/config"),
+  guestLogin: () =>
+    request<{ ok: boolean }>("/api/auth/guest", { method: "POST" }),
+  devLogin: () =>
+    request<{ ok: boolean }>("/api/auth/dev-login", { method: "POST" }),
   logout: () => request<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
 
   me: () => request<Me>("/api/me"),
@@ -143,6 +149,38 @@ export const api = {
   adminStatus: () =>
     request<{ admin: boolean; email: string; owner_email: string }>(
       "/api/admin/status",
+    ),
+  requestAccess: (body: { email: string; name?: string; note?: string }) =>
+    request<{ ok: boolean; status: string; message: string }>(
+      "/api/access-request",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+    ),
+  sendFeedback: (kind: string, body: string) =>
+    request<{ ok: boolean; message: string }>("/api/feedback", {
+      method: "POST",
+      body: JSON.stringify({ kind, body }),
+    }),
+  adminTestEmail: () =>
+    request<{ ok: boolean; detail: string }>("/api/admin/test-email", {
+      method: "POST",
+    }),
+  adminInbox: (includeDone = false) =>
+    request<Inbox>(`/api/admin/inbox?include_done=${includeDone}`),
+  adminApprove: (id: number) =>
+    request<{ ok: boolean; email: string }>(
+      `/api/admin/inbox/${id}/approve`,
+      { method: "POST" },
+    ),
+  adminInboxDone: (id: number) =>
+    request<{ ok: boolean }>(`/api/admin/inbox/${id}/done`, {
+      method: "POST",
+    }),
+  adminMetrics: (window: string) =>
+    request<AdminMetrics>(
+      `/api/admin/metrics?window=${encodeURIComponent(window)}`,
     ),
   adminMembers: () => request<any>("/api/admin/members"),
   adminAddInvite: (email: string) =>
