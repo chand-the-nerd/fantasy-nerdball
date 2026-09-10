@@ -111,7 +111,7 @@ def start_plan(
         events.emit(
             "plan_rejected",
             reason="queue_full",
-            queue_depth=jobs.queue_depth(),
+            queue_depth=jobs.queue_depth(session),
             **events.actor(user),
         )
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(error))

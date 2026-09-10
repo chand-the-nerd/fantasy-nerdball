@@ -266,6 +266,15 @@ export interface AdminMetrics {
     run_seconds_median: number | null;
     run_seconds_p95: number | null;
     wait_seconds_p95: number | null;
+    run_cost_mb_median: number | null;
+    run_cost_mb_p95: number | null;
+  };
+  capacity: {
+    rss_mb: number | null;
+    memory_limit_mb: number | null;
+    workers: number;
+    parallel_runs_by_memory: number | null;
+    measured_runs: number;
   };
   series: MetricPoint[];
   people: MetricPerson[];

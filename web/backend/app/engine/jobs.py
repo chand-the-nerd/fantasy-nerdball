@@ -16,9 +16,10 @@ import traceback
 from contextlib import redirect_stdout
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
-from .. import events
+from .. import capacity, events
 from ..config import settings
 from ..db import session_scope
 from ..models import Plan, PlayerScores, Run, Squad, User, utcnow
@@ -90,7 +91,7 @@ def _execute_plan(plan_id: int) -> None:
             plan=plan.id,
             user=user.id,
             weeks=plan.weeks,
-            queue_depth=queue_depth(),
+            queue_depth=queue_depth(session),
         )
 
         squads = session.scalars(
@@ -115,7 +116,7 @@ def _execute_plan(plan_id: int) -> None:
                 row.progress = done
 
     try:
-        with redirect_stdout(stream):
+        with capacity.MemorySampler() as memory, redirect_stdout(stream):
             weeks = run_plan(
                 user_id=context["user_id"],
                 season=context["season"],
@@ -159,6 +160,8 @@ def _execute_plan(plan_id: int) -> None:
         plan=plan_id,
         weeks=len(weeks),
         seconds=round(time.perf_counter() - started, 1),
+        rss_cost_mb=memory.cost_mb,
+        rss_peak_mb=memory.peak,
     )
 
 
@@ -223,21 +226,43 @@ def _enqueue(item: tuple[str, int]) -> None:
     start_worker()
 
 
-def queue_depth() -> int:
-    """How many jobs are waiting, not counting the one in progress."""
-    return _queue.qsize()
+def queue_depth(session: Session | None = None) -> int:
+    """How many jobs are waiting, across the whole deployment.
+
+    Counted from the database rather than from this process's queue.
+    The in-memory queue is per worker process, so with more than one it
+    would report a fraction of the real backlog — which is exactly the
+    moment the number starts to matter.
+
+    Pass an open session when there is one: opening a second connection
+    inside a transaction that is midway through a write is asking for
+    trouble on SQLite.
+    """
+    def count(active: Session) -> int:
+        runs = active.scalar(
+            select(func.count())
+            .select_from(Run)
+            .where(Run.status == "queued")
+        )
+        plans = active.scalar(
+            select(func.count())
+            .select_from(Plan)
+            .where(Plan.status == "queued")
+        )
+        return int(runs or 0) + int(plans or 0)
+
+    try:
+        if session is not None:
+            return count(session)
+        with session_scope() as fresh:
+            return count(fresh)
+    except Exception:
+        # Never let a diagnostic take a run down with it.
+        return _queue.qsize()
 
 
 def is_busy() -> bool:
     return _busy
-
-
-def queue_position(run_id: int, kind: str = "run") -> int:
-    """0 means running or next up."""
-    with _queue.mutex:
-        pending = list(_queue.queue)
-    item = (kind, run_id)
-    return pending.index(item) if item in pending else 0
 
 
 def start_worker() -> None:
@@ -296,7 +321,7 @@ def _load_context(run_id: int) -> dict[str, Any] | None:
             guest=bool(user.is_guest),
             gameweek=run.gameweek,
             waited_seconds=waited,
-            queue_depth=queue_depth(),
+            queue_depth=queue_depth(session),
         )
 
         # Hand the engine every squad this manager has saved this season. It
@@ -323,7 +348,7 @@ def _execute(run_id: int) -> None:
     started = time.perf_counter()
     stream = _LogStream(run_id)
     try:
-        with redirect_stdout(stream):
+        with capacity.MemorySampler() as memory, redirect_stdout(stream):
             result = run_optimisation(
                 user_id=context["user_id"],
                 gameweek=context["gameweek"],
@@ -352,6 +377,7 @@ def _execute(run_id: int) -> None:
             gameweek=context["gameweek"],
             seconds=round(time.perf_counter() - started, 1),
             error_type=type(error).__name__,
+            rss_peak_mb=memory.peak,
         )
         traceback.print_exc()
         return
@@ -368,6 +394,12 @@ def _execute(run_id: int) -> None:
         ),
         transfers=int(result.get("squad", {}).get("transfers_made") or 0),
         chip=result.get("squad", {}).get("chip") or None,
+        # What the run cost on top of an already-warm process, and where
+        # that left the process overall. Together with the container's
+        # limit these are what decide how many runs could ever go at
+        # once — see web/CAPACITY.md.
+        rss_cost_mb=memory.cost_mb,
+        rss_peak_mb=memory.peak,
     )
 
 

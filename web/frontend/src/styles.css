@@ -3409,3 +3409,11 @@ tr.is-clickable:focus-visible {
   padding: 4px 10px;
   font-size: 12.5px;
 }
+
+.metric-capacity {
+  margin: 4px 0 18px;
+}
+
+.metric-capacity h4 {
+  margin-top: 0;
+}

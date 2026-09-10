@@ -24,6 +24,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import ipaddress
+import os
 import queue
 import threading
 from contextvars import ContextVar
@@ -32,6 +33,7 @@ from typing import Any
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from . import capacity
 from .config import settings
 from .db import session_scope
 from .models import MetricEvent, User, utcnow
@@ -278,6 +280,7 @@ def summary(session: Session, window: str = "24h") -> dict[str, Any]:
     visitors: dict[str, dict[str, Any]] = {}
     counts: dict[str, int] = {}
     run_seconds: list[float] = []
+    run_costs: list[float] = []
     waits: list[float] = []
     blocked: dict[str, int] = {}
 
@@ -320,8 +323,12 @@ def summary(session: Session, window: str = "24h") -> dict[str, Any]:
 
         if row.kind == "run_queued":
             series_runs[slot] = series_runs.get(slot, 0) + 1
-        if row.kind == "run_finished" and row.value is not None:
-            run_seconds.append(float(row.value))
+        if row.kind == "run_finished":
+            if row.value is not None:
+                run_seconds.append(float(row.value))
+            cost = (row.meta or {}).get("rss_cost_mb")
+            if cost:
+                run_costs.append(float(cost))
         if row.kind == "run_started" and (row.meta or {}).get(
             "waited_seconds"
         ) is not None:
@@ -394,6 +401,7 @@ def summary(session: Session, window: str = "24h") -> dict[str, Any]:
     ]
 
     ordered = sorted(run_seconds)
+    costs = sorted(run_costs)
 
     def percentile(values: list[float], fraction: float) -> float | None:
         if not values:
@@ -425,6 +433,19 @@ def summary(session: Session, window: str = "24h") -> dict[str, Any]:
             "run_seconds_median": percentile(ordered, 0.5),
             "run_seconds_p95": percentile(ordered, 0.95),
             "wait_seconds_p95": percentile(sorted(waits), 0.95),
+            "run_cost_mb_median": percentile(costs, 0.5),
+            "run_cost_mb_p95": percentile(costs, 0.95),
+        },
+        # What the box has, what it's using, and how many runs would fit
+        # in it at once. See web/CAPACITY.md for what to do with them.
+        "capacity": {
+            "rss_mb": capacity.rss_mb(),
+            "memory_limit_mb": capacity.memory_limit_mb(),
+            "workers": int(os.getenv("WEB_CONCURRENCY", "1")),
+            "parallel_runs_by_memory": capacity.parallel_capacity(
+                percentile(costs, 0.95)
+            ),
+            "measured_runs": len(costs),
         },
         "series": series,
         "people": people[:100],

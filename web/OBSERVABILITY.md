@@ -52,7 +52,7 @@ is wrong rather than something is happening.
 |---|---|---|
 | `run_queued` | `run`, `gameweek`, `queue_depth`, `user`, `guest` | A run was accepted. |
 | `run_started` | `run`, `waited_seconds`, `queue_depth`, … | The worker picked it up. `waited_seconds` is queue latency — the number that goes bad first as usage grows. |
-| `run_finished` | `run`, `seconds`, `projected_points`, `transfers`, `chip` | Success. `seconds` is the capacity input from the scaling discussion. |
+| `run_finished` | `run`, `seconds`, `projected_points`, `transfers`, `chip`, `rss_cost_mb`, `rss_peak_mb` | Success. `seconds` and `rss_cost_mb` are the two inputs to sizing: see web/CAPACITY.md. |
 | `run_failed` | `run`, `seconds`, `error_type` | The engine threw. |
 | `run_rejected` | `reason`, `queue_depth` | Refused: `queue_full` or `already_running`. `queue_full` means the single worker is overrun. |
 | `run_cancelled` | `run` | Dropped from the queue by the user. |
@@ -79,7 +79,7 @@ is wrong rather than something is happening.
 | `http_error` | `path`, `method`, `ms` | An unhandled exception, which never reaches the line above. |
 | `page_view` | `path` | The SPA served for an extension-less path. |
 | `boot` | `commit`, `database`, `guest_mode` | Startup. Confirms which build is live. |
-| `heartbeat` | `members`, `guests_live`, `runs_24h`, `runs_failed_24h`, `queue_depth`, `worker_busy` | Every `HEARTBEAT_MINUTES`. This is what makes "how many users do I have" a line on a chart rather than a query someone has to remember to run. |
+| `heartbeat` | `members`, `guests_live`, `runs_24h`, `runs_failed_24h`, `queue_depth`, `worker_busy`, `rss_mb`, `memory_limit_mb`, `workers` | Every `HEARTBEAT_MINUTES`. This is what makes "how many users do I have" a line on a chart rather than a query someone has to remember to run. |
 
 ## The dashboard in the admin pane
 

@@ -76,7 +76,7 @@ export function AdminMetricsPanel() {
   if (error) return <div className="notice bad">{error}</div>;
   if (!data) return <p className="muted">Reading the numbers…</p>;
 
-  const { totals } = data;
+  const { totals, capacity } = data;
   const failRate =
     totals.runs_finished + totals.runs_failed > 0
       ? Math.round(
@@ -140,6 +140,51 @@ export function AdminMetricsPanel() {
           label="Runs failing"
           hint={`${totals.runs_rejected} turned away`}
         />
+      </div>
+
+      <div className="metric-capacity">
+        <h4>Headroom</h4>
+        <div className="stat-rows">
+          <div>
+            <span>Memory a run costs</span>
+            <span>
+              {totals.run_cost_mb_p95
+                ? `${totals.run_cost_mb_p95} MB at the 95th percentile`
+                : "not measured yet"}
+            </span>
+          </div>
+          <div>
+            <span>Container</span>
+            <span>
+              {capacity.memory_limit_mb
+                ? `${Math.round(capacity.rss_mb ?? 0)} MB used of ` +
+                  `${Math.round(capacity.memory_limit_mb)} MB`
+                : `${Math.round(capacity.rss_mb ?? 0)} MB used, limit ` +
+                  "not reported"}
+            </span>
+          </div>
+          <div>
+            <span>Runs at once, on memory</span>
+            <span>
+              {capacity.parallel_runs_by_memory === null
+                ? "needs a few completed runs"
+                : `about ${capacity.parallel_runs_by_memory}`}
+            </span>
+          </div>
+          <div>
+            <span>Worker processes</span>
+            <span>
+              {capacity.workers}
+              {capacity.workers === 1 && " — one run at a time"}
+            </span>
+          </div>
+        </div>
+        <p className="hint">
+          Measured from {capacity.measured_runs} completed run
+          {capacity.measured_runs === 1 ? "" : "s"} in this window. Memory
+          is only one limit — see web/CAPACITY.md before raising
+          WEB_CONCURRENCY.
+        </p>
       </div>
 
       <div className="metric-chart">
