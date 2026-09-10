@@ -179,7 +179,11 @@ function Wrap({
 }) {
   if (!locked) return <>{children}</>;
   return (
-    <GuestLock note="Every number the projection was built from, player by player.">
+    <GuestLock
+      note={
+        "Every number the projection was built from, player by player."
+      }
+    >
       {children}
     </GuestLock>
   );

@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from . import guest
+from . import events, guest, metrics
 from .config import settings
 from .db import get_session
 from .models import Invite, User, UserSettings, utcnow
@@ -101,6 +101,8 @@ def current_user(
         request.session.clear()
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sign in to continue")
     guest.touch(session, user)
+    metrics.set_actor(user.id, user.is_guest)
+    events.note_session(user)
     return user
 
 

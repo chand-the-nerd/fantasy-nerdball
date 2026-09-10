@@ -117,7 +117,12 @@ export function App() {
                   </span>
                 </div>
               </div>
-              <GuestLock note="A plan is built over several gameweeks and kept between them, so it needs an account.">
+              <GuestLock
+                note={
+                  "A plan is built over several gameweeks and kept " +
+                  "between them, so it needs an account."
+                }
+              >
                 <div className="panel">
                   <h3>Plan ahead</h3>
                   <p className="muted">

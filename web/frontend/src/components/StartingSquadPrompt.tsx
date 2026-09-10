@@ -91,7 +91,12 @@ export function StartingSquadPrompt({
 
       <div className="start-options">
         {guest ? (
-          <GuestLock note="Pulls your real side, its value and your free transfers straight from FPL.">
+          <GuestLock
+            note={
+              "Pulls your real side, its value and your free transfers " +
+              "straight from FPL."
+            }
+          >
             <div className="start-option">
               <strong>Import from FPL</strong>
               <p className="muted">

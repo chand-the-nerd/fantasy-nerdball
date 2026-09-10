@@ -1,4 +1,5 @@
 import type {
+  AdminMetrics,
   AuthConfig,
   GameweekInfo,
   PlayerPool,
@@ -147,6 +148,10 @@ export const api = {
   adminStatus: () =>
     request<{ admin: boolean; email: string; owner_email: string }>(
       "/api/admin/status",
+    ),
+  adminMetrics: (window: string) =>
+    request<AdminMetrics>(
+      `/api/admin/metrics?window=${encodeURIComponent(window)}`,
     ),
   adminMembers: () => request<any>("/api/admin/members"),
   adminAddInvite: (email: string) =>

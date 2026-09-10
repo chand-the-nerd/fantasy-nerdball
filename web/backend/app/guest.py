@@ -20,6 +20,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from . import events
 from .config import settings
 from .models import (
     GameweekResult,
@@ -96,6 +97,7 @@ def enforce(row: UserSettings) -> None:
 
 
 def limit(what: str, allowed: int) -> HTTPException:
+    events.emit("guest_blocked", feature=what, kind="limit")
     return HTTPException(
         status.HTTP_403_FORBIDDEN,
         f"Without signing in you can set {allowed} {what}. Sign in for "
@@ -104,6 +106,7 @@ def limit(what: str, allowed: int) -> HTTPException:
 
 
 def members_only(feature: str) -> HTTPException:
+    events.emit("guest_blocked", feature=feature, kind="locked")
     return HTTPException(
         status.HTTP_403_FORBIDDEN,
         f"{feature} is for signed-in users. Sign in to use it.",
@@ -170,6 +173,8 @@ def purge_expired(session: Session) -> int:
     ).all()
     for user in stale:
         discard(session, user)
+    if stale:
+        events.emit("guests_purged", count=len(stale))
     return len(stale)
 
 

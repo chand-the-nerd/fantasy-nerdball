@@ -7,6 +7,7 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import events
 from ..auth import current_user
 from ..config import settings
 from ..db import get_session
@@ -32,6 +33,11 @@ def start_run(
         )
     )
     if active is not None:
+        events.emit(
+            "run_rejected",
+            reason="already_running",
+            **events.actor(user),
+        )
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             "You already have an optimisation in progress.",
@@ -59,8 +65,24 @@ def start_run(
         run.status = "failed"
         run.error = str(error)
         session.commit()
+        # The queue filling up is the single worker being overrun, which
+        # is the first thing that will break as usage grows. Worth an
+        # event of its own rather than being one 503 among many.
+        events.emit(
+            "run_rejected",
+            reason="queue_full",
+            queue_depth=jobs.queue_depth(),
+            **events.actor(user),
+        )
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(error))
 
+    events.emit(
+        "run_queued",
+        run=run.id,
+        gameweek=gameweek,
+        queue_depth=jobs.queue_depth(),
+        **events.actor(user),
+    )
     return run
 
 
@@ -102,3 +124,4 @@ def cancel_run(
         )
     run.status = "cancelled"
     session.commit()
+    events.emit("run_cancelled", run=run.id, **events.actor(user))

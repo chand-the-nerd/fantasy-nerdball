@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from .. import guest
+from .. import events, guest, metrics
 from ..auth import is_allowed, oauth, upsert_user
 from ..config import settings
 from ..db import get_session
@@ -47,9 +47,13 @@ async def callback(request: Request, session: Session = Depends(get_session)):
     email = (profile.get("email") or "").lower()
 
     if not email or not profile.get("email_verified", True):
+        events.emit("sign_in_denied", reason="no_verified_email")
         return RedirectResponse("/?error=no_verified_email")
 
     if not is_allowed(email, session):
+        # The address is recorded here and nowhere else in the log: a
+        # refused sign-in is only actionable if you know who to invite.
+        events.emit("sign_in_denied", reason="not_invited", email=email)
         return RedirectResponse("/?error=not_invited")
 
     try:
@@ -61,9 +65,18 @@ async def callback(request: Request, session: Session = Depends(get_session)):
             picture=profile.get("picture", ""),
         )
     except HTTPException:
+        events.emit("sign_in_denied", reason="league_full", email=email)
         return RedirectResponse("/?error=league_full")
 
     request.session["user_id"] = user.id
+    events.emit(
+        "sign_in",
+        user=user.id,
+        method="google",
+        # Distinguishes a first sign-in from a returning one, which is
+        # how you count growth rather than activity.
+        new_user=user.created_at == user.last_seen_at,
+    )
     return RedirectResponse("/")
 
 
@@ -83,6 +96,8 @@ def guest_login(request: Request, session: Session = Depends(get_session)):
         )
     user = guest.create(session)
     request.session["user_id"] = user.id
+    metrics.set_actor(user.id, True)
+    events.emit("guest_start", user=user.id, guest=True)
     return {"ok": True}
 
 
@@ -114,7 +129,10 @@ def logout(request: Request, session: Session = Depends(get_session)) -> dict:
 
     if user_id:
         user = session.get(User, user_id)
-        if user is not None and user.is_guest:
-            guest.discard(session, user)
+        if user is not None:
+            events.emit("sign_out", user=user.id, guest=bool(user.is_guest))
+            if user.is_guest:
+                guest.discard(session, user)
+        events.forget_session(user_id)
 
     return {"ok": True}

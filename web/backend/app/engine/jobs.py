@@ -7,15 +7,18 @@ order, which also keeps the engine's working-directory switching safe.
 
 from __future__ import annotations
 
+import datetime as dt
 import io
 import queue
 import threading
+import time
 import traceback
 from contextlib import redirect_stdout
 from typing import Any
 
 from sqlalchemy import select
 
+from .. import events
 from ..config import settings
 from ..db import session_scope
 from ..models import Plan, PlayerScores, Run, Squad, User, utcnow
@@ -28,6 +31,10 @@ from .planner import run_plan
 _queue: "queue.Queue[tuple[str, int]]" = queue.Queue()
 _worker: threading.Thread | None = None
 _worker_lock = threading.Lock()
+# Whether the single worker is mid-job. Read by the heartbeat, which is
+# how utilisation of the one thing that can't be parallelised gets onto a
+# dashboard.
+_busy = False
 
 
 def _should_store_scores(cache: PlayerScores | None, gameweek: int) -> bool:
@@ -68,6 +75,7 @@ def append_plan_log(plan_id: int, line: str) -> None:
 
 
 def _execute_plan(plan_id: int) -> None:
+    started = time.perf_counter()
     with session_scope() as session:
         plan = session.get(Plan, plan_id)
         if plan is None or plan.status != "queued":
@@ -77,6 +85,13 @@ def _execute_plan(plan_id: int) -> None:
             return
         plan.status = "running"
         plan.started_at = utcnow()
+        events.emit(
+            "plan_started",
+            plan=plan.id,
+            user=user.id,
+            weeks=plan.weeks,
+            queue_depth=queue_depth(),
+        )
 
         squads = session.scalars(
             select(Squad).where(Squad.user_id == user.id, Squad.season == plan.season)
@@ -122,6 +137,12 @@ def _execute_plan(plan_id: int) -> None:
                 row.status = "failed"
                 row.error = f"{type(error).__name__}: {error}\n\n{stream.tail()}".strip()
                 row.finished_at = utcnow()
+        events.emit(
+            "plan_failed",
+            plan=plan_id,
+            seconds=round(time.perf_counter() - started, 1),
+            error_type=type(error).__name__,
+        )
         traceback.print_exc()
         return
 
@@ -132,6 +153,13 @@ def _execute_plan(plan_id: int) -> None:
             row.progress = len(weeks)
             row.status = "complete"
             row.finished_at = utcnow()
+
+    events.emit(
+        "plan_finished",
+        plan=plan_id,
+        weeks=len(weeks),
+        seconds=round(time.perf_counter() - started, 1),
+    )
 
 
 class _LogStream(io.TextIOBase):
@@ -195,6 +223,15 @@ def _enqueue(item: tuple[str, int]) -> None:
     start_worker()
 
 
+def queue_depth() -> int:
+    """How many jobs are waiting, not counting the one in progress."""
+    return _queue.qsize()
+
+
+def is_busy() -> bool:
+    return _busy
+
+
 def queue_position(run_id: int, kind: str = "run") -> int:
     """0 means running or next up."""
     with _queue.mutex:
@@ -213,16 +250,20 @@ def start_worker() -> None:
 
 
 def _loop() -> None:
+    global _busy
     while True:
         kind, item_id = _queue.get()
+        _busy = True
         try:
             if kind == "plan":
                 _execute_plan(item_id)
             else:
                 _execute(item_id)
         except Exception:  # a worker that dies takes the queue with it
+            events.emit("worker_error", kind=kind, id=item_id)
             traceback.print_exc()
         finally:
+            _busy = False
             _queue.task_done()
 
 
@@ -237,6 +278,26 @@ def _load_context(run_id: int) -> dict[str, Any] | None:
 
         run.status = "running"
         run.started_at = utcnow()
+
+        # How long this run sat in the queue. With one worker for the
+        # whole site this is the number that turns into "the app feels
+        # slow" long before any request does.
+        waited = None
+        if run.created_at is not None:
+            created = run.created_at
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=dt.timezone.utc)
+            waited = round((utcnow() - created).total_seconds(), 1)
+
+        events.emit(
+            "run_started",
+            run=run.id,
+            user=user.id,
+            guest=bool(user.is_guest),
+            gameweek=run.gameweek,
+            waited_seconds=waited,
+            queue_depth=queue_depth(),
+        )
 
         # Hand the engine every squad this manager has saved this season. It
         # asks for a specific gameweek, which varies with Free Hit.
@@ -259,6 +320,7 @@ def _execute(run_id: int) -> None:
     if context is None:
         return
 
+    started = time.perf_counter()
     stream = _LogStream(run_id)
     try:
         with redirect_stdout(stream):
@@ -283,10 +345,30 @@ def _execute(run_id: int) -> None:
                 # breaks, so it goes here rather than in the progress feed.
                 run.error = f"{detail}\n\n{stream.tail()}".strip()
                 run.finished_at = utcnow()
+        events.emit(
+            "run_failed",
+            run=run_id,
+            user=context["user_id"],
+            gameweek=context["gameweek"],
+            seconds=round(time.perf_counter() - started, 1),
+            error_type=type(error).__name__,
+        )
         traceback.print_exc()
         return
 
     _store_result(run_id, context, result)
+    events.emit(
+        "run_finished",
+        run=run_id,
+        user=context["user_id"],
+        gameweek=context["gameweek"],
+        seconds=round(time.perf_counter() - started, 1),
+        projected_points=round(
+            float(result.get("squad", {}).get("projected_points") or 0), 1
+        ),
+        transfers=int(result.get("squad", {}).get("transfers_made") or 0),
+        chip=result.get("squad", {}).get("chip") or None,
+    )
 
 
 def _store_result(run_id: int, context: dict[str, Any], result: dict) -> None:

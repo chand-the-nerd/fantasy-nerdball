@@ -225,3 +225,52 @@ export interface PlayerPool {
     ambiguous: boolean;
   }[];
 }
+
+/** One time bucket on the admin dashboard's chart. */
+export interface MetricPoint {
+  at: string;
+  label: string;
+  visitors: number;
+  runs: number;
+}
+
+/** One visitor over the selected window: a manager, or an anonymous
+ *  guest identified only as far as VISITOR_IP_MODE allows. */
+export interface MetricPerson {
+  visitor: string;
+  who: string;
+  detail: string;
+  guest: boolean;
+  sessions: number;
+  runs: number;
+  events: number;
+  first_seen: string;
+  last_seen: string;
+}
+
+export interface AdminMetrics {
+  window: string;
+  since: string;
+  bucket_minutes: number;
+  totals: {
+    visitors: number;
+    members: number;
+    guests: number;
+    sessions: number;
+    sign_ins: number;
+    runs: number;
+    runs_finished: number;
+    runs_failed: number;
+    runs_rejected: number;
+    plans: number;
+    run_seconds_median: number | null;
+    run_seconds_p95: number | null;
+    wait_seconds_p95: number | null;
+  };
+  series: MetricPoint[];
+  people: MetricPerson[];
+  blocked: { feature: string; count: number }[];
+  activity: { kind: string; count: number }[];
+  ip_mode: string;
+  dropped: number;
+}

@@ -356,7 +356,12 @@ function Lookup() {
 /** The lookup panel as a guest sees it: present, blurred, inert. */
 function LockedLookup() {
   return (
-    <GuestLock note="Season totals, expected goals and upcoming fixtures for any player in the game.">
+    <GuestLock
+      note={
+        "Season totals, expected goals and upcoming fixtures for any " +
+        "player in the game."
+      }
+    >
       <div className="panel">
         <h3>Look up a player</h3>
         <p className="muted" style={{ marginTop: -6 }}>

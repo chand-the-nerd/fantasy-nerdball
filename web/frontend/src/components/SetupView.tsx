@@ -357,7 +357,9 @@ export function SetupView({
               {guest
                 ? `Fixed at ${Math.round(GUEST.benchWeight * 100)}% ` +
                   "without an account."
-                : "How important your bench is."}
+                : "How much a bench player’s score counts when picking " +
+                  "the squad. A Bench Boost week uses 100% whatever this " +
+                  "is set to."}
             </span>
           </div>
           <Toggle
@@ -400,7 +402,9 @@ export function SetupView({
           )}
           <div
             className={
-              !guest && settings.use_ml_weights ? "weights is-inactive" : "weights"
+              !guest && settings.use_ml_weights
+                ? "weights is-inactive"
+                : "weights"
             }
           >
             {POSITIONS.map((position) => (
@@ -457,8 +461,8 @@ export function SetupView({
           </p>
           {guest && (
             <GuestNote>
-              Guests can avoid {GUEST.maxBlacklist} players ({blacklist.length}{" "}
-              of {GUEST.maxBlacklist} used).
+              Guests can avoid {GUEST.maxBlacklist} players (
+              {blacklist.length} of {GUEST.maxBlacklist} used).
             </GuestNote>
           )}
           <div className="field">
@@ -504,7 +508,12 @@ export function SetupView({
 
       <Section title="User" blurb="Link your FPL side (recommended).">
         {guest ? (
-          <GuestLock note="Links your real team so its squad, value and free transfers come across on their own.">
+          <GuestLock
+            note={
+              "Links your real team so its squad, value and free " +
+              "transfers come across on their own."
+            }
+          >
             <div className="panel col-half">
               <h3>Your FPL team</h3>
               <p className="muted" style={{ marginTop: -6 }}>

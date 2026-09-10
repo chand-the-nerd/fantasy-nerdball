@@ -3304,3 +3304,108 @@ tr.is-clickable:focus-visible {
     white-space: normal;
   }
 }
+
+/* ── Admin usage dashboard ───────────────────────────────────────────────
+   Numbers first, then the shape of them, then the people behind them. */
+
+.metric-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.metric-windows {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.metric-windows .chip {
+  padding: 5px 11px;
+  font-size: 12.5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fade);
+  cursor: pointer;
+}
+
+.metric-windows .chip.on {
+  border-color: var(--floodlight);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--floodlight) 14%, transparent);
+}
+
+.metric-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.metric-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
+}
+
+.metric-tile strong {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-tile > span {
+  font-size: 12.5px;
+  color: var(--fade);
+}
+
+.metric-tile .hint {
+  font-size: 11.5px;
+  margin: 0;
+}
+
+.metric-chart {
+  margin: 4px 0 20px;
+}
+
+.metric-chart .hint {
+  margin-top: 6px;
+  text-align: right;
+}
+
+.admin-panel h4 {
+  margin: 20px 0 8px;
+  font-size: 13.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--floodlight);
+}
+
+.admin-panel .pill {
+  margin-left: 7px;
+  padding: 1px 7px;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--fade);
+}
+
+.admin-panel .small {
+  font-size: 11.5px;
+}
+
+.tabs.small button {
+  padding: 4px 10px;
+  font-size: 12.5px;
+}

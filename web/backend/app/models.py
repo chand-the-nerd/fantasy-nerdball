@@ -295,3 +295,40 @@ class GameweekResult(Base):
     updated_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
+
+
+class MetricEvent(Base):
+    """An append-only record of things people did, for the admin dashboard.
+
+    Deliberately not joined to users by a foreign key. Guest accounts are
+    deleted the moment their session ends, and a cascade would take the
+    history with them — leaving a dashboard that can only ever describe
+    the people still signed in. The user id is kept as a plain integer so
+    a member's activity can still be resolved by name, and anything left
+    dangling reads as a visitor who has since gone.
+
+    Written from a background thread and pruned on a timer: see
+    metrics.py, and web/OBSERVABILITY.md for what each kind means.
+    """
+
+    __tablename__ = "metric_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(48), index=True)
+
+    # Who, at the coarsest resolution that still answers the question.
+    # `visitor` is the stable identity used for unique counts: a user id
+    # for a signed-in manager, a salted hash of the address for a guest.
+    visitor: Mapped[str] = mapped_column(String(64), index=True, default="")
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_guest: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Only populated for guests, and only as far as VISITOR_IP_MODE
+    # allows: there is no name to fall back on when they leave.
+    label: Mapped[str] = mapped_column(String(64), default="")
+
+    # A duration in seconds for runs, or whatever a kind wants to chart.
+    value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    meta: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import guest
+from .. import events, guest
 from ..auth import current_user
 from ..config import settings
 from ..db import get_session
@@ -108,8 +108,21 @@ def start_plan(
         plan.status = "failed"
         plan.error = str(error)
         session.commit()
+        events.emit(
+            "plan_rejected",
+            reason="queue_full",
+            queue_depth=jobs.queue_depth(),
+            **events.actor(user),
+        )
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(error))
 
+    events.emit(
+        "plan_queued",
+        plan=plan.id,
+        weeks=plan.weeks,
+        chips=len(plan.chips or {}) or None,
+        **events.actor(user),
+    )
     return plan
 
 
