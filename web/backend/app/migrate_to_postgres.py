@@ -12,18 +12,19 @@ just copied. It refuses to run against a target that already has
 managers in it unless you insist, because running it twice by accident
 is a far more likely mistake than needing to.
 
-Usage, from the repo root with the Railway CLI installed:
+The SQLite file lives on the container's volume, so this has to run in
+the container rather than on your machine. `railway run` executes
+locally with the service's variables injected — it never sees /data.
+`railway ssh` is the one that goes inside:
 
-    railway run --service <app> python web/backend/migrate_to_postgres.py \\
-        --sqlite /data/nerdball.db
+    railway ssh
+    python -m app.migrate_to_postgres --sqlite /data/nerdball.db --dry-run
 
-Or locally against a tunnelled database:
+Then the same without --dry-run. DATABASE_URL is already set in the
+container, so --target is only needed if you want a different one.
 
-    DATABASE_URL=postgresql://... python web/backend/migrate_to_postgres.py \\
-        --sqlite ./data/nerdball.db
-
-Add --force to write into a target that already has data, and --dry-run
-to see what it would copy without touching anything.
+Add --force to write into a target that already has managers in it, and
+--dry-run to see what would be copied without touching anything.
 """
 
 from __future__ import annotations
@@ -33,13 +34,11 @@ import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from sqlalchemy import create_engine, func, select, text
+from sqlalchemy.orm import Session
 
-from sqlalchemy import create_engine, func, select, text  # noqa: E402
-from sqlalchemy.orm import Session  # noqa: E402
-
-from app.db import _dumps  # noqa: E402
-from app.models import Base, User  # noqa: E402
+from .db import _dumps
+from .models import Base, User
 
 # Order matters: parents before children, which is exactly the order
 # SQLAlchemy sorts them into for creation.

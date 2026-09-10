@@ -132,9 +132,14 @@ Pointing the app at Postgres does not bring the old data with it —
 Postgres starts empty, and it looks exactly as though every account was
 deleted. `web/backend/migrate_to_postgres.py` copies it across:
 
+The SQLite file is on the container's volume, so this runs **in the
+container**. `railway run` executes locally with the service's variables
+injected and never sees `/data`; `railway ssh` is the one that goes
+inside:
+
 ```
-railway run --service <app> python web/backend/migrate_to_postgres.py \
-    --sqlite /data/nerdball.db --dry-run
+railway ssh
+python -m app.migrate_to_postgres --sqlite /data/nerdball.db --dry-run
 ```
 
 Drop `--dry-run` when the counts look right. It copies every table in
