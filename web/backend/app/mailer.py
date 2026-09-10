@@ -28,6 +28,7 @@ from .config import settings
 log = logging.getLogger("nerdball.mail")
 
 RESEND_ENDPOINT = "https://api.resend.com/emails"
+USER_AGENT = "fantasy-nerdball/1.0"
 
 
 def configured() -> bool:
@@ -134,6 +135,13 @@ def _send_via_resend(subject: str, body: str, reply_to: str) -> None:
         headers={
             "Authorization": f"Bearer {settings.resend_api_key}",
             "Content-Type": "application/json",
+            "Accept": "application/json",
+            # Not decoration. Cloudflare sits in front of the Resend API
+            # and bans urllib's default "Python-urllib/3.x" signature at
+            # the edge, returning a 403 that never reaches Resend and has
+            # nothing to do with the API key. Any ordinary agent string
+            # gets through.
+            "User-Agent": USER_AGENT,
         },
         method="POST",
     )
@@ -142,6 +150,17 @@ def _send_via_resend(subject: str, body: str, reply_to: str) -> None:
             response.read()
     except urllib.error.HTTPError as error:
         detail = error.read().decode("utf-8", "replace")[:300]
+
+        # A 403 carrying a Cloudflare error code never reached Resend at
+        # all, so it says nothing about the key, the domain or MAIL_TO.
+        if "error code: 1010" in detail:
+            raise RuntimeError(
+                "Blocked by Cloudflare in front of the Resend API, not by "
+                "Resend. This means the request went out without a proper "
+                "User-Agent header — the deployed code is older than the "
+                f"fix for it. ({detail})"
+            )
+
         if error.code == 403 and "resend.dev" in settings.mail_from:
             raise RuntimeError(
                 "Resend refused it. The onboarding@resend.dev sender can "
@@ -149,6 +168,15 @@ def _send_via_resend(subject: str, body: str, reply_to: str) -> None:
                 f"MAIL_TO is {settings.mail_to}. Either change MAIL_TO to "
                 "that address, or verify a domain and set MAIL_FROM to "
                 f"use it. ({detail})"
+            )
+        if error.code == 403:
+            raise RuntimeError(
+                "Resend refused it. Usually MAIL_FROM isn't on a verified "
+                f"domain — it's currently {settings.mail_from}. ({detail})"
+            )
+        if error.code == 401:
+            raise RuntimeError(
+                f"Resend rejected the API key. ({detail})"
             )
         raise RuntimeError(f"Resend refused it ({error.code}): {detail}")
 
