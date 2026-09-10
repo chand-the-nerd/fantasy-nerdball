@@ -205,10 +205,6 @@ export function SignIn() {
             >
               Continue without signing in
             </button>
-            <span className="hint">
-              Build a squad and run the optimiser with the tuning fixed.
-              Nothing is saved once you leave.
-            </span>
           </div>
         )}
 
