@@ -121,6 +121,41 @@ like it should. Each replica gets its own in-memory queue, its own
 per-deployment — so the scheduler would run once per replica. Horizontal
 replicas are for after the queue lives in the database.
 
+## Moving from SQLite to Postgres
+
+The app falls back to SQLite when `DATABASE_URL` isn't set on the **app**
+service. Note *app* service: a `DATABASE_URL` on the Postgres service is
+Postgres's own variable and the app never sees it. Use a Railway
+variable reference (`${{Postgres.DATABASE_URL}}`) so the two are linked.
+
+Pointing the app at Postgres does not bring the old data with it —
+Postgres starts empty, and it looks exactly as though every account was
+deleted. `web/backend/migrate_to_postgres.py` copies it across:
+
+```
+railway run --service <app> python web/backend/migrate_to_postgres.py \
+    --sqlite /data/nerdball.db --dry-run
+```
+
+Drop `--dry-run` when the counts look right. It copies every table in
+dependency order, resets the id sequences so the next insert doesn't
+collide with a row it just copied, and refuses to run against a target
+that already has managers in it unless you pass `--force`.
+
+Two things it fixes on the way through, both of which bite when moving:
+
+- **NaN in JSON.** pandas returns NaN for a missing number — an injured
+  player's chance of playing, most often. SQLite stored it as text and
+  never looked; Postgres parses JSON and rejects the row, failing a run
+  after the optimiser has done all the work. The database engine now
+  serialises non-finite floats as null everywhere, so this is handled
+  for new rows as well as migrated ones.
+- **Concurrent table creation.** With `WEB_CONCURRENCY` above 1, every
+  worker runs `create_all` at once, two can pass the existence check
+  before either finishes, and the loser dies with a duplicate key on
+  `pg_type_typname_nsp_index`, taking the deploy with it. Schema
+  creation now runs under a Postgres advisory lock.
+
 ## Before going public
 
 Four things become load-bearing that currently aren't:

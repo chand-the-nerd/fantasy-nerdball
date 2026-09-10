@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
+import logging
+import math
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Any
 
-import logging
-
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.schema import CreateColumn
 
@@ -18,11 +20,53 @@ connect_args: dict = {}
 if settings.database_url.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
 
+
+def _finite(value: Any) -> Any:
+    """Replace anything JSON can't hold with null, recursively.
+
+    pandas and numpy hand back NaN for a missing number — an injured
+    player's chance of playing, most often. Python's json module writes
+    that as the bare token NaN, which is not valid JSON. SQLite accepted
+    it because it stores JSON as text and never looked; Postgres parses
+    it and refuses the whole row, failing a run after the optimiser had
+    already done all the work.
+
+    Doing it in the serialiser rather than at one call site means every
+    JSON column in the app is covered, including the ones added later by
+    somebody who never heard of this problem.
+    """
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {key: _finite(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_finite(item) for item in value]
+    return value
+
+
+def _fallback(obj: Any) -> Any:
+    """Numpy scalars, which json doesn't recognise but pandas returns."""
+    item = getattr(obj, "item", None)
+    if callable(item):
+        try:
+            return _finite(item())
+        except Exception:
+            pass
+    if isinstance(obj, (set, frozenset)):
+        return sorted(obj)
+    return str(obj)
+
+
+def _dumps(value: Any) -> str:
+    return json.dumps(_finite(value), default=_fallback)
+
+
 engine = create_engine(
     settings.database_url,
     pool_pre_ping=True,
     future=True,
     connect_args=connect_args,
+    json_serializer=_dumps,
 )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
@@ -69,9 +113,53 @@ def _add_missing_columns() -> None:
                 log.exception("Could not add column %s.%s", table.name, column.name)
 
 
+# One arbitrary but fixed number, so every process asks for the same
+# lock. Postgres advisory locks are just an integer namespace.
+SCHEMA_LOCK_KEY = 8_244_101
+
+
+@contextmanager
+def _schema_lock() -> Iterator[None]:
+    """Hold the schema open for one process at a time.
+
+    With more than one uvicorn worker, every process runs init_db at
+    once. create_all checks whether a table exists and then creates it,
+    and two processes can both pass the check before either finishes —
+    at which point the loser dies with a duplicate key on
+    pg_type_typname_nsp_index and takes the deploy with it.
+
+    An advisory lock serialises them: the second process waits, then
+    finds the tables already there and does nothing. SQLite has no such
+    thing, but it also can't run several worker processes usefully, so
+    there is nothing to serialise.
+    """
+    if settings.database_backend != "postgres":
+        yield
+        return
+
+    connection = engine.connect()
+    try:
+        connection.execute(
+            text("SELECT pg_advisory_lock(:key)"), {"key": SCHEMA_LOCK_KEY}
+        )
+        connection.commit()
+        yield
+    finally:
+        try:
+            connection.execute(
+                text("SELECT pg_advisory_unlock(:key)"),
+                {"key": SCHEMA_LOCK_KEY},
+            )
+            connection.commit()
+        except Exception:
+            log.warning("Could not release the schema lock", exc_info=True)
+        connection.close()
+
+
 def init_db() -> None:
-    Base.metadata.create_all(engine)
-    _add_missing_columns()
+    with _schema_lock():
+        Base.metadata.create_all(engine)
+        _add_missing_columns()
 
 
 def get_session() -> Iterator[Session]:
