@@ -3523,3 +3523,26 @@ tr.is-clickable:focus-visible {
   background: var(--floodlight);
   color: var(--pitch, #10231a);
 }
+
+.mail-status {
+  margin-bottom: 14px;
+}
+
+.mail-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mail-status code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--line) 45%, transparent);
+  font-size: 12px;
+}
+
+.mail-status .hint {
+  margin-top: 4px;
+}

@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import events, mailer, metrics
-from ..auth import current_admin, current_user, seat_count
+from ..auth import current_admin, current_user, is_allowed, seat_count
 from ..config import settings
 from ..db import get_session
 from ..models import Invite, InboxItem, User, utcnow
@@ -73,9 +73,9 @@ def request_access(
 ) -> dict:
     """Ask the admin for a seat.
 
-    Answers the same way whether or not the address is already known.
-    Telling an unauthenticated caller "that one's already a member"
-    would turn this into a way to find out who plays.
+    Three outcomes, and the caller is told which: they are already
+    approved and should just sign in, they have already asked, or the
+    request has gone through.
     """
     email = payload.email.strip().lower()
     if not EMAIL_PATTERN.match(email):
@@ -91,43 +91,64 @@ def request_access(
         )
 
     note = (payload.note or "").strip()[:1000]
-    existing = session.scalar(
+
+    # Already welcome: on the allowlist, holding an invite, or signed in
+    # before now. Telling them so is the useful answer — asking the admin
+    # for something you already have, and hearing nothing back, is worse
+    # than the small amount this discloses about who is a member.
+    if is_allowed(email, session):
+        return {
+            "ok": True,
+            "status": "already_approved",
+            "message": (
+                "That address is already approved. Sign in with Google "
+                "above — no need to ask."
+            ),
+        }
+
+    pending = session.scalar(
         select(InboxItem).where(
             InboxItem.kind == "access_request",
             InboxItem.email == email,
             InboxItem.status == "new",
         )
     )
-    already_member = session.scalar(
-        select(User).where(User.email == email, User.is_guest.is_(False))
-    )
-
-    if existing is None and already_member is None:
-        session.add(
-            InboxItem(
-                kind="access_request",
-                email=email,
-                name=(payload.name or "").strip()[:120],
-                body=note,
-            )
-        )
-        session.commit()
-
-        events.emit("access_requested", email=email)
-        seats = seat_count(session)
-        mailer.send(
-            subject=f"Access request — {email}",
-            body=(
-                f"{email} has asked for access to Fantasy Nerdball.\n\n"
-                f"{note or 'No message.'}\n\n"
-                f"Seats: {seats} of {settings.max_users} taken.\n"
-                "Approve or dismiss it in the admin pane."
+    if pending is not None:
+        return {
+            "ok": True,
+            "status": "pending",
+            "message": (
+                "You've already asked and the admin has it. You'll be "
+                "able to sign in once they add your address."
             ),
-            reply_to=email,
+        }
+
+    session.add(
+        InboxItem(
+            kind="access_request",
+            email=email,
+            name=(payload.name or "").strip()[:120],
+            body=note,
         )
+    )
+    session.commit()
+
+    events.emit("access_requested", email=email)
+    seats = seat_count(session)
+    mailer.send(
+        subject=f"Access request — {email}",
+        body=(
+            f"{email} has asked for access to Fantasy Nerdball.\n\n"
+            f"{note or 'No message.'}\n\n"
+            f"Seats: {seats} of {settings.max_users} taken.\n"
+            "Approve or dismiss it in the admin pane."
+        ),
+        reply_to=email,
+    )
 
     return {
         "ok": True,
+        "status": "sent",
         "message": (
             "Request sent. You'll be able to sign in with Google once "
             "the admin adds your address."
@@ -229,6 +250,29 @@ def read_inbox(
         "seats_used": seat_count(session),
         "seats_total": settings.max_users,
         "email_configured": mailer.configured(),
+        "email": mailer.status(),
+    }
+
+
+@router.post("/api/admin/test-email")
+def test_email(admin: User = Depends(current_admin)) -> dict:
+    """Send yourself one email now, and say exactly what happened.
+
+    Sent on this thread rather than in the background, because the point
+    is the answer, not the message.
+    """
+    error = mailer.send_now(
+        subject="Fantasy Nerdball — test",
+        body=(
+            "If you're reading this, access requests and feedback will "
+            "reach you too."
+        ),
+    )
+    if error:
+        return {"ok": False, "detail": error}
+    return {
+        "ok": True,
+        "detail": f"Sent to {settings.mail_to}. Give it a minute.",
     }
 
 

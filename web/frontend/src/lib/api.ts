@@ -151,14 +151,21 @@ export const api = {
       "/api/admin/status",
     ),
   requestAccess: (body: { email: string; name?: string; note?: string }) =>
-    request<{ ok: boolean; message: string }>("/api/access-request", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+    request<{ ok: boolean; status: string; message: string }>(
+      "/api/access-request",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+    ),
   sendFeedback: (kind: string, body: string) =>
     request<{ ok: boolean; message: string }>("/api/feedback", {
       method: "POST",
       body: JSON.stringify({ kind, body }),
+    }),
+  adminTestEmail: () =>
+    request<{ ok: boolean; detail: string }>("/api/admin/test-email", {
+      method: "POST",
     }),
   adminInbox: (includeDone = false) =>
     request<Inbox>(`/api/admin/inbox?include_done=${includeDone}`),

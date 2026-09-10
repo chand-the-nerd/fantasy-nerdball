@@ -21,7 +21,8 @@ export function SignIn() {
   const [asking, setAsking] = useState(false);
   const [askEmail, setAskEmail] = useState("");
   const [askNote, setAskNote] = useState("");
-  const [askState, setAskState] = useState<"" | "sending" | "sent">("");
+  const [askState, setAskState] = useState<"" | "sending" | "done">("");
+  const [askReply, setAskReply] = useState({ status: "", message: "" });
   const [askError, setAskError] = useState("");
   const params = new URLSearchParams(window.location.search);
   const error = params.get("error");
@@ -46,11 +47,12 @@ export function SignIn() {
     setAskError("");
     setAskState("sending");
     try {
-      await api.requestAccess({
+      const reply = await api.requestAccess({
         email: askEmail.trim(),
         note: askNote.trim() || undefined,
       });
-      setAskState("sent");
+      setAskReply({ status: reply.status, message: reply.message });
+      setAskState("done");
     } catch (err) {
       setAskError(err instanceof ApiError ? err.message : String(err));
       setAskState("");
@@ -132,7 +134,7 @@ export function SignIn() {
           </p>
         )}
 
-        {config?.google && !asking && askState !== "sent" && (
+        {config?.google && !asking && askState !== "done" && (
           <button
             className="link-button request-link"
             type="button"
@@ -142,14 +144,19 @@ export function SignIn() {
           </button>
         )}
 
-        {askState === "sent" && (
-          <div className="notice good">
-            Request sent. You'll be able to sign in with Google once the
-            admin adds your address.
+        {askState === "done" && (
+          <div
+            className={
+              askReply.status === "already_approved"
+                ? "notice"
+                : "notice good"
+            }
+          >
+            {askReply.message}
           </div>
         )}
 
-        {asking && askState !== "sent" && (
+        {asking && askState !== "done" && (
           <div className="request-panel">
             <label htmlFor="ask-email">
               Your Google address

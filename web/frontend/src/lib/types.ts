@@ -132,6 +132,15 @@ export interface InboxItem {
   handled_by: string;
 }
 
+export interface MailStatus {
+  configured: boolean;
+  mode: string;
+  to: string;
+  from: string;
+  last_error: string;
+  last_sent: string;
+}
+
 export interface Inbox {
   items: InboxItem[];
   unread: number;
@@ -139,6 +148,7 @@ export interface Inbox {
   seats_used: number;
   seats_total: number;
   email_configured: boolean;
+  email: MailStatus;
 }
 
 export type Theme = "legacy" | "dark" | "light";

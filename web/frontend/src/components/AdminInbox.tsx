@@ -14,6 +14,11 @@ function when(iso: string): string {
 export function AdminInbox({ onCount }: { onCount?: (n: number) => void }) {
   const [data, setData] = useState<Inbox | null>(null);
   const [showDone, setShowDone] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    ok: boolean;
+    detail: string;
+  } | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
 
@@ -47,6 +52,22 @@ export function AdminInbox({ onCount }: { onCount?: (n: number) => void }) {
     }
   };
 
+  const testEmail = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      setTestResult(await api.adminTestEmail());
+    } catch (err) {
+      setTestResult({
+        ok: false,
+        detail: err instanceof ApiError ? err.message : String(err),
+      });
+    } finally {
+      setTesting(false);
+      void load(showDone);
+    }
+  };
+
   if (error) return <div className="notice bad">{error}</div>;
   if (!data) return <p className="muted">Opening the inbox…</p>;
 
@@ -56,14 +77,47 @@ export function AdminInbox({ onCount }: { onCount?: (n: number) => void }) {
     <>
       {status && <div className="notice good">{status}</div>}
 
-      {!data.email_configured && (
-        <div className="notice">
-          Nothing is being emailed to you, so this page is the only place
-          these appear. Set <code>MAIL_TO</code> and either{" "}
-          <code>RESEND_API_KEY</code> or the <code>SMTP_*</code> variables
-          on the Railway service to change that.
+      <div className="mail-status">
+        <div className="mail-line">
+          <span className="muted">
+            {data.email.mode === "off"
+              ? "Email isn't set up — this page is the only place these " +
+                "appear."
+              : `Emailing ${data.email.to || "nobody"} via ` +
+                `${data.email.mode}`}
+            {data.email.last_sent && ` · last sent ${when(
+              data.email.last_sent,
+            )}`}
+          </span>
+          <button
+            className="link-button"
+            type="button"
+            disabled={testing}
+            onClick={() => void testEmail()}
+          >
+            {testing ? "Sending…" : "Send test email"}
+          </button>
         </div>
-      )}
+
+        {data.email.mode === "off" && (
+          <p className="hint">
+            Set <code>MAIL_TO</code> and either <code>RESEND_API_KEY</code>{" "}
+            or the <code>SMTP_*</code> variables on the Railway service.
+          </p>
+        )}
+
+        {data.email.last_error && !testResult && (
+          <div className="notice bad">
+            Last attempt failed. {data.email.last_error}
+          </div>
+        )}
+
+        {testResult && (
+          <div className={testResult.ok ? "notice good" : "notice bad"}>
+            {testResult.detail}
+          </div>
+        )}
+      </div>
 
       <div className="metric-head">
         <span className="muted">
