@@ -375,3 +375,16 @@ export interface SavedSquad {
   chip: string;
   players: number;
 }
+
+export interface BackupFile {
+  name: string;
+  bytes: number;
+  taken_at: string;
+}
+
+export interface BackupList {
+  backups: BackupFile[];
+  keep: number;
+  every_hours: number;
+  on_same_volume: boolean;
+}

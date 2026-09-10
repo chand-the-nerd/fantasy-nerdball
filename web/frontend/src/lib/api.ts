@@ -1,6 +1,7 @@
 import type {
   AdminMetrics,
   AdminUsers,
+  BackupList,
   SavedSquad,
   AuthConfig,
   Inbox,
@@ -171,6 +172,12 @@ export const api = {
       body: JSON.stringify({ kind, body }),
     }),
   adminUsers: () => request<AdminUsers>("/api/admin/users"),
+  adminBackups: () => request<BackupList>("/api/admin/backups"),
+  adminBackupNow: () =>
+    request<{ ok: boolean; name: string; bytes: number }>(
+      "/api/admin/backups",
+      { method: "POST" },
+    ),
   adminUserSquads: (id: number) =>
     request<{ squads: SavedSquad[] }>(`/api/admin/users/${id}/squads`),
   adminReactivate: (id: number) =>

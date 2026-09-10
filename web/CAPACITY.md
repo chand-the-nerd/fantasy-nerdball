@@ -161,6 +161,30 @@ Two things it fixes on the way through, both of which bite when moving:
   `pg_type_typname_nsp_index`, taking the deploy with it. Schema
   creation now runs under a Postgres advisory lock.
 
+## Backups without a paid plan
+
+`app/backup.py` writes the whole database to a compressed JSON file on
+the volume once a day, keeps the last 14, and lists them in the admin
+page for download. By hand, inside the container:
+
+```
+railway ssh
+python -m app.backup create
+python -m app.backup list
+python -m app.backup restore nerdball-20260910-204759.json.gz --force
+```
+
+Restoring empties every table and refills it from the file, then resets
+the id sequences. It refuses to run against a database that has users
+unless you pass `--force`, because there is no undo.
+
+**What this covers and what it doesn't.** It covers the likely disaster:
+a bug, or a misconfigured `INACTIVE_DAYS`, deleting rows that mattered —
+yesterday's file still has them. It does not cover losing the volume,
+because the backups are on it. Downloading one occasionally from the
+admin page is what closes that gap, and is the thing worth doing before
+advertising.
+
 ## Before going public
 
 Four things become load-bearing that currently aren't:

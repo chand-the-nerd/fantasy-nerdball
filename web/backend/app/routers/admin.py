@@ -11,11 +11,11 @@ import datetime as dt
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import emails, events, lifecycle, mailer, metrics
+from .. import backup, emails, events, lifecycle, mailer, metrics
 from ..auth import current_admin, current_user, seat_count
 from ..config import settings
 from ..db import get_session
@@ -205,6 +205,54 @@ def admin_users(
         "purge_after_months": settings.purge_after_months,
         "season": settings.current_season,
     }
+
+
+@router.get("/backups")
+def admin_backups(admin: User = Depends(current_admin)) -> dict:
+    """What's been backed up, and how recently."""
+    items = backup.listing()
+    return {
+        "backups": items,
+        "keep": settings.backup_keep,
+        "every_hours": settings.backup_every_hours,
+        # Said plainly rather than implied: these sit on the same volume
+        # as the database, so they survive a bad delete but not the loss
+        # of the volume. Downloading one is what fixes that.
+        "on_same_volume": True,
+    }
+
+
+@router.post("/backups")
+def admin_backup_now(admin: User = Depends(current_admin)) -> dict:
+    """Take one now, before doing something risky."""
+    try:
+        path = backup.create(label="manual")
+    except Exception as error:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            f"Backup failed: {type(error).__name__}: {error}",
+        )
+    backup.prune(settings.backup_keep)
+    return {"ok": True, "name": path.name, "bytes": path.stat().st_size}
+
+
+@router.get("/backups/{name}")
+def admin_backup_download(
+    name: str, admin: User = Depends(current_admin)
+) -> FileResponse:
+    """Hand one over, so a copy can live somewhere that isn't Railway."""
+    # Names come from the listing, but this endpoint takes whatever it
+    # is given, so it is checked rather than trusted.
+    if "/" in name or "\\" in name or not name.startswith("nerdball-"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Bad name")
+
+    path = backup.backup_dir() / name
+    if not path.exists():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such backup")
+
+    return FileResponse(
+        path, media_type="application/gzip", filename=name
+    )
 
 
 @router.get("/users/{user_id}/squads")

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api";
-import type { AdminUsers, SavedSquad } from "../lib/types";
+import type { AdminUsers, BackupList, SavedSquad } from "../lib/types";
 
 function ago(iso: string): string {
   if (!iso) return "never";
@@ -18,6 +18,7 @@ export function AdminManagers() {
   const [openId, setOpenId] = useState<number | null>(null);
   const [squads, setSquads] = useState<SavedSquad[]>([]);
   const [busy, setBusy] = useState(false);
+  const [backups, setBackups] = useState<BackupList | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -28,9 +29,19 @@ export function AdminManagers() {
     }
   }, []);
 
+  const loadBackups = useCallback(async () => {
+    try {
+      setBackups(await api.adminBackups());
+    } catch {
+      // The list is a convenience; failing to fetch it shouldn't take
+      // the whole page down.
+    }
+  }, []);
+
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadBackups();
+  }, [load, loadBackups]);
 
   const openSquads = async (id: number) => {
     if (openId === id) {
@@ -215,6 +226,66 @@ export function AdminManagers() {
         {data.purge_after_months} months. Admins and anyone in
         ALLOWED_EMAILS are never touched.
       </p>
+
+      <h4>Backups</h4>
+      {backups === null ? (
+        <p className="muted">Checking…</p>
+      ) : (
+        <>
+          <div className="metric-head">
+            <span className="muted">
+              {backups.every_hours > 0
+                ? `Every ${backups.every_hours}h, keeping the last ` +
+                  `${backups.keep}`
+                : "Automatic backups are switched off"}
+            </span>
+            <button
+              className="link-button"
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                void act(async () => {
+                  await api.adminBackupNow();
+                  await loadBackups();
+                }, "Backup taken.")
+              }
+            >
+              Back up now
+            </button>
+          </div>
+
+          {backups.backups.length === 0 ? (
+            <p className="muted">
+              Nothing yet — the first one is taken shortly after a deploy.
+            </p>
+          ) : (
+            <div className="stat-rows">
+              {backups.backups.slice(0, 8).map((file) => (
+                <div key={file.name}>
+                  <span>{ago(file.taken_at)}</span>
+                  <span>
+                    {(file.bytes / 1024).toFixed(0)} KB{" "}
+                    <a
+                      className="link-button"
+                      href={`/api/admin/backups/${file.name}`}
+                      download
+                    >
+                      Download
+                    </a>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <p className="hint">
+            These live on the same volume as the database, so they cover a
+            bad delete but not the loss of the volume itself. Download one
+            now and then and keep it somewhere else — that's the bit
+            Railway's paid backups would do for you.
+          </p>
+        </>
+      )}
 
       {data.invites.length > 0 && (
         <>

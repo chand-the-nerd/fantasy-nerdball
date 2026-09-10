@@ -16,7 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import capacity, events, lifecycle, metrics
+from . import backup, capacity, events, lifecycle, metrics
 from .auth import current_user
 from .config import settings
 from .db import get_session, init_db, session_scope
@@ -68,6 +68,7 @@ async def lifespan(app: FastAPI):
         start_history_scheduler()
         start_heartbeat()
         lifecycle.start_scheduler()
+        backup.start_scheduler()
     else:
         log.info("Another worker holds the scheduler lease; skipping")
     if not settings.engine_dir.exists():

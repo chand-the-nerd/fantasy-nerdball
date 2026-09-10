@@ -109,6 +109,11 @@ class Settings:
         # Lets you work on the UI without Google credentials configured.
         self.dev_login_email = os.getenv("DEV_LOGIN_EMAIL", "")
 
+        # Built-in backups, since Railway's own are a paid feature.
+        # Written to the volume the app already has; 0 switches them off.
+        self.backup_every_hours = int(os.getenv("BACKUP_EVERY_HOURS", "24"))
+        self.backup_keep = int(os.getenv("BACKUP_KEEP", "14"))
+
         # How long an approved invitation lasts before it lapses and
         # the place goes back to whoever is waiting. 0 disables it.
         self.invite_ttl_hours = int(os.getenv("INVITE_TTL_HOURS", "72"))
