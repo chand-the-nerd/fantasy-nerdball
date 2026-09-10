@@ -109,6 +109,24 @@ class Settings:
         # Lets you work on the UI without Google credentials configured.
         self.dev_login_email = os.getenv("DEV_LOGIN_EMAIL", "")
 
+        # How deep the queue has to get before guests are asked to
+        # wait so signed-in managers aren't stuck behind them. 0 turns
+        # the preference off and treats everyone the same.
+        self.guest_pause_depth = int(os.getenv("GUEST_PAUSE_DEPTH", "3"))
+
+        # How long a scored player pool is reused for. Scoring is the
+        # expensive half of a run and depends only on the gameweek and
+        # the model settings, so runs sharing both share the answer —
+        # every guest run, in practice. 0 switches the cache off.
+        self.scoring_cache_minutes = int(
+            os.getenv("SCORING_CACHE_MINUTES", "20")
+        )
+        # Each entry holds two dataframes, in the same container as the
+        # optimiser, so only a handful are kept.
+        self.scoring_cache_entries = int(
+            os.getenv("SCORING_CACHE_ENTRIES", "4")
+        )
+
         # Built-in backups, since Railway's own are a paid feature.
         # Written to the volume the app already has; 0 switches them off.
         self.backup_every_hours = int(os.getenv("BACKUP_EVERY_HOURS", "24"))

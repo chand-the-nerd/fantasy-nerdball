@@ -59,8 +59,27 @@ def start_run(
     session.commit()
     session.refresh(run)
 
+    # When there's a backlog, the people with accounts get the worker.
+    if user.is_guest and jobs.guests_should_wait():
+        run.status = "failed"
+        run.error = "Busy"
+        session.commit()
+        events.emit(
+            "run_rejected",
+            reason="guest_deferred",
+            queue_depth=jobs.queue_depth(session),
+            **events.actor(user),
+        )
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "The optimiser is busy, and signed-in managers go first "
+            "while it is. This is a free beta running on one small "
+            "server — try again in a few minutes, or sign in for "
+            "priority.",
+        )
+
     try:
-        jobs.enqueue(run.id)
+        jobs.enqueue(run.id, guest=user.is_guest)
     except RuntimeError as error:
         run.status = "failed"
         run.error = str(error)

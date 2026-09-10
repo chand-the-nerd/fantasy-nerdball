@@ -2,6 +2,7 @@ import type {
   AdminMetrics,
   AdminUsers,
   BackupList,
+  SiteStatus,
   SavedSquad,
   AuthConfig,
   Inbox,
@@ -171,6 +172,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ kind, body }),
     }),
+  status: () => request<SiteStatus>("/api/status"),
   adminUsers: () => request<AdminUsers>("/api/admin/users"),
   adminBackups: () => request<BackupList>("/api/admin/backups"),
   adminBackupNow: () =>

@@ -363,6 +363,14 @@ export interface AdminUsers {
   invite_ttl_hours: number;
   purge_after_months: number;
   season: string;
+  season_stale: boolean;
+  fpl_cache: Record<string, number>;
+  scoring_cache: {
+    entries: { gameweek: number | null; age_seconds: number }[];
+    hits: number;
+    misses: number;
+    hit_rate: number | null;
+  };
 }
 
 export interface SavedSquad {
@@ -387,4 +395,12 @@ export interface BackupList {
   keep: number;
   every_hours: number;
   on_same_volume: boolean;
+}
+
+export interface SiteStatus {
+  queue_depth: number;
+  worker_busy: boolean;
+  busy: boolean;
+  guest_deferred: boolean;
+  beta: boolean;
 }

@@ -274,6 +274,26 @@ def queue_position(session: Session, email: str) -> int | None:
     return len(waiting) + 1
 
 
+def season_looks_stale() -> bool:
+    """Whether CURRENT_SEASON appears to be last season's.
+
+    The dormant-data purge and every squad key off this string, and
+    nothing goes wrong visibly when it's out of date — the app just
+    quietly keeps filing this year's work under last year. A new season
+    starts in August, so from September a season whose first year is
+    behind us is almost certainly forgotten.
+    """
+    season = settings.current_season
+    try:
+        start_year = int(season.split("-")[0])
+    except (ValueError, IndexError):
+        return False
+
+    now = utcnow()
+    expected = now.year if now.month >= 8 else now.year - 1
+    return start_year < expected
+
+
 def sweep() -> dict[str, int]:
     """One pass of every rule, in the order they escalate."""
     with session_scope() as session:
@@ -290,6 +310,16 @@ def sweep() -> dict[str, int]:
     }
     if any(result.values()):
         events.emit("lifecycle_sweep", **result)
+
+    if season_looks_stale():
+        log.warning(
+            "CURRENT_SEASON is %s, which looks like last season. Squads "
+            "are being filed under it and dormant data won't be cleared "
+            "until it's rolled over.",
+            settings.current_season,
+        )
+        events.emit("season_stale", season=settings.current_season)
+
     return result
 
 

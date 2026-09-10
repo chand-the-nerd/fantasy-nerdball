@@ -3624,3 +3624,35 @@ tr.is-clickable:focus-visible {
   gap: 14px;
   font-size: 12px;
 }
+
+/* ── Under load ──────────────────────────────────────────────────────────
+   Only rendered when it's true, so it can afford to be noticeable. */
+
+.load-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-left: 3px solid var(--floodlight);
+}
+
+.load-notice strong {
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--floodlight);
+}
+
+.load-notice span {
+  color: var(--fade);
+  line-height: 1.55;
+}
+
+.beta-flag {
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fade);
+}

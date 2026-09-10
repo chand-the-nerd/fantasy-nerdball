@@ -167,6 +167,9 @@ export function App() {
             >
               Privacy
             </button>
+            <span className="beta-flag" title="Free, unfunded, and small">
+              Beta
+            </span>
             {guest && (
               <button
                 className="admin-link"

@@ -8,6 +8,7 @@ import { SquadOptions } from "./SquadOptions";
 import { StartingSquadPrompt } from "./StartingSquadPrompt";
 import { ExploredTransfers, SquadCalculations } from "./SquadCalculations";
 import { GuestNote } from "./GuestLock";
+import { LoadNotice } from "./LoadNotice";
 import { api, ApiError } from "../lib/api";
 import { useGuest } from "../lib/guest";
 import { useSettings } from "../lib/settingsStore";
@@ -489,6 +490,8 @@ export function SquadView({
       </div>
 
       {error && <div className="notice bad">{error}</div>}
+
+      <LoadNotice />
 
       {guest && (
         <GuestNote>

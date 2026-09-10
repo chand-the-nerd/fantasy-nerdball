@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime as dt
 import io
+import itertools
 import queue
 import threading
 import time
@@ -29,7 +30,18 @@ from .planner import run_plan
 
 # Items are (kind, id): single runs and multi-week plans share one worker, so
 # they can't fight over the engine's working directory.
-_queue: "queue.Queue[tuple[str, int]]" = queue.Queue()
+# Priorities, lowest first. A signed-in manager waiting behind three
+# guests is the wrong way round: they are the people the site is for,
+# and the guests are having a free look at somebody else's compute.
+MEMBER = 0
+GUEST = 1
+
+# (priority, sequence, kind, id). The sequence keeps it first-come within
+# a priority, and stops the tuple comparison ever reaching the ids.
+_queue: "queue.PriorityQueue[tuple[int, int, str, int]]" = (
+    queue.PriorityQueue()
+)
+_sequence = itertools.count()
 _worker: threading.Thread | None = None
 _worker_lock = threading.Lock()
 # Whether the single worker is mid-job. Read by the heartbeat, which is
@@ -211,19 +223,34 @@ def append_log(run_id: int, line: str) -> None:
         run.log = "\n".join(existing)
 
 
-def enqueue(run_id: int) -> None:
-    _enqueue(("run", run_id))
+def enqueue(run_id: int, guest: bool = False) -> None:
+    _enqueue("run", run_id, GUEST if guest else MEMBER)
 
 
 def enqueue_plan(plan_id: int) -> None:
-    _enqueue(("plan", plan_id))
+    # Plans are signed-in only, so there is no guest case.
+    _enqueue("plan", plan_id, MEMBER)
 
 
-def _enqueue(item: tuple[str, int]) -> None:
+def _enqueue(kind: str, item_id: int, priority: int = MEMBER) -> None:
     if _queue.qsize() >= settings.max_queued_runs:
-        raise RuntimeError("The optimiser queue is full. Try again in a few minutes.")
-    _queue.put(item)
+        raise RuntimeError(
+            "The optimiser queue is full. Try again in a few minutes."
+        )
+    _queue.put((priority, next(_sequence), kind, item_id))
     start_worker()
+
+
+def guests_should_wait() -> bool:
+    """Whether the queue is busy enough to stop taking guest work.
+
+    One worker serves everybody, so a guest run and a member run cost
+    exactly the same. When there is a backlog, the people with accounts
+    get it — and the guests get told why, rather than a spinner.
+    """
+    if settings.guest_pause_depth <= 0:
+        return False
+    return _queue.qsize() >= settings.guest_pause_depth
 
 
 def queue_depth(session: Session | None = None) -> int:
@@ -302,28 +329,39 @@ def recover_orphans() -> int:
             plan.finished_at = utcnow()
             recovered += 1
 
-        waiting = session.scalars(
-            select(Run)
-            .where(Run.status == "queued")
-            .order_by(Run.created_at)
-        ).all()
-        queued_plans = session.scalars(
-            select(Plan)
-            .where(Plan.status == "queued")
-            .order_by(Plan.created_at)
-        ).all()
+        # Ids and guest flags, read while the session is open: the rows
+        # themselves are useless once it closes.
+        waiting = [
+            (run.id, bool(guest_flag))
+            for run, guest_flag in session.execute(
+                select(Run, User.is_guest)
+                .join(User, User.id == Run.user_id)
+                .where(Run.status == "queued")
+                .order_by(Run.created_at)
+            )
+        ]
+        queued_plans = [
+            plan.id
+            for plan in session.scalars(
+                select(Plan)
+                .where(Plan.status == "queued")
+                .order_by(Plan.created_at)
+            )
+        ]
 
     # Re-queued outside the transaction: the worker picks jobs up by id
     # and needs to find them committed.
-    for run in waiting:
+    for run, is_guest in waiting:
         try:
-            _queue.put_nowait(("run", run.id))
+            _queue.put_nowait(
+                (GUEST if is_guest else MEMBER, next(_sequence), "run", run)
+            )
             recovered += 1
         except queue.Full:
             break
     for plan in queued_plans:
         try:
-            _queue.put_nowait(("plan", plan.id))
+            _queue.put_nowait((MEMBER, next(_sequence), "plan", plan))
             recovered += 1
         except queue.Full:
             break
@@ -349,7 +387,7 @@ def start_worker() -> None:
 def _loop() -> None:
     global _busy
     while True:
-        kind, item_id = _queue.get()
+        _priority, _order, kind, item_id = _queue.get()
         _busy = True
         try:
             if kind == "plan":

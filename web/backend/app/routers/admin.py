@@ -20,6 +20,8 @@ from ..auth import current_admin, current_user, seat_count
 from ..config import settings
 from ..db import get_session
 from ..models import Invite, Run, Squad, User, utcnow
+from ..engine import scoring_cache
+from ..services import fpl
 from ..schemas import InviteIn, RestoreSquadIn
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -204,6 +206,9 @@ def admin_users(
         "invite_ttl_hours": settings.invite_ttl_hours,
         "purge_after_months": settings.purge_after_months,
         "season": settings.current_season,
+        "season_stale": lifecycle.season_looks_stale(),
+        "fpl_cache": fpl.cache_state(),
+        "scoring_cache": scoring_cache.state(),
     }
 
 

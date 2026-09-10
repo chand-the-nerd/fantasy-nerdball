@@ -17,6 +17,7 @@ from typing import Any, Callable
 import pandas as pd
 
 from ..config import settings
+from . import scoring_cache
 from .runtime_config import build_config, ensure_engine_on_path
 from .workspace import read_saved_squad, run_in_workspace, seed_previous_squad, user_workspace
 
@@ -501,7 +502,12 @@ def run_optimisation(
             )
 
         say("Checking form, fixtures and expected goals")
-        players, scored, available_budget = nerdball.process_player_data(components, config)
+        # Reused between runs whose scoring settings match — which is
+        # every guest run for a gameweek, since their model is fixed.
+        players, scored, available_budget = scoring_cache.load(
+            config,
+            lambda: nerdball.process_player_data(components, config),
+        )
 
         scored_players = _serialise_scores(scored, config.GAMEWEEK)
 

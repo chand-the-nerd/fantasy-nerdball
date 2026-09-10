@@ -355,6 +355,30 @@ def start_heartbeat() -> None:
     threading.Thread(target=loop, name="heartbeat", daemon=True).start()
 
 
+@app.get("/api/status")
+def status(
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+) -> dict:
+    """How busy the site is, and what that means for this person.
+
+    The app runs on one small server that nobody pays for, so there are
+    moments when it can't do everything at once. Saying so plainly — and
+    saying what a guest can do about it — is better than a spinner and a
+    guess.
+    """
+    depth = jobs.queue_depth(session)
+    deferring = user.is_guest and jobs.guests_should_wait()
+
+    return {
+        "queue_depth": depth,
+        "worker_busy": jobs.is_busy(),
+        "busy": depth >= max(1, settings.guest_pause_depth),
+        "guest_deferred": deferring,
+        "beta": True,
+    }
+
+
 @app.get("/api/health")
 def health() -> dict:
     return {

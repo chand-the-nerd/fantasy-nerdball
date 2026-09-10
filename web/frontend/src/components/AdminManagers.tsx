@@ -79,6 +79,15 @@ export function AdminManagers() {
     <>
       {status && <div className="notice good">{status}</div>}
 
+      {data.season_stale && (
+        <div className="notice bad">
+          <strong>CURRENT_SEASON is {data.season}</strong> — that looks
+          like last season. Squads are being filed under it, and dormant
+          managers' data won't be cleared until it's rolled over. Change
+          it on the Railway service.
+        </div>
+      )}
+
       <div className="metric-head">
         <span className="muted">
           {data.seats_used} of {data.seats_total} places taken
@@ -226,6 +235,16 @@ export function AdminManagers() {
         {data.purge_after_months} months. Admins and anyone in
         ALLOWED_EMAILS are never touched.
       </p>
+
+      {data.scoring_cache.hits + data.scoring_cache.misses > 0 && (
+        <p className="hint">
+          Scored player pool reused on{" "}
+          {Math.round((data.scoring_cache.hit_rate ?? 0) * 100)}% of runs
+          since the last restart ({data.scoring_cache.hits} of{" "}
+          {data.scoring_cache.hits + data.scoring_cache.misses}). Each
+          reuse skips the expensive half of a run.
+        </p>
+      )}
 
       <h4>Backups</h4>
       {backups === null ? (

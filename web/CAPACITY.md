@@ -185,18 +185,81 @@ because the backups are on it. Downloading one occasionally from the
 admin page is what closes that gap, and is the thing worth doing before
 advertising.
 
+## Tests
+
+```
+python web/backend/tests/run_all.py           # everything it can
+python web/backend/tests/run_all.py --quick   # skip the Postgres ones
+```
+
+Twelve suites, each a standalone script that drives the real app through
+a test client against a throwaway database. Three need a real Postgres —
+migration, concurrent schema creation, and the backup round trip —
+because the bugs they cover only exist there. Point `NERDBALL_TEST_PG` at
+a server to run them; without it they're skipped with a note rather than
+failing.
+
+No pytest and no fixtures on purpose. Every bug that has actually bitten
+this app has been an integration bug — a race between worker processes, a
+NaN Postgres won't take, an orphaned row SQLite allowed — and none of
+them would have been caught by a unit test with the database mocked out.
+
+## The scored pool cache
+
+`engine/scoring_cache.py` keeps the output of `process_player_data` for
+`SCORING_CACHE_MINUTES` and hands it to any run whose scoring settings
+match. Scoring is the expensive half of a run — merging past seasons,
+per-player fixture difficulty across the horizon, then building scores —
+and it depends on none of the things that make one manager's run
+different from another's.
+
+Guests all share locked settings, so their runs hit the cache almost
+every time. Managers on the defaults hit it too. Anyone who has tuned
+their weights misses it, which is correct: their scores really are
+different.
+
+The dangerous failure here would be serving one manager numbers computed
+for another's settings, so the key is built the safe way round: every
+uppercase attribute on the config goes in, minus a named list in
+`NOT_SCORING` of fields that only affect squad selection (budget, free
+transfers, forced picks, chips, transfer threshold, bench weight). A
+scoring setting added later is therefore included automatically, and
+forgetting to update the list costs a cache miss rather than a wrong
+answer. `tests/test_scoring_cache.py` asserts both directions.
+
+Frames are copied on the way out, because the optimiser writes into
+them. The hit rate is shown in the admin Managers tab.
+
+## Prioritising signed-in managers
+
+One worker serves everybody, and a guest run costs exactly what a
+member's does. Two things follow from that:
+
+- Runs are queued by priority. Signed-in managers come out ahead of
+  guests, first-come within each group.
+- Past `GUEST_PAUSE_DEPTH` queued jobs, guest runs are refused outright
+  with an explanation — that the site is a free beta on one small server
+  and signing in gets priority — rather than being left in a queue they
+  won't reach the front of.
+
+The load banner on the squad page appears only while this is true, and
+says something different to guests than to members. `/api/status` is
+what it reads.
+
 ## Before going public
 
 Four things become load-bearing that currently aren't:
 
+0. **A DMARC record.** Resend sets up SPF and DKIM when you verify a
+   domain, but not DMARC, and a sending domain without one is itself a
+   spam signal. Add a TXT record at `_dmarc.fplnerdball.com` with
+   `v=DMARC1; p=none; rua=mailto:you@gmail.com;`. Five minutes in
+   GoDaddy, and it matters as soon as you're emailing people who aren't
+   you.
 1. **Postgres**, not the SQLite fallback. Single-writer under real
    concurrency means lock errors. Check `database` in `/api/health`.
 2. **Rate-limit guest creation.** `POST /api/auth/guest` is
    unauthenticated, and every guest can queue CPU-minutes of work.
 3. **Delete guest workspaces.** `guest.discard()` clears the database
    rows but leaves `/data/managers/{id}` behind.
-4. **Cache the scored player pool.** Scoring every player is the
-   expensive half of a run, and every guest runs with identical locked
-   settings — so every guest run for a gameweek recomputes byte-identical
-   scores. Caching on (season, gameweek, settings hash) would cut guest
-   CPU by most of its cost, and help signed-in managers on defaults too.
+4. **Cache the scored player pool.** Done — see below.
