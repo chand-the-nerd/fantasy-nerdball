@@ -97,10 +97,29 @@ class Settings:
         }
         # How long an idle guest account survives before it is swept up.
         self.guest_ttl_hours = int(os.getenv("GUEST_TTL_HOURS", "24"))
+        # Guest sessions are unauthenticated and each can queue real work
+        # on the one worker, so both the rate and the total are capped.
+        # 0 disables either check.
+        self.guest_starts_per_hour = int(
+            os.getenv("GUEST_STARTS_PER_HOUR", "5")
+        )
+        self.max_live_guests = int(os.getenv("MAX_LIVE_GUESTS", "40"))
 
         self.dev_mode = os.getenv("DEV_MODE", "").lower() in {"1", "true", "yes"}
         # Lets you work on the UI without Google credentials configured.
         self.dev_login_email = os.getenv("DEV_LOGIN_EMAIL", "")
+
+        # How long an approved invitation lasts before it lapses and
+        # the place goes back to whoever is waiting. 0 disables it.
+        self.invite_ttl_hours = int(os.getenv("INVITE_TTL_HOURS", "72"))
+        # How long a manager can go without signing in before their
+        # place is freed. 0 disables it. Admins and anyone named in
+        # ALLOWED_EMAILS are never removed.
+        self.inactive_days = int(os.getenv("INACTIVE_DAYS", "28"))
+        # A ceiling on outbound email, since the access-request endpoint
+        # is unauthenticated and the free tier of most providers is a
+        # few hundred a day.
+        self.max_emails_per_day = int(os.getenv("MAX_EMAILS_PER_DAY", "80"))
 
         # Where access requests and feedback get emailed. Without this
         # they still land in the admin inbox; this is the nudge to go

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { GuestFeaturesDialog } from "./GuestFeatures";
+import { PrivacyNotice } from "./PrivacyNotice";
 import { api, ApiError } from "../lib/api";
 import type { AuthConfig } from "../lib/types";
 
@@ -19,10 +20,15 @@ export function SignIn() {
   const [starting, setStarting] = useState(false);
   const [guestError, setGuestError] = useState("");
   const [asking, setAsking] = useState(false);
+  const [privacy, setPrivacy] = useState(false);
   const [askEmail, setAskEmail] = useState("");
   const [askNote, setAskNote] = useState("");
   const [askState, setAskState] = useState<"" | "sending" | "done">("");
-  const [askReply, setAskReply] = useState({ status: "", message: "" });
+  const [askReply, setAskReply] = useState<{
+    status: string;
+    message: string;
+    queue?: number | null;
+  }>({ status: "", message: "" });
   const [askError, setAskError] = useState("");
   const params = new URLSearchParams(window.location.search);
   const error = params.get("error");
@@ -51,7 +57,11 @@ export function SignIn() {
         email: askEmail.trim(),
         note: askNote.trim() || undefined,
       });
-      setAskReply({ status: reply.status, message: reply.message });
+      setAskReply({
+        status: reply.status,
+        message: reply.message,
+        queue: reply.queue_position,
+      });
       setAskState("done");
     } catch (err) {
       setAskError(err instanceof ApiError ? err.message : String(err));
@@ -125,6 +135,7 @@ export function SignIn() {
           </div>
         )}
 
+        {config && config.seats_total === 0 && null}
         {config && config.seats_total > 0 && (
           <p className="seats">
             <strong>{config.seats_used}</strong> active manager
@@ -153,6 +164,12 @@ export function SignIn() {
             }
           >
             {askReply.message}
+            {askReply.queue != null && (
+              <span className="hint">
+                Places come free as managers stop using the site, so the
+                queue does move. Check your email for confirmation.
+              </span>
+            )}
           </div>
         )}
 
@@ -226,6 +243,21 @@ export function SignIn() {
           </button>
         )}
       </div>
+
+      <p className="disclaimer">
+        Fantasy Nerdball is an independent project. It is not affiliated
+        with, endorsed by or connected to the Premier League or Fantasy
+        Premier League.{" "}
+        <button
+          className="link-button"
+          type="button"
+          onClick={() => setPrivacy(true)}
+        >
+          Privacy
+        </button>
+      </p>
+
+      {privacy && <PrivacyNotice onClose={() => setPrivacy(false)} />}
 
       {showGuest && (
         <GuestFeaturesDialog

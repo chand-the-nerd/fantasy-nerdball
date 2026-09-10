@@ -101,6 +101,23 @@ def guest_login(request: Request, session: Session = Depends(get_session)):
             status.HTTP_404_NOT_FOUND,
             "Guest access is switched off on this deployment.",
         )
+
+    if guest.too_many_from(metrics.client_ip_from(request) or "anon"):
+        events.emit("guest_rejected", reason="rate")
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "That's several guest sessions in a short time. Try again "
+            "later, or sign in.",
+        )
+
+    if guest.at_capacity(session):
+        events.emit("guest_rejected", reason="capacity")
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "There are as many guests on the site as it can take right "
+            "now. Try again in a little while.",
+        )
+
     user = guest.create(session)
     request.session["user_id"] = user.id
     metrics.set_actor(user.id, True)

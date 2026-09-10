@@ -16,7 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import capacity, events, metrics
+from . import capacity, events, lifecycle, metrics
 from .auth import current_user
 from .config import settings
 from .db import get_session, init_db, session_scope
@@ -58,11 +58,16 @@ async def lifespan(app: FastAPI):
             settings.data_dir / "nerdball.db",
         )
     jobs.start_worker()
-    # Both write things that belong to the deployment rather than to a
-    # process, so with several workers only one of them should.
+    # Anything left mid-flight by the last deploy is nobody's job to
+    # finish, and a run stuck at "queued" forever is a spinner the user
+    # watches until they give up.
     if claim("scheduler"):
+        recovered = jobs.recover_orphans()
+        if recovered:
+            log.info("Recovered %s interrupted job(s)", recovered)
         start_history_scheduler()
         start_heartbeat()
+        lifecycle.start_scheduler()
     else:
         log.info("Another worker holds the scheduler lease; skipping")
     if not settings.engine_dir.exists():

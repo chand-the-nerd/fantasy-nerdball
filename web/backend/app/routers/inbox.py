@@ -12,6 +12,7 @@ whether an address is already a member.
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 import threading
 import time
@@ -20,7 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import events, mailer, metrics
+from .. import emails, events, lifecycle, mailer, metrics
 from ..auth import current_admin, current_user, is_allowed, seat_count
 from ..config import settings
 from ..db import get_session
@@ -114,12 +115,16 @@ def request_access(
         )
     )
     if pending is not None:
+        position = lifecycle.queue_position(session, email)
         return {
             "ok": True,
             "status": "pending",
+            "queue_position": position,
             "message": (
-                "You've already asked and the admin has it. You'll be "
-                "able to sign in once they add your address."
+                "You've already asked and the admin has it."
+                if position is None
+                else f"You've already asked — you're {position} in the "
+                "queue."
             ),
         }
 
@@ -134,25 +139,40 @@ def request_access(
     session.commit()
 
     events.emit("access_requested", email=email)
+
     seats = seat_count(session)
-    mailer.send(
-        subject=f"Access request — {email}",
-        body=(
-            f"{email} has asked for access to Fantasy Nerdball.\n\n"
-            f"{note or 'No message.'}\n\n"
-            f"Seats: {seats} of {settings.max_users} taken.\n"
-            "Approve or dismiss it in the admin pane."
+    position = lifecycle.queue_position(session, email)
+    free = max(0, settings.max_users - seats)
+
+    mailer.send_template(
+        emails.admin_access_request(
+            email, note, position, f"{seats} of {settings.max_users} taken"
         ),
         reply_to=email,
     )
+    # And a word to the person who asked, so they know it arrived and
+    # where they stand. Sent once per address: a repeat request returns
+    # above without reaching here.
+    mailer.send_template(
+        emails.access_received(email, position, free), to=email
+    )
+
+    if position is None:
+        message = (
+            "Request sent. You'll be able to sign in with Google once "
+            "the admin adds your address."
+        )
+    else:
+        message = (
+            f"Request sent. Every place is currently taken, so you're "
+            f"{position} in the queue — check your email."
+        )
 
     return {
         "ok": True,
         "status": "sent",
-        "message": (
-            "Request sent. You'll be able to sign in with Google once "
-            "the admin adds your address."
-        ),
+        "queue_position": position,
+        "message": message,
     }
 
 
@@ -196,10 +216,9 @@ def send_feedback(
     session.commit()
 
     events.emit("feedback_sent", kind=payload.kind, **events.actor(user))
-    who = "A guest" if user.is_guest else f"{user.name} ({user.email})"
-    mailer.send(
-        subject=f"{FEEDBACK_KINDS[payload.kind]} — Fantasy Nerdball",
-        body=f"From: {who}\n\n{body}",
+    who = "a guest" if user.is_guest else f"{user.name} ({user.email})"
+    mailer.send_template(
+        emails.admin_feedback(FEEDBACK_KINDS[payload.kind], who, body),
         reply_to="" if user.is_guest else user.email,
     )
 
@@ -209,9 +228,10 @@ def send_feedback(
 # ── The admin side ───────────────────────────────────────────────────────
 
 
-def _serialise(item: InboxItem) -> dict:
+def _serialise(item: InboxItem, position: int | None = None) -> dict:
     return {
         "id": item.id,
+        "queue_position": position,
         "kind": item.kind,
         "title": (
             f"Access request - {item.email}"
@@ -234,17 +254,41 @@ def read_inbox(
     admin: User = Depends(current_admin),
     session: Session = Depends(get_session),
 ) -> dict:
-    query = select(InboxItem).order_by(InboxItem.created_at.desc())
-    if not include_done:
-        query = query.where(InboxItem.status == "new")
+    # Access requests are a waiting list, so they read oldest first —
+    # the order they'll be dealt with. Feedback is news, so it reads
+    # newest first. Sorting them together either way would make one of
+    # the two lie about what it is.
+    requests = session.scalars(
+        select(InboxItem)
+        .where(InboxItem.kind == "access_request")
+        .order_by(InboxItem.created_at)
+        .limit(200)
+    ).all()
+    other = session.scalars(
+        select(InboxItem)
+        .where(InboxItem.kind != "access_request")
+        .order_by(InboxItem.created_at.desc())
+        .limit(200)
+    ).all()
 
-    items = session.scalars(query.limit(200)).all()
+    items = list(requests) + list(other)
+    if not include_done:
+        items = [item for item in items if item.status == "new"]
     unread = session.scalar(
         select(InboxItem).where(InboxItem.status == "new").limit(1)
     )
 
+    numbered = []
+    place = 0
+    for item in items:
+        if item.kind == "access_request" and item.status == "new":
+            place += 1
+            numbered.append(_serialise(item, place))
+        else:
+            numbered.append(_serialise(item))
+
     return {
-        "items": [_serialise(item) for item in items],
+        "items": numbered,
         "unread": len([i for i in items if i.status == "new"]),
         "has_unread": unread is not None,
         "seats_used": seat_count(session),
@@ -261,13 +305,8 @@ def test_email(admin: User = Depends(current_admin)) -> dict:
     Sent on this thread rather than in the background, because the point
     is the answer, not the message.
     """
-    error = mailer.send_now(
-        subject="Fantasy Nerdball — test",
-        body=(
-            "If you're reading this, access requests and feedback will "
-            "reach you too."
-        ),
-    )
+    subject, html, text = emails.admin_test()
+    error = mailer.send_now(subject=subject, body=text, html=html)
     if error:
         return {"ok": False, "detail": error}
     return {
@@ -296,11 +335,27 @@ def approve_request(
             "first, or raise MAX_USERS.",
         )
 
+    # The invitation holds a place, so it can't hold one indefinitely.
+    deadline = (
+        utcnow() + dt.timedelta(hours=settings.invite_ttl_hours)
+        if settings.invite_ttl_hours > 0
+        else None
+    )
     existing = session.scalar(
         select(Invite).where(Invite.email == item.email)
     )
     if existing is None:
-        session.add(Invite(email=item.email, invited_by=admin.email))
+        session.add(
+            Invite(
+                email=item.email,
+                invited_by=admin.email,
+                expires_at=deadline,
+            )
+        )
+    else:
+        # Approving again restarts the clock rather than leaving them
+        # holding an invitation that lapsed while they were away.
+        existing.expires_at = deadline
 
     item.status = "done"
     item.handled_at = utcnow()
@@ -308,14 +363,21 @@ def approve_request(
     session.commit()
 
     events.emit("access_approved", by=admin.id, email=item.email)
-    mailer.send(
-        subject="Fantasy Nerdball — you're in",
-        body=(
-            f"{item.email} can now sign in at {settings.public_base_url}\n\n"
-            "Sign in with the Google account for that address."
+    mailer.send_template(
+        emails.access_approved(
+            item.email,
+            settings.invite_ttl_hours,
+            settings.inactive_days,
         ),
+        to=item.email,
+        # So a reply about trouble signing in reaches you.
+        reply_to=settings.mail_to,
     )
-    return {"ok": True, "email": item.email}
+    return {
+        "ok": True,
+        "email": item.email,
+        "expires_at": deadline.isoformat() if deadline else None,
+    }
 
 
 @router.post("/api/admin/inbox/{item_id}/done")

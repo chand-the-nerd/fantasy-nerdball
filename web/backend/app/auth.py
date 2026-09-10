@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import datetime as dt
+
 from authlib.integrations.starlette_client import OAuth
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import func, select
@@ -26,12 +28,29 @@ if settings.google_configured:
 
 
 def is_allowed(email: str, session: Session) -> bool:
-    """An address gets in if it is in ALLOWED_EMAILS or has been invited."""
+    """An address gets in if it's in ALLOWED_EMAILS or holds a live invite.
+
+    Live matters: an invitation that has run out of time is no more use
+    than none at all, and the sweep that deletes expired ones runs on a
+    timer rather than at the moment they lapse.
+    """
     email = email.lower().strip()
     if email in settings.allowed_emails:
         return True
+
     invited = session.scalar(select(Invite).where(Invite.email == email))
-    return invited is not None
+    if invited is None:
+        return False
+    return not _expired(invited)
+
+
+def _expired(invite: Invite) -> bool:
+    if invite.expires_at is None:
+        return False
+    deadline = invite.expires_at
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=dt.timezone.utc)
+    return utcnow() > deadline
 
 
 def seat_count(session: Session) -> int:

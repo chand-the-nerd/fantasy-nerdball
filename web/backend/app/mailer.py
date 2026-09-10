@@ -43,6 +43,35 @@ def configured() -> bool:
 _last_error: str = ""
 _last_sent: str = ""
 
+# A day's sending, counted. The access-request endpoint is
+# unauthenticated and every request now sends two messages, so without a
+# ceiling a stranger with a script could exhaust the provider's free
+# tier before lunch — and a sending domain that suddenly emits hundreds
+# of messages to strangers is one that stops being trusted.
+_day: str = ""
+_sent_today: int = 0
+_suppressed: int = 0
+_count_lock = threading.Lock()
+
+
+def _within_daily_limit() -> bool:
+    global _day, _sent_today, _suppressed
+
+    if settings.max_emails_per_day <= 0:
+        return True
+
+    today = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
+    with _count_lock:
+        if today != _day:
+            _day = today
+            _sent_today = 0
+            _suppressed = 0
+        if _sent_today >= settings.max_emails_per_day:
+            _suppressed += 1
+            return False
+        _sent_today += 1
+    return True
+
 
 def status() -> dict:
     """What the mailer is set up to do, and how it last got on."""
@@ -59,24 +88,60 @@ def status() -> dict:
         "from": settings.mail_from,
         "last_error": _last_error,
         "last_sent": _last_sent,
+        "sent_today": _sent_today,
+        "daily_limit": settings.max_emails_per_day,
+        "suppressed_today": _suppressed,
     }
 
 
-def send(subject: str, body: str, reply_to: str = "") -> None:
-    """Queue one email. Returns immediately; never raises."""
+def send(
+    subject: str,
+    body: str,
+    reply_to: str = "",
+    to: str = "",
+    html: str = "",
+) -> None:
+    """Queue one email. Returns immediately; never raises.
+
+    `to` defaults to MAIL_TO, which is you. Pass it to write to somebody
+    else — which only works once a domain is verified with the provider.
+    `body` is the plain-text version and is always required: some
+    clients show it, and a message with only HTML looks like spam to the
+    filters that decide whether the rest arrives.
+    """
     if not configured():
+        return
+
+    if not _within_daily_limit():
+        log.warning(
+            "Daily email limit reached; not sending %r", subject[:60]
+        )
         return
 
     thread = threading.Thread(
         target=_send,
-        args=(subject, body, reply_to),
+        args=(subject, body, reply_to, to, html),
         name="mail",
         daemon=True,
     )
     thread.start()
 
 
-def send_now(subject: str, body: str, reply_to: str = "") -> str:
+def send_template(
+    template: tuple[str, str, str], to: str = "", reply_to: str = ""
+) -> None:
+    """Queue one of the messages from emails.py."""
+    subject, html, text = template
+    send(subject=subject, body=text, html=html, to=to, reply_to=reply_to)
+
+
+def send_now(
+    subject: str,
+    body: str,
+    reply_to: str = "",
+    to: str = "",
+    html: str = "",
+) -> str:
     """Send on this thread and say what happened.
 
     Used by the admin page's test button. The background path is right
@@ -88,7 +153,8 @@ def send_now(subject: str, body: str, reply_to: str = "") -> str:
     """
     global _last_error, _last_sent
 
-    if not settings.mail_to:
+    recipient = to or settings.mail_to
+    if not recipient:
         return "MAIL_TO isn't set, so there's nowhere to send to."
     if not (settings.resend_api_key or settings.smtp_host):
         return (
@@ -98,9 +164,9 @@ def send_now(subject: str, body: str, reply_to: str = "") -> str:
 
     try:
         if settings.resend_api_key:
-            _send_via_resend(subject, body, reply_to)
+            _send_via_resend(subject, body, reply_to, recipient, html)
         else:
-            _send_via_smtp(subject, body, reply_to)
+            _send_via_smtp(subject, body, reply_to, recipient, html)
     except Exception as error:
         _last_error = f"{type(error).__name__}: {error}"[:500]
         log.warning("Couldn't send the email: %s", _last_error)
@@ -111,19 +177,33 @@ def send_now(subject: str, body: str, reply_to: str = "") -> str:
     return ""
 
 
-def _send(subject: str, body: str, reply_to: str) -> None:
+def _send(
+    subject: str,
+    body: str,
+    reply_to: str,
+    to: str = "",
+    html: str = "",
+) -> None:
     # The message is already saved; email is the notification, not the
     # record. Failures are recorded rather than raised.
-    send_now(subject, body, reply_to)
+    send_now(subject, body, reply_to, to, html)
 
 
-def _send_via_resend(subject: str, body: str, reply_to: str) -> None:
+def _send_via_resend(
+    subject: str,
+    body: str,
+    reply_to: str,
+    to: str = "",
+    html: str = "",
+) -> None:
     payload = {
         "from": settings.mail_from,
-        "to": [settings.mail_to],
+        "to": [to or settings.mail_to],
         "subject": subject,
         "text": body,
     }
+    if html:
+        payload["html"] = html
     if reply_to:
         # So replying to the notification reaches the person who wrote
         # in, rather than the app.
@@ -181,14 +261,24 @@ def _send_via_resend(subject: str, body: str, reply_to: str) -> None:
         raise RuntimeError(f"Resend refused it ({error.code}): {detail}")
 
 
-def _send_via_smtp(subject: str, body: str, reply_to: str) -> None:
+def _send_via_smtp(
+    subject: str,
+    body: str,
+    reply_to: str,
+    to: str = "",
+    html: str = "",
+) -> None:
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = settings.mail_from
-    message["To"] = settings.mail_to
+    message["To"] = to or settings.mail_to
     if reply_to:
         message["Reply-To"] = reply_to
     message.set_content(body)
+    if html:
+        # Text first, HTML as the alternative: the order is what tells a
+        # client which to prefer.
+        message.add_alternative(html, subtype="html")
 
     port = settings.smtp_port
     if port == 465:

@@ -3546,3 +3546,44 @@ tr.is-clickable:focus-visible {
 .mail-status .hint {
   margin-top: 4px;
 }
+
+/* ── Waiting list, managers, and the small print ─────────────────────── */
+
+.queue-no {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--tint-accent);
+  color: var(--floodlight);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.calc-table td.warn,
+.stat-rows .warn {
+  color: var(--floodlight);
+}
+
+.disclaimer {
+  max-width: 46ch;
+  margin: 22px auto 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--fade);
+  text-align: center;
+}
+
+.disclaimer .link-button {
+  font-size: 12px;
+}
+
+.admin-panel h4 {
+  margin: 18px 0 6px;
+}
+
+.admin-panel p {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.6;
+}

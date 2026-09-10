@@ -15,9 +15,12 @@ from __future__ import annotations
 
 import datetime as dt
 import secrets
+import shutil
+import threading
+import time
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from . import events
@@ -128,6 +131,54 @@ def check_lists(
 # ── Lifecycle ────────────────────────────────────────────────────────────
 
 
+# Guest sessions are unauthenticated, so the endpoint that makes them is
+# the cheapest thing on the site to abuse: each one can queue minutes of
+# CPU on a worker there is only one of. These two limits are what stand
+# between a bored stranger and the bill.
+_starts: dict[str, list[float]] = {}
+_starts_lock = threading.Lock()
+
+
+def too_many_from(key: str) -> bool:
+    """Whether this caller has started more guest sessions than allowed."""
+    if settings.guest_starts_per_hour <= 0:
+        return False
+
+    now = time.monotonic()
+    with _starts_lock:
+        seen = [t for t in _starts.get(key, []) if now - t < 3600]
+        if len(seen) >= settings.guest_starts_per_hour:
+            _starts[key] = seen
+            return True
+        seen.append(now)
+        _starts[key] = seen
+
+        if len(_starts) > 5000:
+            for stale in [
+                k for k, times in _starts.items() if not times
+                or now - times[-1] > 3600
+            ]:
+                _starts.pop(stale, None)
+    return False
+
+
+def at_capacity(session: Session) -> bool:
+    """Whether there are already as many live guests as allowed.
+
+    A blunt instrument on purpose. Turning people away for a few minutes
+    is a far better failure than an optimiser queue nobody real can get
+    into, or a disk full of abandoned workspaces.
+    """
+    if settings.max_live_guests <= 0:
+        return False
+    live = session.scalar(
+        select(func.count())
+        .select_from(User)
+        .where(User.is_guest.is_(True))
+    )
+    return int(live or 0) >= settings.max_live_guests
+
+
 def create(session: Session) -> User:
     """A fresh throwaway account, with the guest settings already on it."""
     purge_expired(session)
@@ -157,10 +208,28 @@ def discard(session: Session, user: User) -> None:
     if not user.is_guest:
         return
 
+    user_id = user.id
     for model in (Run, Plan, PlayerScores, GameweekResult, Squad):
         session.execute(delete(model).where(model.user_id == user.id))
     session.delete(user)
     session.commit()
+
+    # And the working directory on the volume. Without this the rows go
+    # and the folders stay, which is invisible until the disk is full.
+    _remove_workspace(user_id)
+
+
+def _remove_workspace(user_id: int) -> None:
+    try:
+        from .engine.workspace import user_root
+
+        path = user_root(user_id)
+        if path.exists():
+            shutil.rmtree(path, ignore_errors=True)
+    except Exception:
+        # A folder left behind is a slow problem; an exception here would
+        # be an immediate one, in the middle of somebody signing out.
+        pass
 
 
 def purge_expired(session: Session) -> int:

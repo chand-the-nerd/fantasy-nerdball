@@ -1,5 +1,6 @@
 import type {
   AdminMetrics,
+  AdminUsers,
   AuthConfig,
   Inbox,
   GameweekInfo,
@@ -151,7 +152,12 @@ export const api = {
       "/api/admin/status",
     ),
   requestAccess: (body: { email: string; name?: string; note?: string }) =>
-    request<{ ok: boolean; status: string; message: string }>(
+    request<{
+      ok: boolean;
+      status: string;
+      queue_position: number | null;
+      message: string;
+    }>(
       "/api/access-request",
       {
         method: "POST",
@@ -163,6 +169,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ kind, body }),
     }),
+  adminUsers: () => request<AdminUsers>("/api/admin/users"),
   adminTestEmail: () =>
     request<{ ok: boolean; detail: string }>("/api/admin/test-email", {
       method: "POST",

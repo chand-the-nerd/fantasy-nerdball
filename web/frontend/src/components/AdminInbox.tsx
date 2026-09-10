@@ -101,9 +101,19 @@ export function AdminInbox({ onCount }: { onCount?: (n: number) => void }) {
 
         {data.email.mode === "off" && (
           <p className="hint">
-            Set <code>MAIL_TO</code> and either <code>RESEND_API_KEY</code>{" "}
+            Set <code>MAIL_TO</code> and either{" "}
+            <code>RESEND_API_KEY</code>{" "}
             or the <code>SMTP_*</code> variables on the Railway service.
           </p>
+        )}
+
+        {data.email.suppressed_today > 0 && (
+          <div className="notice bad">
+            {data.email.suppressed_today} email
+            {data.email.suppressed_today === 1 ? "" : "s"} not sent today —
+            the daily ceiling of {data.email.daily_limit} was reached.
+            Raise MAX_EMAILS_PER_DAY if that's legitimate traffic.
+          </div>
         )}
 
         {data.email.last_error && !testResult && (
@@ -150,7 +160,12 @@ export function AdminInbox({ onCount }: { onCount?: (n: number) => void }) {
               }
             >
               <div className="inbox-head">
-                <strong>{item.title}</strong>
+                <strong>
+                  {item.queue_position !== null && (
+                    <span className="queue-no">#{item.queue_position}</span>
+                  )}
+                  {item.title}
+                </strong>
                 <span className="muted">{when(item.created_at)}</span>
               </div>
 

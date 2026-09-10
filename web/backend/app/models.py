@@ -70,6 +70,14 @@ class Invite(Base):
     invited_by: Mapped[str] = mapped_column(String(320), default="")
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+    # When the invitation stops working, so a held place doesn't sit
+    # unused while somebody waits for it. Null means it never expires,
+    # which is what invites added by hand before this existed are — and
+    # what anything you add directly should stay.
+    expires_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
 
 class UserSettings(Base):
     """Per-manager optimiser settings. Maps onto the engine's Config class."""

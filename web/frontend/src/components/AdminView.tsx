@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { AdminInbox } from "./AdminInbox";
+import { AdminManagers } from "./AdminManagers";
 import { AdminMetricsPanel } from "./AdminMetrics";
 import { api, ApiError } from "../lib/api";
 
@@ -31,7 +32,7 @@ interface Members {
   invites: Invite[];
 }
 
-type Pane = "inbox" | "members" | "metrics";
+type Pane = "inbox" | "managers" | "members" | "metrics";
 
 export function AdminView({ onClose }: { onClose: () => void }) {
   const [pane, setPane] = useState<Pane>("inbox");
@@ -118,10 +119,17 @@ export function AdminView({ onClose }: { onClose: () => void }) {
             </button>
             <button
               type="button"
+              className={pane === "managers" ? "on" : ""}
+              onClick={() => setPane("managers")}
+            >
+              Managers
+            </button>
+            <button
+              type="button"
               className={pane === "members" ? "on" : ""}
               onClick={() => setPane("members")}
             >
-              Managers
+              Access
             </button>
             <button
               type="button"
@@ -143,6 +151,12 @@ export function AdminView({ onClose }: { onClose: () => void }) {
       {pane === "inbox" && (
         <section className="admin-section">
           <AdminInbox onCount={setWaiting} />
+        </section>
+      )}
+
+      {pane === "managers" && (
+        <section className="admin-section">
+          <AdminManagers />
         </section>
       )}
 

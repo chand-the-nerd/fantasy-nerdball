@@ -265,6 +265,78 @@ def is_busy() -> bool:
     return _busy
 
 
+def recover_orphans() -> int:
+    """Put back anything the last process was holding when it stopped.
+
+    The queue lives in memory, so a deploy takes it with it. Rows left
+    saying "queued" are re-queued; rows left saying "running" were mid-
+    flight when the process went away, and there is no way to resume the
+    engine partway, so they are failed with an explanation rather than
+    left spinning forever in somebody's browser.
+
+    Runs once at boot, under the same lease as the other shared jobs, so
+    several workers don't each re-queue the same backlog.
+    """
+    recovered = 0
+    with session_scope() as session:
+        interrupted = session.scalars(
+            select(Run).where(Run.status == "running")
+        ).all()
+        for run in interrupted:
+            run.status = "failed"
+            run.error = (
+                "The server restarted while this was running. Nothing "
+                "was saved — start it again."
+            )
+            run.finished_at = utcnow()
+            recovered += 1
+
+        for plan in session.scalars(
+            select(Plan).where(Plan.status == "running")
+        ):
+            plan.status = "failed"
+            plan.error = (
+                "The server restarted while this was running. Start it "
+                "again."
+            )
+            plan.finished_at = utcnow()
+            recovered += 1
+
+        waiting = session.scalars(
+            select(Run)
+            .where(Run.status == "queued")
+            .order_by(Run.created_at)
+        ).all()
+        queued_plans = session.scalars(
+            select(Plan)
+            .where(Plan.status == "queued")
+            .order_by(Plan.created_at)
+        ).all()
+
+    # Re-queued outside the transaction: the worker picks jobs up by id
+    # and needs to find them committed.
+    for run in waiting:
+        try:
+            _queue.put_nowait(("run", run.id))
+            recovered += 1
+        except queue.Full:
+            break
+    for plan in queued_plans:
+        try:
+            _queue.put_nowait(("plan", plan.id))
+            recovered += 1
+        except queue.Full:
+            break
+
+    if recovered:
+        events.emit(
+            "orphans_recovered",
+            failed=len(interrupted),
+            requeued=len(waiting) + len(queued_plans),
+        )
+    return recovered
+
+
 def start_worker() -> None:
     global _worker
     with _worker_lock:

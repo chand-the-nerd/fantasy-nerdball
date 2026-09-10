@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AdminView } from "./components/AdminView";
 import { FeedbackDialog } from "./components/FeedbackDialog";
 import { GuestFeaturesDialog } from "./components/GuestFeatures";
+import { PrivacyNotice } from "./components/PrivacyNotice";
 import { GuestLock } from "./components/GuestLock";
 import { PlannerView } from "./components/PlannerView";
 import { PlayersView } from "./components/PlayersView";
@@ -36,6 +37,7 @@ export function App() {
   const [tourOpen, setTourOpen] = useState(false);
   const [guestInfo, setGuestInfo] = useState(false);
   const [feedback, setFeedback] = useState(false);
+  const [privacy, setPrivacy] = useState(false);
 
   useEffect(() => {
     api
@@ -158,6 +160,13 @@ export function App() {
             >
               Feedback
             </button>
+            <button
+              className="admin-link"
+              type="button"
+              onClick={() => setPrivacy(true)}
+            >
+              Privacy
+            </button>
             {guest && (
               <button
                 className="admin-link"
@@ -195,6 +204,8 @@ export function App() {
       )}
 
       {feedback && <FeedbackDialog onClose={() => setFeedback(false)} />}
+
+      {privacy && <PrivacyNotice onClose={() => setPrivacy(false)} />}
 
       {adminOpen && (
         <div

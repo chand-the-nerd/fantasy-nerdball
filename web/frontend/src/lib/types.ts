@@ -121,6 +121,8 @@ export interface AuthConfig {
 /** One access request or piece of feedback, in the admin inbox. */
 export interface InboxItem {
   id: number;
+  /** Place in the waiting list, for pending access requests only. */
+  queue_position: number | null;
   kind: string;
   title: string;
   email: string;
@@ -139,6 +141,9 @@ export interface MailStatus {
   from: string;
   last_error: string;
   last_sent: string;
+  sent_today: number;
+  daily_limit: number;
+  suppressed_today: number;
 }
 
 export interface Inbox {
@@ -318,4 +323,36 @@ export interface AdminMetrics {
   activity: { kind: string; count: number }[];
   ip_mode: string;
   dropped: number;
+}
+
+/** One manager in the admin Managers tab. */
+export interface ManagerRow {
+  id: number;
+  name: string;
+  email: string;
+  is_admin: boolean;
+  fpl_entry_id: number | null;
+  created_at: string;
+  last_seen_at: string;
+  idle_days: number | null;
+  /** Null when they're never removed for inactivity. */
+  removal_in_days: number | null;
+  runs: number;
+}
+
+export interface PendingInvite {
+  email: string;
+  invited_by: string;
+  expires_at: string | null;
+  hours_left: number | null;
+  signed_in: boolean;
+}
+
+export interface AdminUsers {
+  users: ManagerRow[];
+  invites: PendingInvite[];
+  seats_used: number;
+  seats_total: number;
+  inactive_days: number;
+  invite_ttl_hours: number;
 }

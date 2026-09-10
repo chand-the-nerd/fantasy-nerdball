@@ -36,6 +36,15 @@ def shared_data_dir() -> Path:
     return path
 
 
+def user_root(user_id: int) -> Path:
+    """Everything belonging to one manager, across every season.
+
+    Named here rather than rebuilt by callers so that deleting an account
+    and creating a workspace can never disagree about where it lives.
+    """
+    return settings.data_dir / "managers" / str(user_id)
+
+
 def user_workspace(user_id: int, season: str, scratch: str | None = None) -> Path:
     """Directory the engine will treat as its project root.
 
@@ -45,7 +54,7 @@ def user_workspace(user_id: int, season: str, scratch: str | None = None) -> Pat
     would leave eight imaginary squads on disk where a later real run could
     read one as fact.
     """
-    path = settings.data_dir / "managers" / str(user_id) / season
+    path = user_root(user_id) / season
     if scratch:
         path = path / "scratch" / scratch
     try:

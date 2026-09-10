@@ -7,18 +7,19 @@ else gets a 403. There is no separate password.
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import events, metrics
 from ..auth import current_admin, current_user, seat_count
 from ..config import settings
 from ..db import get_session
-from ..models import Invite, User
+from ..models import Invite, Run, User, utcnow
 from ..schemas import InviteIn
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -79,6 +80,95 @@ def members(
             }
             for i in invites
         ],
+    }
+
+
+@router.get("/users")
+def admin_users(
+    admin: User = Depends(current_admin),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Every manager, their linked FPL side, and when they last turned up.
+
+    Ordered by last activity so the people about to lose their place for
+    inactivity are at the bottom, where you can see them coming.
+    """
+    users = session.scalars(
+        select(User)
+        .where(User.is_guest.is_(False))
+        .order_by(User.last_seen_at.desc())
+    ).all()
+
+    cutoff_days = settings.inactive_days
+    now = utcnow()
+
+    rows = []
+    for user in users:
+        seen = user.last_seen_at
+        if seen is not None and seen.tzinfo is None:
+            seen = seen.replace(tzinfo=dt.timezone.utc)
+        idle_days = (now - seen).days if seen else None
+
+        protected = user.is_admin or user.email in settings.allowed_emails
+        removal_in = None
+        if cutoff_days > 0 and idle_days is not None and not protected:
+            removal_in = max(0, cutoff_days - idle_days)
+
+        runs = session.scalar(
+            select(func.count())
+            .select_from(Run)
+            .where(Run.user_id == user.id)
+        )
+
+        rows.append(
+            {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "is_admin": user.is_admin,
+                "fpl_entry_id": user.fpl_entry_id,
+                "created_at": user.created_at.isoformat()
+                if user.created_at
+                else "",
+                "last_seen_at": seen.isoformat() if seen else "",
+                "idle_days": idle_days,
+                # None means they are never removed for inactivity.
+                "removal_in_days": removal_in,
+                "runs": int(runs or 0),
+            }
+        )
+
+    pending = session.scalars(
+        select(Invite).order_by(Invite.created_at.desc())
+    ).all()
+    invites = []
+    for invite in pending:
+        expires = invite.expires_at
+        if expires is not None and expires.tzinfo is None:
+            expires = expires.replace(tzinfo=dt.timezone.utc)
+        hours_left = None
+        if expires is not None:
+            hours_left = round((expires - now).total_seconds() / 3600, 1)
+        invites.append(
+            {
+                "email": invite.email,
+                "invited_by": invite.invited_by,
+                "expires_at": expires.isoformat() if expires else None,
+                "hours_left": hours_left,
+                "signed_in": session.scalar(
+                    select(User).where(User.email == invite.email)
+                )
+                is not None,
+            }
+        )
+
+    return {
+        "users": rows,
+        "invites": invites,
+        "seats_used": len(rows),
+        "seats_total": settings.max_users,
+        "inactive_days": cutoff_days,
+        "invite_ttl_hours": settings.invite_ttl_hours,
     }
 
 
