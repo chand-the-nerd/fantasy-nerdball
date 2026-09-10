@@ -102,6 +102,21 @@ class Settings:
         # Lets you work on the UI without Google credentials configured.
         self.dev_login_email = os.getenv("DEV_LOGIN_EMAIL", "")
 
+        # Where access requests and feedback get emailed. Without this
+        # they still land in the admin inbox; this is the nudge to go
+        # and read it.
+        self.mail_to = os.getenv("MAIL_TO", "").strip()
+        self.mail_from = os.getenv(
+            "MAIL_FROM", "Fantasy Nerdball <onboarding@resend.dev>"
+        ).strip()
+        # An HTTP API is preferred where one is configured: some hosts
+        # block outbound SMTP, and this needs no open port at all.
+        self.resend_api_key = os.getenv("RESEND_API_KEY", "").strip()
+        self.smtp_host = os.getenv("SMTP_HOST", "").strip()
+        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        self.smtp_user = os.getenv("SMTP_USER", "").strip()
+        self.smtp_password = os.getenv("SMTP_PASSWORD", "")
+
         # Structured JSON logs on stdout, which is what lets the Railway
         # dashboard filter on attributes. Off in dev, where a person is
         # reading the terminal.

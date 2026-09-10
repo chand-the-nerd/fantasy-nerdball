@@ -169,5 +169,20 @@ class ResultIn(BaseModel):
     season: str | None = None
 
 
+class AccessRequestIn(BaseModel):
+    """Somebody asking to be let in, from the sign-in page."""
+
+    email: str = Field(min_length=3, max_length=320)
+    name: str | None = Field(default=None, max_length=120)
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class FeedbackIn(BaseModel):
+    """A message from inside the app."""
+
+    kind: str = Field(min_length=1, max_length=24)
+    body: str = Field(min_length=1, max_length=4000)
+
+
 class InviteIn(BaseModel):
     email: str

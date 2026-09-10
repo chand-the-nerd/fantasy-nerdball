@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AdminView } from "./components/AdminView";
+import { FeedbackDialog } from "./components/FeedbackDialog";
 import { GuestFeaturesDialog } from "./components/GuestFeatures";
 import { GuestLock } from "./components/GuestLock";
 import { PlannerView } from "./components/PlannerView";
@@ -34,6 +35,7 @@ export function App() {
   const [adminOpen, setAdminOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
   const [guestInfo, setGuestInfo] = useState(false);
+  const [feedback, setFeedback] = useState(false);
 
   useEffect(() => {
     api
@@ -149,6 +151,13 @@ export function App() {
             >
               Tutorial
             </button>
+            <button
+              className="admin-link"
+              type="button"
+              onClick={() => setFeedback(true)}
+            >
+              Feedback
+            </button>
             {guest && (
               <button
                 className="admin-link"
@@ -184,6 +193,8 @@ export function App() {
       {guestInfo && (
         <GuestFeaturesDialog onClose={() => setGuestInfo(false)} />
       )}
+
+      {feedback && <FeedbackDialog onClose={() => setFeedback(false)} />}
 
       {adminOpen && (
         <div

@@ -18,6 +18,11 @@ export function SignIn() {
   const [showGuest, setShowGuest] = useState(false);
   const [starting, setStarting] = useState(false);
   const [guestError, setGuestError] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [askEmail, setAskEmail] = useState("");
+  const [askNote, setAskNote] = useState("");
+  const [askState, setAskState] = useState<"" | "sending" | "sent">("");
+  const [askError, setAskError] = useState("");
   const params = new URLSearchParams(window.location.search);
   const error = params.get("error");
 
@@ -26,9 +31,31 @@ export function SignIn() {
       .authConfig()
       .then(setConfig)
       .catch(() =>
-        setConfig({ google: false, dev_login: false, guest: false }),
+        setConfig({
+          google: false,
+          dev_login: false,
+          guest: false,
+          seats_used: 0,
+          seats_total: 0,
+          seats_free: 0,
+        }),
       );
   }, []);
+
+  const requestAccess = async () => {
+    setAskError("");
+    setAskState("sending");
+    try {
+      await api.requestAccess({
+        email: askEmail.trim(),
+        note: askNote.trim() || undefined,
+      });
+      setAskState("sent");
+    } catch (err) {
+      setAskError(err instanceof ApiError ? err.message : String(err));
+      setAskState("");
+    }
+  };
 
   const continueAsGuest = async () => {
     setGuestError("");
@@ -93,6 +120,79 @@ export function SignIn() {
           <div className="notice bad">
             Google sign-in isn't configured. Set GOOGLE_CLIENT_ID and
             GOOGLE_CLIENT_SECRET on the service, then redeploy.
+          </div>
+        )}
+
+        {config && config.seats_total > 0 && (
+          <p className="seats">
+            <strong>{config.seats_used}</strong> active manager
+            {config.seats_used === 1 ? "" : "s"} ·{" "}
+            <strong>{config.seats_free}</strong>{" "}
+            {config.seats_free === 1 ? "space" : "spaces"} left
+          </p>
+        )}
+
+        {config?.google && !asking && askState !== "sent" && (
+          <button
+            className="link-button request-link"
+            type="button"
+            onClick={() => setAsking(true)}
+          >
+            Request access from the admin
+          </button>
+        )}
+
+        {askState === "sent" && (
+          <div className="notice good">
+            Request sent. You'll be able to sign in with Google once the
+            admin adds your address.
+          </div>
+        )}
+
+        {asking && askState !== "sent" && (
+          <div className="request-panel">
+            <label htmlFor="ask-email">
+              Your Google address
+              <span className="hint">
+                Sign-in is Google-only for now, so this has to be the
+                address on a Google account.
+              </span>
+            </label>
+            <input
+              id="ask-email"
+              type="email"
+              value={askEmail}
+              placeholder="you@gmail.com"
+              onChange={(event) => setAskEmail(event.target.value)}
+            />
+            <label htmlFor="ask-note">
+              Anything to say? <span className="hint">Optional.</span>
+            </label>
+            <textarea
+              id="ask-note"
+              rows={2}
+              value={askNote}
+              placeholder="Who you are, or who sent you."
+              onChange={(event) => setAskNote(event.target.value)}
+            />
+            {askError && <div className="notice bad">{askError}</div>}
+            <div className="request-actions">
+              <button
+                className="btn small"
+                type="button"
+                disabled={!askEmail.trim() || askState === "sending"}
+                onClick={() => void requestAccess()}
+              >
+                {askState === "sending" ? "Sending…" : "Send request"}
+              </button>
+              <button
+                className="btn quiet small"
+                type="button"
+                onClick={() => setAsking(false)}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         )}
 

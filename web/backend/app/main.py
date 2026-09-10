@@ -26,6 +26,7 @@ from .routers import (
     admin,
     auth,
     cron,
+    inbox,
     me,
     performance,
     plans,
@@ -168,6 +169,7 @@ app.include_router(teams.router)
 app.include_router(cron.router)
 app.include_router(performance.router)
 app.include_router(admin.router)
+app.include_router(inbox.router)
 
 
 def warm_engine() -> None:

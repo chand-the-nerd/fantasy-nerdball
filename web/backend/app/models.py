@@ -332,3 +332,41 @@ class MetricEvent(Base):
     # A duration in seconds for runs, or whatever a kind wants to chart.
     value: Mapped[float | None] = mapped_column(Float, nullable=True)
     meta: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+
+
+class InboxItem(Base):
+    """Something a person sent the admin: a request to join, or feedback.
+
+    One table for both, because they want the same handling — arrive,
+    get read, get dealt with — and a single inbox is easier to keep on
+    top of than two. `kind` separates them; `email` is whoever sent it,
+    which for an access request is the Google address they want let in.
+
+    Not joined to users by a foreign key: an access request comes from
+    somebody who by definition has no account yet, and feedback from a
+    guest should outlive the guest.
+    """
+
+    __tablename__ = "inbox_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(24), index=True)
+    email: Mapped[str] = mapped_column(String(320), default="")
+    name: Mapped[str] = mapped_column(String(120), default="")
+    body: Mapped[str] = mapped_column(Text, default="")
+
+    # Who sent it, when they were signed in. Kept as a plain integer so
+    # a departed account doesn't take its feedback with it.
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    from_guest: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    status: Mapped[str] = mapped_column(
+        String(16), default="new", index=True, server_default="new"
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+    handled_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    handled_by: Mapped[str] = mapped_column(String(320), default="")

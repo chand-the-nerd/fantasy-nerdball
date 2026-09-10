@@ -7,7 +7,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from .. import events, guest, metrics
-from ..auth import is_allowed, oauth, upsert_user
+from ..auth import is_allowed, oauth, seat_count, upsert_user
 from ..config import settings
 from ..db import get_session
 from ..models import User
@@ -16,12 +16,19 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.get("/config")
-def auth_config() -> dict:
+def auth_config(session: Session = Depends(get_session)) -> dict:
     """Tells the sign-in screen which methods are available."""
+    # Seat numbers are public on purpose: "five of six taken" is the
+    # difference between asking for access and assuming it's a closed
+    # shop. It's a count, not a list — no addresses leave here.
+    used = seat_count(session)
     return {
         "google": settings.google_configured,
         "dev_login": settings.dev_mode and bool(settings.dev_login_email),
         "guest": settings.guest_mode,
+        "seats_used": used,
+        "seats_total": settings.max_users,
+        "seats_free": max(0, settings.max_users - used),
     }
 
 

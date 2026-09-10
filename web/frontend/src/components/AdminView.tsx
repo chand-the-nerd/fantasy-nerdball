@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { AdminInbox } from "./AdminInbox";
 import { AdminMetricsPanel } from "./AdminMetrics";
 import { api, ApiError } from "../lib/api";
 
@@ -30,10 +31,11 @@ interface Members {
   invites: Invite[];
 }
 
-type Pane = "members" | "metrics";
+type Pane = "inbox" | "members" | "metrics";
 
 export function AdminView({ onClose }: { onClose: () => void }) {
-  const [pane, setPane] = useState<Pane>("members");
+  const [pane, setPane] = useState<Pane>("inbox");
+  const [waiting, setWaiting] = useState(0);
   const [denied, setDenied] = useState("");
   const [data, setData] = useState<Members | null>(null);
   const [cron, setCron] = useState<any>(null);
@@ -108,6 +110,14 @@ export function AdminView({ onClose }: { onClose: () => void }) {
           <div className="tabs small">
             <button
               type="button"
+              className={pane === "inbox" ? "on" : ""}
+              onClick={() => setPane("inbox")}
+            >
+              Inbox
+              {waiting > 0 && <span className="badge">{waiting}</span>}
+            </button>
+            <button
+              type="button"
               className={pane === "members" ? "on" : ""}
               onClick={() => setPane("members")}
             >
@@ -129,6 +139,12 @@ export function AdminView({ onClose }: { onClose: () => void }) {
 
       {error && <div className="notice bad">{error}</div>}
       {status && <div className="notice good">{status}</div>}
+
+      {pane === "inbox" && (
+        <section className="admin-section">
+          <AdminInbox onCount={setWaiting} />
+        </section>
+      )}
 
       {pane === "metrics" && (
         <section className="admin-section">

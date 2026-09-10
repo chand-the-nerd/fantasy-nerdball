@@ -113,6 +113,32 @@ export interface AuthConfig {
   google: boolean;
   dev_login: boolean;
   guest: boolean;
+  seats_used: number;
+  seats_total: number;
+  seats_free: number;
+}
+
+/** One access request or piece of feedback, in the admin inbox. */
+export interface InboxItem {
+  id: number;
+  kind: string;
+  title: string;
+  email: string;
+  name: string;
+  body: string;
+  from_guest: boolean;
+  status: string;
+  created_at: string;
+  handled_by: string;
+}
+
+export interface Inbox {
+  items: InboxItem[];
+  unread: number;
+  has_unread: boolean;
+  seats_used: number;
+  seats_total: number;
+  email_configured: boolean;
 }
 
 export type Theme = "legacy" | "dark" | "light";

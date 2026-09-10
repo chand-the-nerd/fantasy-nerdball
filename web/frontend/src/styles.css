@@ -3417,3 +3417,109 @@ tr.is-clickable:focus-visible {
 .metric-capacity h4 {
   margin-top: 0;
 }
+
+/* ── Access requests and feedback ────────────────────────────────────────
+   The sign-in page says how full the league is before it asks anyone to
+   wait for a seat, and the inbox is a list rather than a table because
+   the messages vary in length. */
+
+.seats {
+  margin: 14px 0 4px;
+  font-size: 13.5px;
+  color: var(--fade);
+}
+
+.seats strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.request-link {
+  display: block;
+  margin-top: 10px;
+}
+
+.request-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-align: left;
+}
+
+.request-panel label {
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.request-panel .hint {
+  margin: 0;
+}
+
+.request-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.inbox {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.inbox-item {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
+}
+
+.inbox-item.done {
+  opacity: 0.55;
+}
+
+.inbox-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inbox-body {
+  margin: 8px 0;
+  white-space: pre-wrap;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.inbox-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.inbox-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tabs.small .badge {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: var(--floodlight);
+  color: var(--pitch, #10231a);
+}

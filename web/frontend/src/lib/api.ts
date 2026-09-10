@@ -1,6 +1,7 @@
 import type {
   AdminMetrics,
   AuthConfig,
+  Inbox,
   GameweekInfo,
   PlayerPool,
   Reference,
@@ -149,6 +150,27 @@ export const api = {
     request<{ admin: boolean; email: string; owner_email: string }>(
       "/api/admin/status",
     ),
+  requestAccess: (body: { email: string; name?: string; note?: string }) =>
+    request<{ ok: boolean; message: string }>("/api/access-request", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  sendFeedback: (kind: string, body: string) =>
+    request<{ ok: boolean; message: string }>("/api/feedback", {
+      method: "POST",
+      body: JSON.stringify({ kind, body }),
+    }),
+  adminInbox: (includeDone = false) =>
+    request<Inbox>(`/api/admin/inbox?include_done=${includeDone}`),
+  adminApprove: (id: number) =>
+    request<{ ok: boolean; email: string }>(
+      `/api/admin/inbox/${id}/approve`,
+      { method: "POST" },
+    ),
+  adminInboxDone: (id: number) =>
+    request<{ ok: boolean }>(`/api/admin/inbox/${id}/done`, {
+      method: "POST",
+    }),
   adminMetrics: (window: string) =>
     request<AdminMetrics>(
       `/api/admin/metrics?window=${encodeURIComponent(window)}`,
