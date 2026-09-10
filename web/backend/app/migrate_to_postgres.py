@@ -80,6 +80,60 @@ def normalise(url: str) -> str:
     return url
 
 
+def drop_orphans(
+    table, rows: list[dict], copied: dict[str, set]
+) -> tuple[list[dict], int]:
+    """Leave behind rows whose parent no longer exists.
+
+    SQLite does not enforce foreign keys unless the pragma is switched
+    on, and the app never switched it on, so a database that has been
+    running a while accumulates children of deleted parents — results
+    belonging to a manager who was removed, most often. Postgres does
+    enforce them and refuses the whole batch.
+
+    Those rows are unreachable already: nothing can load them, because
+    the account they hang off is gone. Dropping them is what makes the
+    copy possible, and the count is reported rather than swallowed so
+    nobody has to wonder where they went.
+    """
+    constraints = [
+        (
+            list(fk.constraint.columns)[0].name,
+            fk.column.table.name,
+            fk.column.name,
+        )
+        for fk in table.foreign_keys
+    ]
+    if not constraints:
+        return rows, 0
+
+    kept = []
+    dropped = 0
+    for row in rows:
+        ok = True
+        for column, parent_table, parent_column in constraints:
+            value = row.get(column)
+            if value is None:
+                # A nullable foreign key with nothing in it is fine.
+                continue
+            known = copied.get(parent_table)
+            if known is None:
+                # Parent table wasn't copied (empty, or keyed on
+                # something other than id). Nothing to check against.
+                continue
+            if parent_column != "id":
+                continue
+            if value not in known:
+                ok = False
+                break
+        if ok:
+            kept.append(row)
+        else:
+            dropped += 1
+
+    return kept, dropped
+
+
 def main() -> int:
     args = parse_args()
 
@@ -118,6 +172,11 @@ def main() -> int:
         return 1
 
     total = 0
+    orphans = 0
+    # Primary keys copied so far, per table, so a child row can be
+    # checked against its parent before Postgres is asked to take it.
+    copied: dict[str, set] = {}
+
     with Session(source) as reader, Session(target) as writer:
         for table in TABLES:
             # A table the old database never had is not an error: it was
@@ -131,13 +190,22 @@ def main() -> int:
                 print(f"  {table.name}: skipped ({type(error).__name__})")
                 continue
 
+            rows, dropped = drop_orphans(table, rows, copied)
+            orphans += dropped
+
+            if "id" in table.columns:
+                copied[table.name] = {
+                    row["id"] for row in rows if row.get("id") is not None
+                }
+
             if not rows:
                 print(f"  {table.name}: empty")
                 continue
 
+            note = f" ({dropped} orphaned, skipped)" if dropped else ""
             # Columns the old file doesn't have (anything added since)
             # simply aren't in the dicts, so they take their defaults.
-            print(f"  {table.name}: {len(rows)} row(s)")
+            print(f"  {table.name}: {len(rows)} row(s){note}")
             total += len(rows)
 
             if args.dry_run:
@@ -147,6 +215,13 @@ def main() -> int:
 
         if not args.dry_run:
             writer.commit()
+
+    if orphans:
+        print(
+            f"\n{orphans} row(s) had no matching parent and were left "
+            "behind. They belong to accounts that no longer exist, so "
+            "nothing could reach them anyway."
+        )
 
     if args.dry_run:
         print(f"\nWould copy {total} row(s). Nothing was written.")
